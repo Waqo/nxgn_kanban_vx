@@ -1,0 +1,181 @@
+import React from 'react';
+import WorkRequirementBars from './WorkRequirementBars.js';
+import EventsSection from './EventsSection.js';
+import NotesSection from './NotesSection.js';
+import IssuesSection from './IssuesSection.js';
+import SalesRepInfo from './SalesRepInfo.js';
+import CommSection from './CommSection.js';
+
+const OverviewTab = ({ 
+    project, 
+    onEventAdded, 
+    noteInput, 
+    setNoteInput, 
+    handleAddNote, 
+    handleReply,
+    replyingTo,
+    notifySales,
+    setNotifySales,
+    replyInput,
+    setReplyInput,
+    handleAddReply,
+    expandedNotes,
+    setExpandedNotes,
+    handleExpandNote,
+    handleResolveIssue,
+    selectedUsers,
+    setSelectedUsers,
+    users,
+    showUserDropdown,
+    setShowUserDropdown,
+    showAllNotes,
+    setShowAllNotes,
+    showAllReplies,
+    setShowAllReplies,
+    handleRaiseIssue,
+    setActiveTab,
+    currentUser
+}) => {
+    return React.createElement('div',
+        { className: "flex flex-col h-full w-full" },
+        [
+            // Top section with Events and Sidebar
+            React.createElement('div',
+                { className: "flex space-x-6 bg-blue-50 p-6 w-full" },
+                [
+                    // Main content (left side)
+                    React.createElement('div',
+                        { className: "flex-1 space-y-8" },
+                        [
+                            // Events Section
+                            React.createElement(EventsSection, { 
+                                events: project?.events,
+                                project: project,
+                                projectId: project?.id,
+                                onEventAdded: onEventAdded
+                            }),
+
+                            // Latest Activity Preview (new)
+                            project?.activities && project?.activities.length > 0 && React.createElement('div',
+                                { className: "bg-white rounded-lg shadow-sm p-4" },
+                                [
+                                    // Header with View All button
+                                    React.createElement('div',
+                                        { className: "flex justify-between items-center mb-3" },
+                                        [
+                                            React.createElement('h3',
+                                                { className: "text-sm font-medium text-gray-500" },
+                                                "Latest Activity"
+                                            ),
+                                            React.createElement('button',
+                                                { 
+                                                    className: "text-sm text-blue-600 hover:text-blue-700",
+                                                    onClick: () => setActiveTab('activity')
+                                                },
+                                                "View All"
+                                            )
+                                        ]
+                                    ),
+                                    // Latest activity content
+                                    React.createElement('div',
+                                        { className: "flex items-start gap-3 text-sm text-gray-600" },
+                                        [
+                                            React.createElement('i', 
+                                                { className: "fas fa-history mt-1 text-gray-400" }
+                                            ),
+                                            React.createElement('div',
+                                                { className: "flex-1" },
+                                                [
+                                                    React.createElement('p',
+                                                        { className: "font-medium" },
+                                                        project?.activities[0]?.Activity
+                                                    ),
+                                                    React.createElement('p',
+                                                        { className: "text-xs text-gray-500 mt-1" },
+                                                        `${project?.activities[0]?.Author} • ${formatDate(project?.activities[0]?.Added_Time)}`
+                                                    )
+                                                ]
+                                            )
+                                        ]
+                                    )
+                                ]
+                            )
+                        ]
+                    ),
+
+                    // Right sidebar
+                    React.createElement('div',
+                        { className: "w-80 flex-shrink-0 space-y-6" },
+                        [
+                            // Sales Rep Info
+                            React.createElement(SalesRepInfo, {
+                                salesRep: project?.salesRep
+                            }),
+
+                            // Work Requirements
+                            React.createElement(WorkRequirementBars, {
+                                project: project
+                            }),
+
+                            // Issues Section
+                            React.createElement(IssuesSection, {
+                                issues: project?.issues,
+                                onResolveIssue: handleResolveIssue,
+                                onRaiseIssue: handleRaiseIssue
+                            }),
+
+                            // Comm Section
+                            React.createElement(CommSection, {
+                                communications: project?.communications,
+                                setActiveTab: setActiveTab
+                            })
+                        ]
+                    )
+                ]
+            ),
+
+            // Bottom section container (similar to top section)
+            React.createElement('div',
+                { className: "flex space-x-6 bg-blue-50 p-6 w-full" },
+                [
+                    // Main content container for Notes
+                    React.createElement('div',
+                        { className: "flex-1" },
+                        React.createElement(NotesSection, {
+                            project,
+                            noteInput,
+                            setNoteInput,
+                            notifySales,
+                            setNotifySales,
+                            selectedUsers,
+                            setSelectedUsers,
+                            users,
+                            handleAddNote,
+                            replyingTo,
+                            replyInput,
+                            setReplyInput,
+                            handleReply,
+                            handleAddReply,
+                            showAllNotes,
+                            setShowAllNotes,
+                            showAllReplies,
+                            setShowAllReplies,
+                            currentUser
+                        })
+                    )
+                ]
+            )
+        ]
+    );
+};
+
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString('en-US', { 
+        month: '2-digit', 
+        day: '2-digit', 
+        year: '2-digit' 
+    });
+};
+
+export default OverviewTab;

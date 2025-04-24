@@ -1,0 +1,625 @@
+import React from 'react';
+import { updateRecord } from '../utils/recordUpdates.js';
+import { useToast } from '../contexts/ToastContext.js';
+
+const formatCurrency = (amount) => {
+    if (!amount) return '$0.00';
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(amount);
+};
+
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return `${(date.getMonth() + 1).toString().padStart(2, '0')}/${
+        date.getDate().toString().padStart(2, '0')}/${
+        date.getFullYear()}`;
+};
+
+const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return `${date.getFullYear()}-${
+        (date.getMonth() + 1).toString().padStart(2, '0')}-${
+        date.getDate().toString().padStart(2, '0')}`;
+};
+
+const calculateProjectedPayment = (projectCost, percentage) => {
+    if (!projectCost) return 0;
+    return (parseFloat(projectCost) * (percentage / 100));
+};
+
+const MilestonesInvestorsTab = ({ project, fetchModalData, isPPAEnabled }) => {
+    const { showToast } = useToast();
+    const [isEditingPayments, setIsEditingPayments] = React.useState(false);
+    const [isSaving, setIsSaving] = React.useState(false);
+    const [milestoneData, setMilestoneData] = React.useState({
+        m1: {
+            payment: project.investorM1Payment || '',
+            date: project.investorM1Date || ''
+        },
+        m2: {
+            payment: project.investorM2Payment || '',
+            date: project.investorM2Date || ''
+        },
+        m3: {
+            payment: project.investorM3Payment || '',
+            date: project.investorM3Date || ''
+        }
+    });
+
+    const handleMilestoneSave = async () => {
+        try {
+            setIsSaving(true);
+            showToast("Updating milestone payments...", "loading");
+
+            await updateRecord(
+                "PM_Kanban_Projects",
+                project.id,
+                {
+                    data: {
+                        Investor_M1_Payment: milestoneData.m1.payment,
+                        Investor_M1_Date: milestoneData.m1.date,
+                        Investor_M2_Payment: milestoneData.m2.payment,
+                        Investor_M2_Date: milestoneData.m2.date,
+                        Investor_M3_Payment: milestoneData.m3.payment,
+                        Investor_M3_Date: milestoneData.m3.date
+                    }
+                }
+            );
+
+            if (typeof fetchModalData === 'function') {
+                await fetchModalData(project.id);
+            }
+            
+            setIsEditingPayments(false);
+            showToast("Milestone payments updated successfully", "success");
+        } catch (error) {
+            console.error("Error updating milestone payments:", error);
+            showToast("Failed to update milestone payments", "error");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleMilestoneChange = (milestone, field, value) => {
+        setMilestoneData(prev => ({
+            ...prev,
+            [milestone]: {
+                ...prev[milestone],
+                [field]: value
+            }
+        }));
+    };
+
+    return React.createElement('div',
+        { className: "p-6 border-t border-gray-200" },
+        [
+            // Header with Edit Button
+            React.createElement('div',
+                { className: "flex justify-between items-center mb-4" },
+                [
+                    React.createElement('h4',
+                        { className: "text-sm font-medium text-gray-900" },
+                        "Milestone Payments"
+                    ),
+                    React.createElement('button',
+                        {
+                            className: `px-4 py-2 rounded-lg text-sm font-medium ${
+                                isEditingPayments 
+                                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            } ${!isPPAEnabled ? 'opacity-50 cursor-not-allowed' : ''}`,
+                            onClick: () => isEditingPayments ? handleMilestoneSave() : setIsEditingPayments(true),
+                            disabled: isSaving || !isPPAEnabled
+                        },
+                        isEditingPayments ? (isSaving ? "Saving..." : "Save Changes") : "Edit Payments"
+                    )
+                ]
+            ),
+
+            // Milestone Cards
+            React.createElement('div',
+                { className: "space-y-4" },
+                [
+                    // M1 Payment Card
+                    React.createElement('div',
+                        { className: "bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm" },
+                        [
+                            React.createElement('div',
+                                { className: "px-4 py-3 bg-gray-50 border-b border-gray-200" },
+                                React.createElement('div',
+                                    { className: "flex justify-between items-center" },
+                                    [
+                                        React.createElement('h4',
+                                            { className: "font-medium text-gray-800" },
+                                            "M1 Payment"
+                                        ),
+                                        React.createElement('span',
+                                            { className: "text-xs bg-blue-100 text-blue-800 font-medium px-2.5 py-0.5 rounded" },
+                                            "50%"
+                                        )
+                                    ]
+                                )
+                            ),
+                            React.createElement('div',
+                                { className: "p-4" },
+                                React.createElement('div',
+                                    { className: "flex justify-between items-center" },
+                                    [
+                                        React.createElement('div',
+                                            null,
+                                            isEditingPayments
+                                                ? React.createElement('div',
+                                                    { className: "mb-2" },
+                                                    [
+                                                        React.createElement('label',
+                                                            { className: "block text-xs text-gray-500 mb-1" },
+                                                            "Payment Date"
+                                                        ),
+                                                        React.createElement('input',
+                                                            {
+                                                                type: "date",
+                                                                className: `border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-blue-500 focus:border-blue-500
+                                                                    ${!isPPAEnabled ? 'bg-gray-50 cursor-not-allowed' : ''}`,
+                                                                value: formatDateForInput(milestoneData.m1.date),
+                                                                disabled: !isPPAEnabled,
+                                                                onChange: (e) => {
+                                                                    const date = e.target.value;
+                                                                    if (date) {
+                                                                        const [year, month, day] = date.split('-');
+                                                                        const formattedDate = `${month}/${day}/${year}`;
+                                                                        handleMilestoneChange('m1', 'date', formattedDate);
+                                                                    } else {
+                                                                        handleMilestoneChange('m1', 'date', '');
+                                                                    }
+                                                                }
+                                                            }
+                                                        )
+                                                    ]
+                                                )
+                                                : milestoneData.m1.date && React.createElement('div',
+                                                    null,
+                                                    [
+                                                        React.createElement('span',
+                                                            { className: "text-xs text-gray-500" },
+                                                            "Payment Date"
+                                                        ),
+                                                        React.createElement('p',
+                                                            { className: "text-sm font-medium" },
+                                                            formatDate(milestoneData.m1.date)
+                                                        )
+                                                    ]
+                                                )
+                                        ),
+                                        React.createElement('div',
+                                            { className: "text-right" },
+                                            [
+                                                isEditingPayments
+                                                    ? React.createElement('div',
+                                                        null,
+                                                        [
+                                                            React.createElement('label',
+                                                                { className: "block text-xs text-gray-500 mb-1" },
+                                                                "Amount"
+                                                            ),
+                                                            React.createElement('input',
+                                                                {
+                                                                    type: "number",
+                                                                    className: `border border-gray-300 rounded px-3 py-1.5 text-sm text-right w-32 focus:ring-blue-500 focus:border-blue-500
+                                                                        ${!isPPAEnabled ? 'bg-gray-50 cursor-not-allowed' : ''}`,
+                                                                    value: milestoneData.m1.payment,
+                                                                    disabled: !isPPAEnabled,
+                                                                    onChange: (e) => handleMilestoneChange('m1', 'payment', e.target.value)
+                                                                }
+                                                            )
+                                                        ]
+                                                    )
+                                                    : React.createElement('div',
+                                                        null,
+                                                        [
+                                                            React.createElement('span',
+                                                                { className: "text-xs text-gray-500" },
+                                                                "Amount"
+                                                            ),
+                                                            React.createElement('p',
+                                                                { className: "text-lg font-semibold" },
+                                                                formatCurrency(milestoneData.m1.payment)
+                                                            )
+                                                        ]
+                                                    ),
+                                                React.createElement('p',
+                                                    { className: "text-xs text-gray-500 mt-1" },
+                                                    `Projected: ${formatCurrency(calculateProjectedPayment(project.projectCost, 50))}`
+                                                )
+                                            ]
+                                        )
+                                    ]
+                                )
+                            )
+                        ]
+                    ),
+
+                    // M2 Payment Card
+                    React.createElement('div',
+                        { className: "bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm" },
+                        [
+                            React.createElement('div',
+                                { className: "px-4 py-3 bg-gray-50 border-b border-gray-200" },
+                                React.createElement('div',
+                                    { className: "flex justify-between items-center" },
+                                    [
+                                        React.createElement('h4',
+                                            { className: "font-medium text-gray-800" },
+                                            "M2 Payment"
+                                        ),
+                                        React.createElement('span',
+                                            { className: "text-xs bg-blue-100 text-blue-800 font-medium px-2.5 py-0.5 rounded" },
+                                            "40%"
+                                        )
+                                    ]
+                                )
+                            ),
+                            React.createElement('div',
+                                { className: "p-4" },
+                                React.createElement('div',
+                                    { className: "flex justify-between items-center" },
+                                    [
+                                        React.createElement('div',
+                                            null,
+                                            isEditingPayments
+                                                ? React.createElement('div',
+                                                    { className: "mb-2" },
+                                                    [
+                                                        React.createElement('label',
+                                                            { className: "block text-xs text-gray-500 mb-1" },
+                                                            "Payment Date"
+                                                        ),
+                                                        React.createElement('input',
+                                                            {
+                                                                type: "date",
+                                                                className: `border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-blue-500 focus:border-blue-500
+                                                                    ${!isPPAEnabled ? 'bg-gray-50 cursor-not-allowed' : ''}`,
+                                                                value: formatDateForInput(milestoneData.m2.date),
+                                                                disabled: !isPPAEnabled,
+                                                                onChange: (e) => {
+                                                                    const date = e.target.value;
+                                                                    if (date) {
+                                                                        const [year, month, day] = date.split('-');
+                                                                        const formattedDate = `${month}/${day}/${year}`;
+                                                                        handleMilestoneChange('m2', 'date', formattedDate);
+                                                                    } else {
+                                                                        handleMilestoneChange('m2', 'date', '');
+                                                                    }
+                                                                }
+                                                            }
+                                                        )
+                                                    ]
+                                                )
+                                                : milestoneData.m2.date && React.createElement('div',
+                                                    null,
+                                                    [
+                                                        React.createElement('span',
+                                                            { className: "text-xs text-gray-500" },
+                                                            "Payment Date"
+                                                        ),
+                                                        React.createElement('p',
+                                                            { className: "text-sm font-medium" },
+                                                            formatDate(milestoneData.m2.date)
+                                                        )
+                                                    ]
+                                                )
+                                        ),
+                                        React.createElement('div',
+                                            { className: "text-right" },
+                                            [
+                                                isEditingPayments
+                                                    ? React.createElement('div',
+                                                        null,
+                                                        [
+                                                            React.createElement('label',
+                                                                { className: "block text-xs text-gray-500 mb-1" },
+                                                                "Amount"
+                                                            ),
+                                                            React.createElement('input',
+                                                                {
+                                                                    type: "number",
+                                                                    className: `border border-gray-300 rounded px-3 py-1.5 text-sm text-right w-32 focus:ring-blue-500 focus:border-blue-500
+                                                                        ${!isPPAEnabled ? 'bg-gray-50 cursor-not-allowed' : ''}`,
+                                                                    value: milestoneData.m2.payment,
+                                                                    disabled: !isPPAEnabled,
+                                                                    onChange: (e) => handleMilestoneChange('m2', 'payment', e.target.value)
+                                                                }
+                                                            )
+                                                        ]
+                                                    )
+                                                    : React.createElement('div',
+                                                        null,
+                                                        [
+                                                            React.createElement('span',
+                                                                { className: "text-xs text-gray-500" },
+                                                                "Amount"
+                                                            ),
+                                                            React.createElement('p',
+                                                                { className: "text-lg font-semibold" },
+                                                                formatCurrency(milestoneData.m2.payment)
+                                                            )
+                                                        ]
+                                                    ),
+                                                React.createElement('p',
+                                                    { className: "text-xs text-gray-500 mt-1" },
+                                                    `Projected: ${formatCurrency(calculateProjectedPayment(project.projectCost, 40))}`
+                                                )
+                                            ]
+                                        )
+                                    ]
+                                )
+                            )
+                        ]
+                    ),
+
+                    // M3 Payment Card
+                    React.createElement('div',
+                        { className: "bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm" },
+                        [
+                            React.createElement('div',
+                                { className: "px-4 py-3 bg-gray-50 border-b border-gray-200" },
+                                React.createElement('div',
+                                    { className: "flex justify-between items-center" },
+                                    [
+                                        React.createElement('h4',
+                                            { className: "font-medium text-gray-800" },
+                                            "M3 Payment"
+                                        ),
+                                        React.createElement('span',
+                                            { className: "text-xs bg-blue-100 text-blue-800 font-medium px-2.5 py-0.5 rounded" },
+                                            "10%"
+                                        )
+                                    ]
+                                )
+                            ),
+                            React.createElement('div',
+                                { className: "p-4" },
+                                React.createElement('div',
+                                    { className: "flex justify-between items-center" },
+                                    [
+                                        React.createElement('div',
+                                            null,
+                                            isEditingPayments
+                                                ? React.createElement('div',
+                                                    { className: "mb-2" },
+                                                    [
+                                                        React.createElement('label',
+                                                            { className: "block text-xs text-gray-500 mb-1" },
+                                                            "Payment Date"
+                                                        ),
+                                                        React.createElement('input',
+                                                            {
+                                                                type: "date",
+                                                                className: `border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-blue-500 focus:border-blue-500
+                                                                    ${!isPPAEnabled ? 'bg-gray-50 cursor-not-allowed' : ''}`,
+                                                                value: formatDateForInput(milestoneData.m3.date),
+                                                                disabled: !isPPAEnabled,
+                                                                onChange: (e) => {
+                                                                    const date = e.target.value;
+                                                                    if (date) {
+                                                                        const [year, month, day] = date.split('-');
+                                                                        const formattedDate = `${month}/${day}/${year}`;
+                                                                        handleMilestoneChange('m3', 'date', formattedDate);
+                                                                    } else {
+                                                                        handleMilestoneChange('m3', 'date', '');
+                                                                    }
+                                                                }
+                                                            }
+                                                        )
+                                                    ]
+                                                )
+                                                : milestoneData.m3.date && React.createElement('div',
+                                                    null,
+                                                    [
+                                                        React.createElement('span',
+                                                            { className: "text-xs text-gray-500" },
+                                                            "Payment Date"
+                                                        ),
+                                                        React.createElement('p',
+                                                            { className: "text-sm font-medium" },
+                                                            formatDate(milestoneData.m3.date)
+                                                        )
+                                                    ]
+                                                )
+                                        ),
+                                        React.createElement('div',
+                                            { className: "text-right" },
+                                            [
+                                                isEditingPayments
+                                                    ? React.createElement('div',
+                                                        null,
+                                                        [
+                                                            React.createElement('label',
+                                                                { className: "block text-xs text-gray-500 mb-1" },
+                                                                "Amount"
+                                                            ),
+                                                            React.createElement('input',
+                                                                {
+                                                                    type: "number",
+                                                                    className: `border border-gray-300 rounded px-3 py-1.5 text-sm text-right w-32 focus:ring-blue-500 focus:border-blue-500
+                                                                        ${!isPPAEnabled ? 'bg-gray-50 cursor-not-allowed' : ''}`,
+                                                                    value: milestoneData.m3.payment,
+                                                                    disabled: !isPPAEnabled,
+                                                                    onChange: (e) => handleMilestoneChange('m3', 'payment', e.target.value)
+                                                                }
+                                                            )
+                                                        ]
+                                                    )
+                                                    : React.createElement('div',
+                                                        null,
+                                                        [
+                                                            React.createElement('span',
+                                                                { className: "text-xs text-gray-500" },
+                                                                "Amount"
+                                                            ),
+                                                            React.createElement('p',
+                                                                { className: "text-lg font-semibold" },
+                                                                formatCurrency(milestoneData.m3.payment)
+                                                            )
+                                                        ]
+                                                    ),
+                                                React.createElement('p',
+                                                    { className: "text-xs text-gray-500 mt-1" },
+                                                    `Projected: ${formatCurrency(calculateProjectedPayment(project.projectCost, 10))}`
+                                                )
+                                            ]
+                                        )
+                                    ]
+                                )
+                            )
+                        ]
+                    ),
+
+                    // Payment Summary
+                    React.createElement('div',
+                        { className: "bg-gray-50 border border-gray-200 rounded-lg p-4 mt-6" },
+                        [
+                            React.createElement('div',
+                                { className: "flex justify-between items-center" },
+                                [
+                                    React.createElement('h4',
+                                        { className: "font-medium text-gray-800" },
+                                        "Total Payments"
+                                    ),
+                                    React.createElement('div',
+                                        { className: "text-right" },
+                                        [
+                                            React.createElement('p',
+                                                { className: "text-xl font-bold text-blue-700" },
+                                                formatCurrency(
+                                                    (parseFloat(milestoneData.m1.payment) || 0) +
+                                                    (parseFloat(milestoneData.m2.payment) || 0) +
+                                                    (parseFloat(milestoneData.m3.payment) || 0)
+                                                )
+                                            ),
+                                            React.createElement('p',
+                                                { className: "text-xs text-gray-500" },
+                                                `Project Cost: ${formatCurrency(project.projectCost)}`
+                                            )
+                                        ]
+                                    )
+                                ]
+                            ),
+
+                            // Progress Bar
+                            React.createElement('div',
+                                { className: "mt-4" },
+                                [
+                                    React.createElement('div',
+                                        { className: "h-2 bg-gray-200 rounded-full overflow-hidden" },
+                                        React.createElement('div',
+                                            {
+                                                className: "h-full bg-blue-500 transition-all duration-300",
+                                                style: {
+                                                    width: `${Math.min(
+                                                        ((parseFloat(milestoneData.m1.payment) || 0) +
+                                                        (parseFloat(milestoneData.m2.payment) || 0) +
+                                                        (parseFloat(milestoneData.m3.payment) || 0)) /
+                                                        (parseFloat(project.projectCost) || 1) * 100,
+                                                        100
+                                                    )}%`
+                                                }
+                                            }
+                                        )
+                                    ),
+                                    React.createElement('div',
+                                        { className: "flex justify-between mt-1" },
+                                        [
+                                            React.createElement('span',
+                                                { className: "text-xs text-gray-500" },
+                                                "0%"
+                                            ),
+                                            React.createElement('span',
+                                                { className: "text-xs text-gray-500" },
+                                                "100%"
+                                            )
+                                        ]
+                                    )
+                                ]
+                            ),
+
+                            // Payment Status Summary Cards
+                            React.createElement('div',
+                                { className: "grid grid-cols-3 gap-4 mt-4" },
+                                [
+                                    // Paid Amount
+                                    React.createElement('div',
+                                        { className: "bg-white p-3 rounded-lg border border-gray-200" },
+                                        [
+                                            React.createElement('span',
+                                                { className: "text-xs text-gray-500 block" },
+                                                "Total Paid"
+                                            ),
+                                            React.createElement('span',
+                                                { className: "text-lg font-semibold text-green-600" },
+                                                formatCurrency(
+                                                    (parseFloat(milestoneData.m1.payment) || 0) +
+                                                    (parseFloat(milestoneData.m2.payment) || 0) +
+                                                    (parseFloat(milestoneData.m3.payment) || 0)
+                                                )
+                                            )
+                                        ]
+                                    ),
+                                    // Remaining Amount
+                                    React.createElement('div',
+                                        { className: "bg-white p-3 rounded-lg border border-gray-200" },
+                                        [
+                                            React.createElement('span',
+                                                { className: "text-xs text-gray-500 block" },
+                                                "Remaining"
+                                            ),
+                                            React.createElement('span',
+                                                { className: "text-lg font-semibold text-gray-900" },
+                                                formatCurrency(
+                                                    Math.max(
+                                                        (parseFloat(project.projectCost) || 0) -
+                                                        ((parseFloat(milestoneData.m1.payment) || 0) +
+                                                        (parseFloat(milestoneData.m2.payment) || 0) +
+                                                        (parseFloat(milestoneData.m3.payment) || 0)),
+                                                        0
+                                                    )
+                                                )
+                                            )
+                                        ]
+                                    ),
+                                    // Progress Percentage
+                                    React.createElement('div',
+                                        { className: "bg-white p-3 rounded-lg border border-gray-200" },
+                                        [
+                                            React.createElement('span',
+                                                { className: "text-xs text-gray-500 block" },
+                                                "Progress"
+                                            ),
+                                            React.createElement('span',
+                                                { className: "text-lg font-semibold text-blue-600" },
+                                                `${Math.min(
+                                                    Math.round(
+                                                        ((parseFloat(milestoneData.m1.payment) || 0) +
+                                                        (parseFloat(milestoneData.m2.payment) || 0) +
+                                                        (parseFloat(milestoneData.m3.payment) || 0)) /
+                                                        (parseFloat(project.projectCost) || 1) * 100
+                                                    ),
+                                                    100
+                                                )}%`
+                                            )
+                                        ]
+                                    )
+                                ]
+                            )
+                        ]
+                    )
+                ]
+            )
+        ]
+    );
+};
+
+export default MilestonesInvestorsTab; 

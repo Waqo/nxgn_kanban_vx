@@ -1,0 +1,585 @@
+/* global React */
+import React, { useState } from 'react';
+import { Phone, ChevronDown, ChevronUp, PhoneIncoming, PhoneOutgoing, Send, MessageSquare, Mail } from 'lucide-react';
+import CommItem from './CommItem.js';
+import { useToast } from '../contexts/ToastContext.js';
+import EmailTemplatesSection from './EmailTemplatesSection.js';
+
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    
+    // Handle dates that come in as "MM/DD/YY 00:00:00" format
+    if (dateString.includes('00:00:00')) {
+        const [datePart, _] = dateString.split(' ');
+        return datePart;
+    }
+
+    // For full timestamps, format them properly
+    return new Date(dateString).toLocaleString('en-US', { 
+        month: '2-digit', 
+        day: '2-digit', 
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+};
+
+const CommunicationTab = ({ communications: initialCommunications, project, currentUser, fetchModalData }) => {
+    const { showToast } = useToast();
+    const [expandedCalls, setExpandedCalls] = useState(new Set());
+    const [newMessage, setNewMessage] = useState('');
+    const [isSending, setIsSending] = useState(false);
+    const [communications, setCommunications] = useState(initialCommunications);
+    const [activeFilters, setActiveFilters] = useState(new Set(['SMS', 'Call', 'Email']));
+    const [showAllItems, setShowAllItems] = useState(false);
+
+    // Update local communications when prop changes
+    React.useEffect(() => {
+        setCommunications(initialCommunications);
+    }, [initialCommunications]);
+
+    // Add logging for debugging
+    React.useEffect(() => {
+        console.log('CommunicationTab currentUser:', currentUser);
+        console.log('CommunicationTab project:', project);
+    }, [currentUser, project]);
+
+    // Modify the sortedCommunications memo to include pagination and correct sorting
+    const sortedCommunications = React.useMemo(() => {
+        if (!communications) return [];
+        const filtered = [...communications]
+            .filter(comm => activeFilters.has(comm.Communication_Type))
+            .sort((a, b) => new Date(a.Added_Time) - new Date(b.Added_Time)); // Oldest at top, newest at bottom
+        
+        return showAllItems ? filtered : filtered.slice(-4); // Show only last 4 items
+    }, [communications, activeFilters, showAllItems]);
+
+    const refreshCommunications = async () => {
+        try {
+            const response = await ZOHO.CREATOR.DATA.getRecords({
+                app_name: "nexgen-portal",
+                report_name: "PM_Kanban_Communication",
+                criteria: `(Project == ${project.id})`
+            });
+            
+            if (response.code === 3000) {
+                const updatedComms = response.data.map(communication => ({
+                    ID: communication.ID,
+                    Communication_Type: communication.Communication_Type || '',
+                    Call_Type: communication.Call_Type || '',
+                    Call_Type1: communication.Call_Type1 || '',
+                    Subject: communication.Subject_field || '',
+                    Description: communication.Description || '',
+                    Call_Start_Time: communication.Call_Start_Time || '',
+                    Call_Duration: communication.Call_Duration || '',
+                    Agent_Email: communication.Agent_Email || '',
+                    User: communication.User?.display_value || '',
+                    Contact: communication.Contact?.display_value || '',
+                    SMS_Type: communication.SMS_Type || '',
+                    SMS_Delivery_Status: communication.SMS_Delivery_Status || '',
+                    SMS_Sent_Time: communication.SMS_Sent_Time || '',
+                    SMS_Content: communication.SMS_Content || '',
+                    Email_Type: communication.Email_Type || '',
+                    Email_Subject: communication.Email_Subject || '',
+                    Email_Sent_Time: communication.Email_Sent_Time || '',
+                    Email_To: communication.Email_To || '',
+                    Added_Time: communication.Added_Time || ''
+                }));
+
+                // Update local state with new communications
+                setCommunications(updatedComms);
+            }
+        } catch (error) {
+            console.error('Failed to refresh communications:', error);
+            showToast('Failed to refresh communications', 'error');
+        }
+    };
+
+    const handleSendMessage = async () => {
+        if (!newMessage.trim() || isSending) return;
+        
+        if (!currentUser?.id) {
+            console.error('No current user found');
+            showToast('Unable to send message: User not found', 'error');
+            return;
+        }
+
+        if (!project?.id || !project.contactID) {
+            console.error('Missing project or contact information');
+            showToast('Unable to send message: Missing project information', 'error');
+            return;
+        }
+
+        setIsSending(true);
+
+        const messageData = {
+            data: {
+                Project: project.id,
+                Communication_Type: "SMS",
+                User: currentUser.id,
+                Contact: project.contactID,
+                SMS_Type: "OUTGOING",
+                SMS_Content: newMessage.trim()
+            }
+        };
+
+        console.log('Message send config:', {
+            app_name: "nexgen-portal",
+            form_name: "Add_Communication",
+            payload: messageData
+        });
+
+        try {
+            const response = await ZOHO.CREATOR.DATA.addRecords({
+                app_name: "nexgen-portal",
+                form_name: "Add_Communication",
+                payload: messageData
+            });
+
+            console.log('Message send response:', response);
+
+            if (response.code === 3000) {
+                setNewMessage('');
+                // Refresh communications after successful send
+                await refreshCommunications();
+                showToast('Message sent successfully', 'success');
+            } else {
+                showToast('Failed to send message', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to send message:', error);
+            showToast('Failed to send message', 'error');
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    const toggleCallExpansion = (callId) => {
+        setExpandedCalls(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(callId)) {
+                newSet.delete(callId);
+            } else {
+                newSet.add(callId);
+            }
+            return newSet;
+        });
+    };
+
+    const toggleFilter = (type) => {
+        setActiveFilters(prev => {
+            const newFilters = new Set(prev);
+            if (newFilters.has(type)) {
+                newFilters.delete(type);
+            } else {
+                newFilters.add(type);
+            }
+            // Ensure at least one filter is always active
+            if (newFilters.size === 0) {
+                newFilters.add(type);
+            }
+            return newFilters;
+        });
+    };
+
+    const renderFilterGroup = () => {
+        return React.createElement('div',
+            { className: "flex items-center gap-2 px-6 py-3 bg-gray-50 border-b" },
+            [
+                React.createElement('span',
+                    { className: "text-sm text-gray-500 mr-2" },
+                    "Filter:"
+                ),
+                // SMS Filter
+                React.createElement('button',
+                    {
+                        onClick: () => toggleFilter('SMS'),
+                        className: `px-3 py-1.5 rounded-full text-sm flex items-center gap-2 
+                            ${activeFilters.has('SMS') 
+                                ? 'bg-blue-100 text-blue-700' 
+                                : 'bg-gray-100 text-gray-500'}`
+                    },
+                    [
+                        React.createElement(MessageSquare, { size: 14 }),
+                        "SMS"
+                    ]
+                ),
+                // Call Filter
+                React.createElement('button',
+                    {
+                        onClick: () => toggleFilter('Call'),
+                        className: `px-3 py-1.5 rounded-full text-sm flex items-center gap-2 
+                            ${activeFilters.has('Call') 
+                                ? 'bg-blue-100 text-blue-700' 
+                                : 'bg-gray-100 text-gray-500'}`
+                    },
+                    [
+                        React.createElement(Phone, { size: 14 }),
+                        "Calls"
+                    ]
+                ),
+                // Email Filter
+                React.createElement('button',
+                    {
+                        onClick: () => toggleFilter('Email'),
+                        className: `px-3 py-1.5 rounded-full text-sm flex items-center gap-2 
+                            ${activeFilters.has('Email') 
+                                ? 'bg-blue-100 text-blue-700' 
+                                : 'bg-gray-100 text-gray-500'}`
+                    },
+                    [
+                        React.createElement(Mail, { size: 14 }),
+                        "Email"
+                    ]
+                )
+            ]
+        );
+    };
+
+    const renderViewMoreButton = () => {
+        const totalCount = communications?.filter(comm => 
+            activeFilters.has(comm.Communication_Type)
+        ).length || 0;
+
+        if (totalCount <= 4) return null;
+
+        return React.createElement('div',
+            { 
+                className: "sticky top-0 z-10 bg-gray-50 px-6 py-2 border-b flex justify-between items-center"
+            },
+            [
+                React.createElement('span',
+                    { className: "text-sm text-gray-500" },
+                    `Showing ${showAllItems ? totalCount : Math.min(4, totalCount)} of ${totalCount} items`
+                ),
+                React.createElement('button',
+                    {
+                        onClick: () => setShowAllItems(!showAllItems),
+                        className: "text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    },
+                    showAllItems ? "Show Less" : "View All"
+                )
+            ]
+        );
+    };
+
+    const renderMessage = (comm) => {
+        const isOutgoing = comm.SMS_Type === 'OUTGOING';
+        
+        return React.createElement('div',
+            {
+                className: `flex ${isOutgoing ? 'justify-end' : 'justify-start'} mb-4`
+            },
+            React.createElement('div',
+                {
+                    className: `max-w-[70%] ${
+                        isOutgoing 
+                            ? 'bg-blue-600 text-white rounded-l-lg rounded-tr-lg' 
+                            : 'bg-gray-100 text-gray-900 rounded-r-lg rounded-tl-lg'
+                    } px-4 py-2 shadow-sm`
+                },
+                [
+                    React.createElement('p', 
+                        { className: 'mb-1' }, 
+                        comm.SMS_Content
+                    ),
+                    React.createElement('div',
+                        { 
+                            className: `text-xs ${isOutgoing ? 'text-blue-100' : 'text-gray-500'} flex items-center gap-2` 
+                        },
+                        [
+                            React.createElement('span', null, formatDate(comm.SMS_Sent_Time)),
+                            React.createElement('span', null, '•'),
+                            React.createElement('span', null, 
+                                isOutgoing ? (comm.User || 'System') : (comm.Contact || 'Unknown Contact')
+                            ),
+                            // Only show delivery status for outgoing messages
+                            isOutgoing && React.createElement('span', 
+                                { 
+                                    className: `ml-2 ${
+                                        comm.SMS_Delivery_Status === 'DELIVERED' 
+                                            ? 'text-green-300' 
+                                            : 'text-red-300'
+                                    }`
+                                },
+                                [
+                                    '•',
+                                    React.createElement('span',
+                                        { className: 'ml-2' },
+                                        comm.SMS_Delivery_Status === 'DELIVERED' ? 'Delivered' : 'Not Delivered'
+                                    )
+                                ]
+                            )
+                        ]
+                    )
+                ]
+            )
+        );
+    };
+
+    const renderCallItem = (comm) => {
+        const isExpanded = expandedCalls.has(comm.ID);
+        const isIncoming = (comm.Call_Type1 || comm.Call_Type) === 'Inbound';
+        
+        return React.createElement('div',
+            { className: "flex flex-col w-full my-4" },
+            [
+                // Basic Call Info Button
+                React.createElement('button',
+                    {
+                        onClick: () => toggleCallExpansion(comm.ID),
+                        className: "flex items-center w-full p-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    },
+                    [
+                        React.createElement('div',
+                            { className: "flex-1 flex items-center space-x-3" },
+                            [
+                                React.createElement(isIncoming ? PhoneIncoming : PhoneOutgoing, {
+                                    className: isIncoming ? "text-green-600" : "text-blue-600",
+                                    size: 16
+                                }),
+                                React.createElement('span',
+                                    { className: "font-medium" },
+                                    isIncoming ? 'Incoming Call' : 'Outgoing Call'
+                                ),
+                                React.createElement('span',
+                                    { className: "text-gray-600" },
+                                    '•'
+                                ),
+                                React.createElement('span',
+                                    null,
+                                    comm.Call_Duration || 'N/A'
+                                ),
+                                React.createElement('span',
+                                    { className: "text-gray-600" },
+                                    '•'
+                                ),
+                                React.createElement('span',
+                                    null,
+                                    comm.User || 'Unknown Agent'
+                                )
+                            ]
+                        ),
+                        React.createElement(isExpanded ? ChevronUp : ChevronDown, {
+                            size: 16,
+                            className: "text-gray-600"
+                        })
+                    ]
+                ),
+
+                // Expanded Details
+                isExpanded && React.createElement('div',
+                    { className: "mt-2 p-4 bg-white border rounded-lg space-y-3" },
+                    [
+                        React.createElement('div',
+                            { className: "grid grid-cols-2 gap-4 text-sm" },
+                            [
+                                React.createElement('div',
+                                    null,
+                                    [
+                                        React.createElement('p',
+                                            { className: "font-medium text-gray-700" },
+                                            "Time"
+                                        ),
+                                        React.createElement('p',
+                                            null,
+                                            comm.SMS_Sent_Time
+                                        )
+                                    ]
+                                ),
+                                React.createElement('div',
+                                    null,
+                                    [
+                                        React.createElement('p',
+                                            { className: "font-medium text-gray-700" },
+                                            "Contact"
+                                        ),
+                                        React.createElement('p',
+                                            null,
+                                            comm.Contact || 'N/A'
+                                        )
+                                    ]
+                                ),
+                                React.createElement('div',
+                                    { className: "col-span-2" },
+                                    [
+                                        React.createElement('p',
+                                            { className: "font-medium text-gray-700" },
+                                            "Description"
+                                        ),
+                                        React.createElement('p',
+                                            { className: "text-gray-600" },
+                                            comm.Description || 'No description available'
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        );
+    };
+
+    const renderEmailItem = (comm) => {
+        const isTemplate = comm.Email_Type === 'Template';
+        const isAutomated = comm.Email_Type === 'Automated';
+        
+        return React.createElement('div',
+            { className: "flex items-center w-full p-3 bg-blue-50 rounded-lg" },
+            [
+                React.createElement(Mail, { 
+                    className: "text-blue-600 mr-3",
+                    size: 16 
+                }),
+                React.createElement('div',
+                    { className: "flex-1" },
+                    [
+                        React.createElement('div',
+                            { className: "flex items-center space-x-2" },
+                            [
+                                React.createElement('span',
+                                    { className: "font-medium" },
+                                    comm.Email_Subject
+                                ),
+                                React.createElement('span',
+                                    { className: "text-gray-600" },
+                                    '•'
+                                ),
+                                React.createElement('span',
+                                    { className: "text-sm text-gray-600" },
+                                    comm.Contact
+                                )
+                            ]
+                        ),
+                        React.createElement('div',
+                            { className: "flex items-center mt-1 space-x-2 text-xs text-gray-500" },
+                            [
+                                React.createElement('span', null, formatDate(comm.Email_Sent_Time)),
+                                React.createElement('span', null, '•'),
+                                React.createElement('span', null, isTemplate ? 'Template Email' : isAutomated ? 'Automated Email' : 'Email'),
+                                React.createElement('span', null, '•'),
+                                React.createElement('span', null, `Sent by ${comm.User || 'System'}`)
+                            ]
+                        )
+                    ]
+                )
+            ]
+        );
+    };
+
+    const renderCommunicationItem = (comm) => {
+        switch (comm.Communication_Type) {
+            case 'SMS':
+                return renderMessage(comm);
+            case 'Call':
+                return renderCallItem(comm);
+            case 'Email':
+                return renderEmailItem(comm);
+            default:
+                return null;
+        }
+    };
+
+    return React.createElement('div',
+        { className: "flex flex-col h-full bg-white" },
+        [
+            // Header
+            React.createElement('div',
+                { className: "px-6 py-4 border-b" },
+                [
+                    React.createElement('h2',
+                        { className: "text-lg font-semibold" },
+                        "Communications"
+                    ),
+                    React.createElement('p',
+                        { className: "text-sm text-gray-600" },
+                        `Project Contact: ${project.contactName || 'No Contact'} | Phone: ${project.contactPhone || 'No Phone'} | Email: ${project.contactEmail || 'No Email'}`
+                    )
+                ]
+            ),
+            // Chat Interface Container (includes filters, messages, and input)
+            React.createElement('div',
+                { 
+                    className: "flex flex-col border mx-6 rounded-lg shadow-lg"
+                },
+                [
+                    // Filter Group
+                    renderFilterGroup(),
+                    // View More Button
+                    renderViewMoreButton(),
+                    // Communications Container (scrollable)
+                    React.createElement('div',
+                        { 
+                            className: "min-h-0 h-[400px] overflow-y-auto px-6 py-4 space-y-4 bg-gray-50"
+                        },
+                        sortedCommunications?.map(comm => 
+                            React.createElement('div',
+                                { key: comm.ID },
+                                renderCommunicationItem(comm)
+                            )
+                        ) || React.createElement('div',
+                            { className: "text-center py-8 text-gray-500" },
+                            "No communications found"
+                        )
+                    ),
+                    // Message Input (stays at bottom)
+                    React.createElement('div',
+                        { className: "px-6 py-4 border-t bg-white rounded-b-lg" },
+                        [
+                            React.createElement('div',
+                                { className: "flex space-x-4" },
+                                [
+                                    React.createElement('textarea',
+                                        {
+                                            value: newMessage,
+                                            onChange: (e) => setNewMessage(e.target.value),
+                                            placeholder: "Type your message...",
+                                            className: "flex-1 min-h-[80px] p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500",
+                                            onKeyDown: (e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    handleSendMessage();
+                                                }
+                                            }
+                                        }
+                                    ),
+                                    React.createElement('button',
+                                        {
+                                            onClick: handleSendMessage,
+                                            disabled: isSending || !newMessage.trim(),
+                                            className: `px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 
+                                                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 
+                                                h-fit disabled:opacity-50 disabled:cursor-not-allowed`
+                                        },
+                                        React.createElement('div',
+                                            { className: "flex items-center space-x-2" },
+                                            [
+                                                React.createElement(Send, { size: 16 }),
+                                                React.createElement('span', null, isSending ? 'Sending...' : 'Send SMS')
+                                            ]
+                                        )
+                                    )
+                                ]
+                            ),
+                            React.createElement('p',
+                                { className: "mt-2 text-xs text-gray-500" },
+                                "Messages are logged and stored for project documentation"
+                            )
+                        ]
+                    )
+                ]
+            ),
+            // Email Templates Section
+            React.createElement(EmailTemplatesSection, {
+                project: project,
+                onEmailSent: refreshCommunications,
+                currentUser: currentUser,
+                className: "mt-6"
+            })
+        ]
+    );
+};
+
+export default CommunicationTab;

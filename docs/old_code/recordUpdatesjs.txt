@@ -1,0 +1,256 @@
+import { logError } from './errorHandling.js';
+
+/**
+ * Updates a record in Zoho Creator
+ * @param {string} reportName - The link name of the report
+ * @param {string} id - The ID of the record to update
+ * @param {Object} data - The form data to update (in JSON format)
+ * @param {function} showToast - A function to show toast messages
+ * @param {Object} options - Additional options for the update
+ * @param {string} [options.loadingMessage="Updating record..."] - Message to show during loading
+ * @param {string} [options.successMessage="Record updated successfully"] - Message to show on successful update
+ * @param {string} [options.errorMessage="Failed to update record:"] - Message to show on error
+ * @param {string} [options.appName="nexgen-portal"] - The application name (defaults to "nexgen-portal")
+ * @returns {Promise} - Resolves with the response from the API
+ */
+export const updateRecord = async (
+    report_name, 
+    id, 
+    payload, 
+    showToast,
+    options = {
+        loadingMessage: 'Updating record...',
+        successMessage: 'Record updated successfully',
+        errorMessage: 'Failed to update record:', // Will be followed by error.message
+        app_name: "nexgen-portal"
+    }
+) => {
+    try {
+        if (showToast) showToast(options.loadingMessage, 'loading');
+        
+        
+
+        const config = {
+            report_name,
+            id,
+            payload
+        };
+
+        const response = await ZOHO.CREATOR.DATA.updateRecordById(config);
+console.log("Update Response:", response);
+        if (!response) {
+            throw new Error("No response received from ZOHO API");
+        }
+
+        if (response.code !== 3000) {
+            throw new Error(`Failed to update record: ${response.message || JSON.stringify(response)}`);
+        }
+
+        if (showToast) showToast(options.successMessage, 'success');
+        return response;
+    } catch (error) {
+        if (showToast) showToast(`${options.errorMessage} ${error.message}`, 'error');
+        console.error("Error in updateRecord:", {
+            report_name,
+            id,
+            payload,
+            error: error.message,
+            stack: error.stack
+        });
+        throw error;
+    }
+};
+
+/**
+ * Updates multiple records in sequence
+ * @param {Array<Object>} updates - Array of update configurations
+ * @param {string} updates[].reportName - The report name for this update
+ * @param {string} updates[].id - The record ID to update
+ * @param {Object} updates[].data - The data to update
+ * @param {string} [appName="nexgen-portal"] - The application name
+ * @returns {Promise<Array>} - Resolves with array of responses
+ */
+export const updateMultipleRecords = async (updates, appName = "nexgen-portal") => {
+    const results = [];
+    
+    for (const update of updates) {
+        try {
+            const response = await updateRecord(
+                update.reportName,
+                update.id,
+                update.data,
+                null,
+                { appName }
+            );
+            results.push({
+                success: true,
+                id: update.id,
+                response
+            });
+        } catch (error) {
+            results.push({
+                success: false,
+                id: update.id,
+                error: error.message
+            });
+        }
+    }
+
+    return results;
+};
+
+export const updateUserCallStatus = async (phoneNumber, contactName) => {
+    //console.log('=== Starting Call Status Update ===');
+    //console.log('Input parameters:', { phoneNumber, contactName });
+    
+    try {
+        // Step 1: Get ZOHO init params
+        //console.log('Step 1: Getting ZOHO init params...');
+        const initParams = ZOHO.CREATOR.UTIL.getInitParams();
+        const loginEmail = initParams.loginUser?.trim();
+        //console.log('Retrieved login email:', loginEmail);
+        
+        // Step 2: Get query params
+        //console.log('Step 2: Getting query params...');
+        const queryParams = ZOHO.CREATOR.UTIL.getQueryParams();
+        //console.log('Retrieved query params:', queryParams);
+        
+        if (queryParams.users) {
+            // Step 3: Parse users and find current user
+            //console.log('Step 3: Parsing users data...');
+            const parsedUsers = JSON.parse(queryParams.users);
+            //console.log('Parsed users:', parsedUsers);
+            
+            //console.log('Finding current user...');
+            const currentUser = parsedUsers.find(userStr => {
+                const [id, name, username, email] = userStr.split(', ');
+                return email === loginEmail;
+            });
+            
+            if (!currentUser) {
+                console.error('User lookup failed:', { loginEmail, parsedUsers });
+                throw new Error("Could not find user in query params");
+            }
+
+            // Step 4: Extract user ID
+            //console.log('Step 4: Extracting user ID...');
+            const [userId] = currentUser.split(', ');
+            //console.log('Found user ID:', userId);
+            
+            // Step 5: Update user's call status
+            //console.log('Step 5: Updating call status...');
+            const updateResponse = await updateRecord(
+                "PM_Kanban_Users",
+                userId,
+                {
+                    data: {
+                        In_Call: true,
+                        Calling_Number: phoneNumber,
+                        Calling_Name: contactName
+                    }
+                },
+                null,
+                { appName: "nexgen-portal" }
+            );
+            //console.log('Call status update response:', updateResponse);
+
+            // Step 6: Reload parent window
+            //console.log('Step 6: Initiating parent window reload...');
+            const param = { action: "reload" };
+            ZOHO.CREATOR.UTIL.navigateParentURL(param);
+            //console.log('Parent window reload command sent');
+            
+            //console.log('=== Call Status Update Completed Successfully ===');
+        } else {
+            console.error('Step 3 Failed: No users data in query params');
+            throw new Error("No users data in query params");
+        }
+    } catch (error) {
+        console.error('=== Call Status Update Failed ===');
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            phoneNumber,
+            contactName
+        });
+        throw error;
+    }
+};
+
+export const updateActiveDetailWindow = async (projectId = "") => {
+    try {
+        // Get current user's email from init params
+        const initParams = await ZOHO.CREATOR.UTIL.getInitParams();
+        const loginEmail = initParams.loginUser?.trim();
+        
+        if (!loginEmail) {
+            throw new Error("No login email found in init params");
+        }
+
+        // Get user record from PM_Kanban_Users report
+        const userResponse = await ZOHO.CREATOR.DATA.getRecords({
+            app_name: "nexgen-portal",
+            report_name: "PM_Kanban_Users",
+            criteria: `(Email == "${loginEmail}")`
+        });
+
+        if (!userResponse || userResponse.code !== 3000 || !userResponse.data?.length) {
+            throw new Error(`Could not find user with email ${loginEmail}`);
+        }
+
+        const userId = userResponse.data[0].ID;
+
+        // Update the user's active detail window
+        return await ZOHO.CREATOR.DATA.updateRecordById({
+            app_name: "nexgen-portal",
+            report_name: "PM_Kanban_Users",
+            id: userId,
+            payload: {
+                data: {
+                    Active_Detail_Window: projectId || ""
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Error updating active detail window:", {
+            projectId,
+            error: error.message,
+            stack: error.stack
+        });
+        throw error;
+    }
+};
+
+// Example usage:
+/*
+import { updateRecord, updateMultipleRecords } from '../utils/recordUpdates.js';
+
+// Single update
+try {
+    const response = await updateRecord(
+        "Kanban_Widget_Report_Demo",
+        "123456",
+        { status: "Complete" }
+    );
+    //console.log("Update successful:", response);
+} catch (error) {
+    console.error("Update failed:", error);
+}
+
+// Multiple updates
+const updates = [
+    {
+        reportName: "Kanban_Widget_Report_Demo",
+        id: "123456",
+        data: { status: "Complete" }
+    },
+    {
+        reportName: "Kanban_Widget_Notes_Report",
+        id: "789012",
+        data: { content: "Updated note" }
+    }
+];
+
+const results = await updateMultipleRecords(updates);
+//console.log("Multiple updates results:", results);
+*/

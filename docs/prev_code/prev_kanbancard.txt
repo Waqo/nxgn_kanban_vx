@@ -1,0 +1,161 @@
+// app/components/kanban/KanbanCard.js
+
+const KanbanCard = {
+  name: 'KanbanCard',
+  props: {
+    project: {
+      type: Object,
+      required: true,
+      // Expected shape defined in dataSchema.txt (e.g., id, contactName, address, systemSize, etc.)
+    },
+  },
+  emits: ['dragstart', 'dragend'], // Emits events handled by KanbanColumn
+  computed: {
+    // Example computed property for display
+    formattedAddress() {
+      if (!this.project.address) return 'No Address';
+      // Basic formatting, can be enhanced in utils/formatters.js later
+      return `${this.project.addressLine1 || ''}, ${this.project.city || ''}, ${this.project.state || ''}`.replace(/^, |, $/g, '');
+    },
+    contactNameDisplay() {
+        return this.project.contactName || 'No Contact Name';
+    },
+    systemSizeDisplay() {
+        return this.project.systemSize ? `${this.project.systemSize} kW` : 'N/A';
+    },
+    workBadges() {
+        const badges = [];
+        const project = this.project;
+
+        // Tree Work
+        if (project.treeWorkRequired) {
+            const isCompleted = project.treeWorkStatus === 'Completed';
+            badges.push({
+                text: 'Tree',
+                color: isCompleted ? 'gray' : 'green'
+            });
+        }
+
+        // Roof Work
+        if (project.roofWorkRequired) {
+            const isCompleted = project.roofWorkStatus === 'Completed';
+            badges.push({
+                text: 'Roof',
+                color: isCompleted ? 'gray' : 'red'
+            });
+        }
+
+        // Panel Upgrade Work
+        if (project.panelUpgradeRequired) {
+            const isCompleted = project.panelUpgradeStatus === 'Completed';
+            badges.push({
+                text: 'PU',
+                color: isCompleted ? 'gray' : 'blue'
+            });
+        }
+
+        return badges;
+    },
+    showSurveyBadge() {
+        return Array.isArray(this.project.Survey_Results) && this.project.Survey_Results.length > 0;
+    },
+    systemSizeBadgeColor() {
+        // Handles both boolean true and string "true"
+        const isApproved = this.project.Is_Approved === true || this.project.Is_Approved === 'true';
+        return isApproved ? 'green' : 'gray';
+    },
+    isCashDeal() {
+        // Handles both boolean true and string "true"
+        return this.project.Is_Cash_Finance === true || this.project.Is_Cash_Finance === 'true';
+    }
+    // Add more computed properties for badges, status indicators etc. later
+  },
+  methods: {
+    handleDragStart(event) {
+      console.log(`KanbanCard: Drag Start - Project ID: ${this.project.id}`);
+      // Set data to be transferred (typically the item's ID)
+      // Use a generic type like 'text/plain' for broad compatibility
+      event.dataTransfer.setData('text/plain', this.project.id);
+      event.dataTransfer.effectAllowed = 'move'; // Indicate the type of operation allowed
+      // Emit event upwards to KanbanColumn -> KanbanBoard
+      this.$emit('dragstart');
+    },
+    handleDragEnd(event) {
+      console.log(`KanbanCard: Drag End - Project ID: ${this.project.id}`);
+       // Consider clearing dataTransfer if needed, though often not necessary
+       // event.dataTransfer.clearData();
+      this.$emit('dragend');
+    },
+  },
+  // Reference the template defined in widget.html
+  // template: '#kanban-card-template'
+  template: `
+      <div
+        :draggable="true"
+        @dragstart="handleDragStart"
+        @dragend="handleDragEnd"
+        :class="[
+            'kanban-card bg-white rounded-md shadow p-3 border-2 hover:shadow-md cursor-grab active:cursor-grabbing',
+            project.Need_Help 
+                ? 'border-red-500 ring-2 ring-red-500 ring-inset'
+                : 'border-gray-200'
+        ]"
+        >
+        <!-- Card Header -->
+        <div :class="[
+            'flex items-center justify-between p-2 bg-gray-50 border-b rounded-t-md -m-3 mb-3'
+        ]">
+             <!-- Left side: Work/Survey Badges -->
+             <div class="flex flex-wrap gap-1">
+                 <!-- Work Badges -->
+                 <base-badge v-for="badge in workBadges" :key="badge.text" :color="badge.color" :title="badge.text">
+                     {{ badge.text }}
+                 </base-badge>
+             </div>
+             <!-- Right side: Icons (Placeholder for Cash Deal) -->
+             <div>
+                 <!-- Cash Deal Icon -->
+                 <i v-if="isCashDeal" class="fas fa-dollar-sign text-green-600" title="Cash Deal"></i>
+             </div>
+        </div>
+        
+        <!-- Card Main Content -->
+        <div class="mb-2">
+          <h4 class="text-sm font-medium text-gray-800 truncate" :title="contactNameDisplay">{{ contactNameDisplay }}</h4>
+        </div>
+
+        <!-- Address Row -->
+        <div class="mb-2 flex items-center gap-1.5 text-sm text-gray-700" :title="formattedAddress">
+            <i class="fas fa-map-marker-alt text-gray-400 w-4 text-center"></i>
+            <span class="truncate">{{ project.addressLine1 || 'No Address' }}</span>
+        </div>
+
+        <!-- Card Body: Badges Section -->
+        <div class="mb-2 flex flex-wrap gap-1"> 
+            <!-- Survey Badge - MOVED HERE -->
+            <base-badge v-if="showSurveyBadge" color="gray" title="Survey Completed">
+                 SURV
+             </base-badge>
+             <!-- System Size Badge -->
+             <base-badge v-if="project.systemSize > 0" :color="systemSizeBadgeColor">
+                 {{ systemSizeDisplay }}
+             </base-badge>
+             <!-- Placeholder for Project Type, Roof Type badges -->
+        </div>
+
+        <!-- Card Body: Details -->
+        <div class="text-xs text-gray-600 space-y-1"></div>
+
+        <!-- Card Footer / Badges (Placeholder) -->
+        <div class="mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-1">
+            <!-- Badges for status, work needed, etc. will go here -->
+            <!-- Example: <span class="badge badge-red">Roof Work</span> -->
+        </div>
+      </div>
+    `
+};
+
+// Expose the component definition globally within the AppComponents object
+// window.AppComponents = window.AppComponents || {};
+// window.AppComponents.KanbanCard = KanbanCard; 
+export default KanbanCard; 

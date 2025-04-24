@@ -1,0 +1,196 @@
+/**
+ * Creates WorkDrive folders for a project using Custom API
+ * @param {string} projectId - The ID of the project
+ * @param {string} [userEmail] - Email of the current user
+ * @returns {Promise<Object>} - Resolves with the API response containing folder IDs
+ */
+export const createWorkDriveFolders = async (projectId, userEmail) => {
+    console.log('=== Starting createWorkDriveFolders ===');
+    console.log('Input parameters:', { projectId, userEmail });
+
+    const config = {
+        workspace_name: "nexgenroofingandsolar",
+        api_name: "Create_WorkDrive_Folder",
+        http_method: "POST",
+        content_type: "application/json",
+        public_key: "pDZ1NVhZuqk2t1HWGeZvqHXtS",
+        payload: {
+            project_id: projectId,
+            user_email: userEmail
+        }
+    };
+
+    console.log('API Configuration:', config);
+
+    try {
+        console.log('Attempting to invoke ZOHO.CREATOR.DATA.invokeCustomApi...');
+        const response = await ZOHO.CREATOR.DATA.invokeCustomApi(config);
+        console.log('Raw API response:', response);
+            
+        if (!response) {
+            console.error('Received null/undefined response');
+            throw new Error('No response received from API');
+        }
+
+        if (response.code !== 3000) {
+            console.error('API returned non-success code:', response.code);
+            console.error('Error message:', response.message);
+            console.error('Full error response:', response);
+            throw new Error(response.message || 'Failed to create WorkDrive folders');
+        }
+
+        console.log('Successfully created WorkDrive folders:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('Error in createWorkDriveFolders:', error);
+        console.error('Error stack:', error.stack);
+        console.error('Error details:', {
+            name: error.name,
+            message: error.message,
+            cause: error.cause
+        });
+        throw error;
+    } finally {
+        console.log('=== Completed createWorkDriveFolders ===');
+    }
+};
+
+/**
+ * Uploads a file to WorkDrive for a project using Custom API
+ * @param {string} projectId - The ID of the project
+ * @param {string} [userEmail] - Email of the current user
+ * @param {string} documentId - The ID of the document to upload
+ * @returns {Promise<Object>} - Resolves with the API response containing folder IDs
+ */
+export const uploadWorkDriveFile = async (projectId, userEmail, documentId) => {
+    console.log('=== Starting uploadWorkDriveFile ===');
+    console.log('Input parameters:', { projectId, userEmail, documentId });
+
+    const config = {
+        workspace_name: "nexgenroofingandsolar",
+        api_name: "Upload_to_WorkDrive",
+        http_method: "POST",
+        content_type: "application/json",
+        public_key: "uNQuJKxGy2KF2Grd9HsZNS56E",
+        payload: {
+            project_id: projectId,
+            user_email: userEmail,
+            document_id: documentId
+        }
+    };
+
+    console.log('API Configuration:', config);
+
+    // Create a promise that rejects after 30 seconds
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+            reject(new Error('API call timed out after 30 seconds'));
+        }, 30000);
+    });
+
+    try {
+        console.log('Attempting to invoke ZOHO.CREATOR.DATA.invokeCustomApi...');
+        
+        // Race between the API call and timeout
+        const response = await Promise.race([
+            ZOHO.CREATOR.DATA.invokeCustomApi(config),
+            timeoutPromise
+        ]);
+        
+        console.log('Raw API response:', response);
+            
+        if (!response) {
+            console.error('Received null/undefined response');
+            throw new Error('No response received from API');
+        }
+
+        if (response.code !== 3000) {
+            console.error('API returned non-success code:', response.code);
+            console.error('Error message:', response.message);
+            console.error('Full error response:', response);
+            throw new Error(response.message || 'Failed to upload file to WorkDrive');
+        }
+
+        console.log('Successfully uploaded file to WorkDrive:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('Error in uploadWorkDriveFile:', error);
+        console.error('Error stack:', error.stack);
+        console.error('Error details:', {
+            name: error.name,
+            message: error.message,
+            cause: error.cause
+        });
+
+        // Check if it's a timeout error
+        if (error.message.includes('timed out')) {
+            console.error('API call timed out. This could indicate:');
+            console.error('1. The API is not responding');
+            console.error('2. The API is taking too long to process');
+            console.error('3. There might be network issues');
+        }
+
+        throw error;
+    } finally {
+        console.log('=== Completed uploadWorkDriveFile ===');
+    }
+};
+
+/**
+ * Sending Email Notifications to Clients using Custom API
+ * @param {string} template- The name of the template to use
+ * @param {integer} id - The id of the project record
+ * @param {string} currentUserId - The email of the current user
+ * @returns {Promise<Object>} - Resolves with the API response 
+ */
+export const sendEmailNotifications = async (template, id, currentUserId) => {
+    console.log('=== Starting sendEmailNotifications ===');
+    console.log('Input parameters:', { template, id, currentUserId });
+
+    const config = {
+        workspace_name: "nexgenroofingandsolar",
+        api_name: "Send_Email_to_Client",
+        http_method: "POST",
+        content_type: "application/json",
+        public_key: "v7UbhEx9Pm2QxKDsfkNUdqjbC",
+        payload: {
+            template: template,
+            id: id,
+            currentUserId: currentUserId
+        }
+    };
+
+    console.log('API Configuration:', config);
+
+    try {
+        console.log('Attempting to invoke ZOHO.CREATOR.DATA.invokeCustomApi...');
+        const response = await ZOHO.CREATOR.DATA.invokeCustomApi(config);
+        console.log('Raw API response:', response);
+            
+        if (!response) {
+            console.error('Received null/undefined response');
+            throw new Error('No response received from API');
+        }
+
+        if (response.code !== 3000) {
+            console.error('API returned non-success code:', response.code);
+            console.error('Error message:', response.message);
+            console.error('Full error response:', response);
+            throw new Error(response.message || 'Failed to send email notifications');
+        }
+
+        console.log('Successfully sent email notifications:', response.data);
+        return response.data;
+    } catch (error) {
+        console.error('Error in sendEmailNotifications:', error);
+        console.error('Error stack:', error.stack);
+        console.error('Error details:', {
+            name: error.name,
+            message: error.message,
+            cause: error.cause
+        });
+        throw error;
+    } finally {
+        console.log('=== Completed sendEmailNotifications ===');
+    }
+};

@@ -1,0 +1,724 @@
+import React, { useState, useEffect } from "react";
+import Select from "react-select";
+
+const Toolbar = ({
+  onSearch,
+  onFilter,
+  onSort,
+  onRefresh,
+  disabled,
+  lastUpdated,
+  isRefreshing,
+  onViewChange,
+  currentView,
+  isTranchesView,
+  setIsTranchesView,
+  tranchesData,
+  searchConfig,
+  filterConfig,
+  sortConfig,
+  projects,
+  onCardClick,
+  salesReps,
+  salesOrgs,
+  tags,
+  stages,
+  totalSystemSize,
+}) => {
+ 
+
+  // Add error boundary
+  React.useEffect(() => {
+    const checkZohoAvailability = async () => {
+      try {
+        if (!window.ZOHO?.CREATOR) {
+          console.error("ZOHO.CREATOR not found in window object");
+          return;
+        }
+        // await ZOHO.CREATOR.init(); // Not needed in V2
+        // console.log('ZOHO available in Toolbar');
+      } catch (error) {
+        console.error("Error checking ZOHO in Toolbar:", error);
+      }
+    };
+
+    checkZohoAvailability();
+  }, []);
+
+  // Add forceUpdate state
+  const [forceUpdate, setForceUpdate] = useState(0);
+
+  // Remove local state since we're getting it from props
+  const [showResults, setShowResults] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+
+  // Update search handler to use searchConfig
+  const handleSearch = (value) => {
+    onSearch({ term: value, category: searchConfig.category });
+
+    if (value.trim()) {
+      // Filter projects based on search term
+      const results = projects
+        .filter(
+          (project) =>
+            project.contactName?.toLowerCase().includes(value.toLowerCase()) ||
+            project.address?.toLowerCase().includes(value.toLowerCase()) ||
+            project.projectId?.toLowerCase().includes(value.toLowerCase())
+        )
+        .slice(0, 10);
+      setSearchResults(results);
+      setShowResults(true);
+    } else {
+      setSearchResults([]);
+      setShowResults(false);
+    }
+  };
+
+  const handleFilterChange = (filterType, value) => {
+    const newFilters = {
+      ...filterConfig,
+      [filterType]: value,
+    };
+    onFilter(newFilters);
+  };
+
+  // Add timer to update the relative time
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setForceUpdate((prev) => prev + 1); // Force re-render every minute
+    }, 60000); // Update every minute
+
+    return () => clearInterval(timer); // Cleanup on unmount
+  }, []);
+
+  // Update handleReset to work with new filter system
+  const handleReset = () => {
+    // Reset search
+    onSearch({ term: "", category: "contactName" });
+
+    // Reset filter selections
+    setSelectedFilterType(null);
+    setSelectedFilters([]);
+
+    // Reset all filters in parent
+    onFilter({
+      projectType: [],
+      tags: [],
+      workRequired: [],
+      salesRep: [],
+      salesOrg: [],
+      cashDeal: false,
+      needHelp: false,
+    });
+
+    // Reset sort
+    onSort({
+      field: "contactName",
+      direction: "asc",
+    });
+  };
+
+  // Updated sort handler
+  const handleSortChange = (value) => {
+    onSort({
+      field: value,
+      direction: sortConfig.direction,
+    });
+  };
+
+  // Direction toggle handler
+  const handleDirectionToggle = () => {
+    const newDirection = sortConfig.direction === "asc" ? "desc" : "asc";
+    onSort({
+      ...sortConfig,
+      direction: newDirection,
+    });
+  };
+
+  const formatLastUpdated = (date) => {
+    const now = new Date();
+    const diff = Math.floor((now - date) / 1000); // difference in seconds
+
+    if (diff < 60) return "Just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return date.toLocaleDateString();
+  };
+
+  // Add this new component for search results
+  const SearchResultItem = ({ result, onSelect }) => {
+    return React.createElement(
+      "button",
+      {
+        className:
+          "w-full text-left px-4 py-2 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none",
+        onClick: () => onSelect(result),
+      },
+      [
+        // Contact Name
+        React.createElement(
+          "div",
+          { className: "font-medium text-gray-900" },
+          result.contactName || "No Contact Name"
+        ),
+        // Address and Stage
+        React.createElement(
+          "div",
+          { className: "text-sm text-gray-600 flex justify-between" },
+          [
+            React.createElement("span", null, result.address || "No Address"),
+            React.createElement(
+              "span",
+              { className: "text-blue-600" },
+              result.stageField?.display_value || "No Stage"
+            ),
+          ]
+        ),
+      ]
+    );
+  };
+
+  // Add click handler that uses the parent's card click handler
+  const handleResultClick = (result) => {
+    setSearchResults([]); // Clear results after selection
+    onCardClick(result); // Use the same handler as card clicks
+  };
+
+  // Add state for filter type and selections
+  const [selectedFilterType, setSelectedFilterType] = React.useState(null);
+  const [selectedFilters, setSelectedFilters] = React.useState([]);
+
+  // Define filter types and their options
+  const filterTypes = [
+    { value: "tags", label: "Tags" },
+    { value: "workRequired", label: "Work Required" },
+    { value: "salesRep", label: "Sales Rep" },
+    { value: "salesOrg", label: "Sales Organization" },
+    { value: "projectType", label: "Project Type" },
+  ];
+
+  // Get options based on filter type
+  const getFilterOptions = (filterType) => {
+    switch (filterType) {
+      case "tags":
+        if (!tags) {
+          console.warn("Tags prop is undefined in Toolbar");
+          return [];
+        }
+        // Convert Map or object to array of options
+        const tagOptions = Array.from(tags, ([id, tag]) => {
+          return {
+            value: id,
+            label: tag.name,
+            color: tag.color,
+          };
+        });
+
+        return tagOptions;
+      case "workRequired":
+        return [
+          { value: "tree", label: "Tree Work" },
+          { value: "roof", label: "Roof Work" },
+          { value: "panel", label: "Panel Upgrade" },
+        ];
+      case "projectType":
+        return [
+          { value: "commercial", label: "Commercial" },
+          { value: "residential", label: "Residential" },
+        ];
+      case "salesRep":
+        return salesReps.map((rep) => ({
+          value: rep,
+          label: rep,
+        }));
+      case "salesOrg":
+        return salesOrgs.map((org) => ({
+          value: org,
+          label: org,
+        }));
+      default:
+        return [];
+    }
+  };
+
+  // Handle filter type change
+  const handleFilterTypeChange = (selected) => {
+    setSelectedFilterType(selected);
+    setSelectedFilters([]);
+
+    // Initialize empty array for the new filter type
+    const newFilters = {
+      ...filterConfig,
+      [selected?.value]: [],
+    };
+
+    onFilter(newFilters);
+  };
+
+  // Handle filter selections change
+  const handleFilterSelectionsChange = (selected) => {
+    setSelectedFilters(selected || []);
+
+    // Ensure we're setting an array for the filter
+    const newFilters = {
+      ...filterConfig,
+      [selectedFilterType.value]: selected ? selected.map((s) => s.value) : [],
+    };
+
+    onFilter(newFilters);
+  };
+
+  // Custom styles for React Select
+  const customStyles = {
+    control: (base) => ({
+      ...base,
+      minHeight: "38px",
+      borderColor: "#e5e7eb",
+      "&:hover": {
+        borderColor: "#3b82f6",
+      },
+    }),
+    menu: (base) => ({
+      ...base,
+      zIndex: 50,
+    }),
+    multiValue: (base, { data }) => ({
+      ...base,
+      backgroundColor: data.color ? `${data.color}20` : "#f3f4f6",
+      borderRadius: "4px",
+    }),
+    multiValueLabel: (base, { data }) => ({
+      ...base,
+      color: data.color ? data.color : "#374151",
+    }),
+  };
+
+  // Replace the existing filter controls with new ones
+  const filterControls = React.createElement(
+    "div",
+    { className: "flex items-center gap-2" },
+    [
+      // Filter Type Dropdown
+      React.createElement(Select, {
+        className: "w-48",
+        classNamePrefix: "select",
+        isClearable: true,
+        placeholder: "Select Filter Type",
+        options: filterTypes,
+        value: selectedFilterType,
+        onChange: handleFilterTypeChange,
+        styles: customStyles,
+      }),
+
+      // Filter Selections Dropdown
+      React.createElement(Select, {
+        className: "w-64",
+        classNamePrefix: "select",
+        isMulti: true,
+        isClearable: true,
+        isSearchable: true,
+        placeholder: selectedFilterType
+          ? `Select ${selectedFilterType.label}`
+          : "Select Filter Type First",
+        options: selectedFilterType
+          ? getFilterOptions(selectedFilterType.value)
+          : [],
+        value: selectedFilters,
+        onChange: handleFilterSelectionsChange,
+        isDisabled: !selectedFilterType,
+        styles: customStyles,
+      }),
+    ]
+  );
+
+  // Update the getTotalProjects function to count only tranched projects
+  const getTotalProjects = (projects) => {
+    if (!projects) return 0;
+
+    // Get all cards - handle both column-based and flattened structures
+    const allCards = Array.isArray(projects[0]?.cards) 
+      ? projects.flatMap(column => column.cards || [])
+      : projects;
+
+    console.log("Total cards in getTotalProjects:", allCards.length);
+
+    // Filter for tranched projects (has tranche ID)
+    const tranchedProjects = allCards.filter((project) => {
+      // Check if project has a tranche ID
+      const hasTranche = project.tranche?.ID || project.tranche?.id;
+
+      // Apply other filters
+      const matchesSearch =
+        !searchConfig.term ||
+        project[searchConfig.category]
+          ?.toString()
+          .toLowerCase()
+          .includes(searchConfig.term.toLowerCase());
+
+      const matchesTags =
+        !filterConfig.tags?.length ||
+        filterConfig.tags.every((tagId) =>
+          project?.Tags?.some((cardTag) => cardTag.ID === tagId)
+        );
+
+      const matchesWorkRequired =
+        !filterConfig.workRequired?.length ||
+        filterConfig.workRequired.some((work) => {
+          switch (work) {
+            case "tree":
+              return project.treeWork === "Yes";
+            case "roof":
+              return project.roofWork === "Yes";
+            case "panel":
+              return project.panelUpgrade === "Yes";
+            default:
+              return false;
+          }
+        });
+
+      const matchesProjectType =
+        !filterConfig.projectType?.length ||
+        filterConfig.projectType.some((type) => {
+          switch (type) {
+            case "commercial":
+              return (
+                project.isCommercial === "true" || project.isCommercial === true
+              );
+            case "residential":
+              return (
+                project.isCommercial !== "true" && project.isCommercial !== true
+              );
+            default:
+              return false;
+          }
+        });
+
+      const matchesCashDeal =
+        !filterConfig.cashDeal ||
+        project.isCashDeal === "true" ||
+        project.isCashDeal === true;
+
+      const matchesSalesRep =
+        !filterConfig.salesRep?.length ||
+        filterConfig.salesRep.includes(project.salesRepName);
+
+      const matchesSalesOrg =
+        !filterConfig.salesOrg?.length ||
+        filterConfig.salesOrg.includes(project.salesRepOrg);
+
+      const matchesNeedHelp =
+        !filterConfig.needHelp || 
+        (project.needHelp === true || project.needHelp === "true");
+
+      return hasTranche && 
+             matchesSearch &&
+             matchesTags &&
+             matchesWorkRequired &&
+             matchesProjectType &&
+             matchesCashDeal &&
+             matchesSalesRep &&
+             matchesSalesOrg &&
+             matchesNeedHelp;
+    });
+
+    console.log("Project counts:", {
+      allCards: allCards.length,
+      tranchedProjects: tranchedProjects.length
+    });
+
+    return tranchedProjects.length;
+  };
+
+  return React.createElement(
+    "div",
+    {
+      className:
+        "bg-white shadow-sm px-4 py-3 sticky top-0 z-50 flex flex-col gap-3 flex-shrink-0",
+    },
+    [
+      // Row 1: Search and View Toggle
+      React.createElement(
+        "div",
+        { className: "flex items-center justify-between" },
+        [
+          // Left side with search and count
+          React.createElement("div", { className: "flex items-center gap-4" }, [
+            // Search bar
+            React.createElement(
+              "div",
+              {
+                className: "relative w-96",
+                onBlur: (e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget)) {
+                    setShowResults(false);
+                  }
+                },
+              },
+              [
+                // Search input
+                React.createElement("input", {
+                  type: "text",
+                  className:
+                    "w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500",
+                  placeholder: "Search all fields...",
+                  value: searchConfig.term,
+                  onChange: (e) => handleSearch(e.target.value),
+                  onFocus: () => setShowResults(true),
+                }),
+                React.createElement("i", {
+                  className:
+                    "fas fa-search absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400",
+                }),
+
+                // Search results dropdown
+                searchConfig.term &&
+                  showResults &&
+                  React.createElement(
+                    "div",
+                    {
+                      className:
+                        "absolute z-50 left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg max-h-96 overflow-y-auto",
+                    },
+                    searchResults.length > 0
+                      ? searchResults.map((result) =>
+                          React.createElement(SearchResultItem, {
+                            key: result.id,
+                            result: result,
+                            onSelect: handleResultClick,
+                          })
+                        )
+                      : React.createElement(
+                          "div",
+                          { className: "px-4 py-2 text-gray-500 text-sm" },
+                          "No results found"
+                        )
+                  ),
+              ]
+            ),
+
+            // Total System Size
+            React.createElement(
+              'span',
+              { className: 'px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-semibold ml-4' },
+              `Total: ${totalSystemSize} kW`
+            ),
+
+            // Project count badge - only show in Tranche View
+            isTranchesView &&
+              React.createElement(
+                "div",
+                {
+                  className:
+                    "px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-600 font-medium",
+                },
+                `${getTotalProjects(projects)} Projects`
+              ),
+          ]),
+
+          // View toggles container
+          React.createElement("div", { className: "flex items-center gap-4" }, [
+            // Only show view toggle group when not in tranche view
+            !isTranchesView && React.createElement(
+              "div",
+              {
+                className:
+                  "flex rounded-lg border border-gray-300 p-1 bg-white",
+              },
+              ["all", "sales", "install"].map((view) =>
+                React.createElement(
+                  "button",
+                  {
+                    key: view,
+                    className: `px-3 py-1 rounded-md text-sm font-medium ${
+                      currentView === view
+                        ? "bg-blue-500 text-white"
+                        : "text-gray-600 hover:bg-gray-100"
+                    }`,
+                    onClick: () => onViewChange(view),
+                  },
+                  view.charAt(0).toUpperCase() + view.slice(1)
+                )
+              )
+            ),
+
+            // Tranche View toggle
+            React.createElement(
+              "button",
+              {
+                className: `px-3 py-1 rounded-lg border border-gray-300 text-sm font-medium ${
+                  isTranchesView
+                    ? "bg-blue-500 text-white border-blue-500"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`,
+                onClick: () => setIsTranchesView((prev) => !prev),
+                disabled: !tranchesData.length,
+              },
+              "Tranche View"
+            ),
+          ]),
+        ]
+      ),
+
+      // Row 2: Filters and Actions
+      React.createElement(
+        "div",
+        { className: "flex items-center justify-between" },
+        [
+          // Left side: Toggle buttons only
+          React.createElement("div", { className: "flex items-center gap-4" }, [
+            // Cash Deal Toggle
+            React.createElement(
+              "button",
+              {
+                className: `px-4 py-2 rounded-lg border transition-colors ${
+                  filterConfig.cashDeal
+                    ? "bg-green-100 border-green-400 text-green-700"
+                    : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                }`,
+                onClick: () =>
+                  onFilter({
+                    ...filterConfig,
+                    cashDeal: !filterConfig.cashDeal,
+                  }),
+              },
+              "Cash Deal"
+            ),
+
+            // Need Help Toggle
+            React.createElement(
+              "button",
+              {
+                className: `px-4 py-2 rounded-lg border transition-colors ${
+                  filterConfig.needHelp
+                    ? "bg-red-100 border-red-400 text-red-700"
+                    : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                }`,
+                onClick: () =>
+                  onFilter({
+                    ...filterConfig,
+                    needHelp: !filterConfig.needHelp,
+                  }),
+              },
+              "Need Help"
+            ),
+
+            // Sort Controls Group
+            React.createElement(
+              "div",
+              { className: "flex items-center gap-2" },
+              [
+                // Sort Field Select
+                React.createElement(
+                  "select",
+                  {
+                    className:
+                      "px-3 py-2 border rounded-lg bg-white focus:outline-none focus:border-blue-500",
+                    value: sortConfig.field,
+                    onChange: (e) => handleSortChange(e.target.value),
+                  },
+                  [
+                    { value: "contactName", label: "Sort by Contact Name" },
+                    { value: "dateSold", label: "Sort by Date Sold" },
+                    { value: "addedTime", label: "Sort by Added Time" },
+                    { value: "modifiedTime", label: "Sort by Modified Time" },
+                  ].map((option) =>
+                    React.createElement(
+                      "option",
+                      {
+                        value: option.value,
+                      },
+                      option.label
+                    )
+                  )
+                ),
+
+                // Sort Direction Button
+                React.createElement(
+                  "button",
+                  {
+                    className:
+                      "p-2 rounded-lg border border-gray-300 hover:bg-gray-50",
+                    onClick: handleDirectionToggle,
+                    title:
+                      sortConfig.direction === "asc"
+                        ? "Sort Ascending"
+                        : "Sort Descending",
+                  },
+                  React.createElement("i", {
+                    className: `fas fa-sort-amount-${
+                      sortConfig.direction === "asc" ? "up" : "down"
+                    }-alt text-gray-600`,
+                  })
+                ),
+
+                // Filter Controls (moved here)
+                filterControls,
+              ]
+            ),
+          ]),
+
+          // Right side: Reset and Refresh buttons
+          React.createElement("div", { className: "flex items-center gap-4" }, [
+            // Reset View Button
+            React.createElement(
+              "button",
+              {
+                className:
+                  "px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 flex items-center gap-2",
+                onClick: handleReset,
+                title: "Reset View",
+              },
+              [
+                React.createElement("i", {
+                  className: "fas fa-undo text-gray-600",
+                }),
+                "Reset View",
+              ]
+            ),
+
+            // Refresh button
+            React.createElement(
+              "button",
+              {
+                className: `px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 
+                                    flex items-center gap-2 ${
+                                      disabled
+                                        ? "opacity-50 cursor-not-allowed"
+                                        : ""
+                                    }`,
+                onClick: onRefresh,
+                disabled: disabled,
+                title: "Refresh",
+              },
+              [
+                React.createElement("i", {
+                  className: `fas fa-sync-alt ${
+                    isRefreshing ? "animate-spin" : ""
+                  }`,
+                }),
+                "Refresh",
+              ]
+            ),
+
+            // Last updated indicator
+            React.createElement(
+              "div",
+              {
+                className: "text-sm text-gray-500 flex items-center gap-1",
+                title: lastUpdated?.toLocaleString(),
+              },
+              [
+                React.createElement("i", {
+                  className: "fas fa-clock text-gray-400",
+                }),
+                formatLastUpdated(lastUpdated),
+              ]
+            ),
+          ]),
+        ]
+      ),
+    ]
+  );
+};
+
+export default Toolbar;

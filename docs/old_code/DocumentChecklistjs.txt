@@ -1,0 +1,91 @@
+/* global React */
+import React from 'react';
+
+const DocumentChecklist = ({ project, docTypes, className }) => {
+    const [isExpanded, setIsExpanded] = React.useState(false);
+
+    // Filter docTypes to only include those that should be in checklist
+    const checklistItems = docTypes
+        .filter(docType => docType.Include_In_Checklist)
+        .sort((a, b) => a.Name.localeCompare(b.Name));
+
+    // Calculate completed items by checking if any document exists with matching Doc_Type
+    const getIsCompleted = (docTypeId) => {
+        return project.documents?.some(doc => doc.Doc_Type?.ID === docTypeId) || false;
+    };
+
+    // Calculate completed items count
+    const completedCount = checklistItems.filter(item => getIsCompleted(item.ID)).length;
+
+    return React.createElement('div',
+        { className: `bg-white rounded-lg border border-gray-200 mb-4 overflow-hidden ${className || ''}` },
+        [
+            // Header (always visible)
+            React.createElement('div',
+                {
+                    className: "p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between cursor-pointer hover:bg-gray-100",
+                    onClick: () => setIsExpanded(!isExpanded)
+                },
+                [
+                    // Left side: Title and completion count
+                    React.createElement('div',
+                        { className: "flex items-center gap-3" },
+                        [
+                            React.createElement('h3',
+                                { className: "text-lg font-semibold text-gray-900" },
+                                "Document Checklist"
+                            ),
+                            React.createElement('span',
+                                { className: "px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm" },
+                                `${completedCount}/${checklistItems.length} Complete`
+                            )
+                        ]
+                    ),
+                    // Right side: Expand/collapse icon
+                    React.createElement('i',
+                        { 
+                            className: `fas fa-chevron-${isExpanded ? 'up' : 'down'} text-gray-400`
+                        }
+                    )
+                ]
+            ),
+            // Checklist grid (collapsible)
+            isExpanded && React.createElement('div',
+                { className: "p-4" },
+                React.createElement('div',
+                    { className: "grid grid-cols-2 md:grid-cols-3 gap-3" },
+                    checklistItems.map(item => 
+                        React.createElement('div',
+                            {
+                                key: item.ID,
+                                className: "flex items-center gap-2"
+                            },
+                            [
+                                // Checkbox icon (read-only)
+                                React.createElement('div',
+                                    {
+                                        className: `w-5 h-5 flex items-center justify-center rounded border ${
+                                            getIsCompleted(item.ID)
+                                                ? 'bg-green-500 border-green-500 text-white'
+                                                : 'border-gray-300 bg-gray-50'
+                                        }`
+                                    },
+                                    getIsCompleted(item.ID) && React.createElement('i',
+                                        { className: "fas fa-check text-xs" }
+                                    )
+                                ),
+                                // Label
+                                React.createElement('span',
+                                    { className: "text-sm text-gray-700" },
+                                    item.Name
+                                )
+                            ]
+                        )
+                    )
+                )
+            )
+        ]
+    );
+};
+
+export default DocumentChecklist;

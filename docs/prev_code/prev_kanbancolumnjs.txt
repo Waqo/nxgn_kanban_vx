@@ -1,0 +1,180 @@
+// app/components/kanban/KanbanColumn.js
+import KanbanCard from './KanbanCard.js';
+import BaseBadge from '../common/BaseBadge.js';
+
+const KanbanColumn = {
+  name: 'KanbanColumn',
+  components: { // Register local component
+    KanbanCard,
+    BaseBadge
+  },
+  props: {
+    stage: {
+      type: Object,
+      required: true,
+      // Expected shape: { ID: String, title: String, ... }
+    },
+    projects: {
+      type: Array,
+      default: () => [],
+      // Expected shape: Array of project objects
+    },
+    isCollapsed: { // Added prop
+        type: Boolean,
+        default: false
+    }
+  },
+  emits: ['card-drag-start', 'card-drag-end', 'column-drop', 'toggle-collapse'],
+  data() {
+    return {
+      isDragOver: false, // State to track if a draggable element is over the column
+    };
+  },
+  computed: {
+    projectCount() {
+      const count = this.projects.length;
+
+      return count;
+    },
+    // Calculate total system size for the column
+    totalSystemSizeKw() {
+      // Ensure projects is an array and contains objects with systemSize
+      if (!Array.isArray(this.projects)) return '0.00';
+      const total = this.projects.reduce((sum, project) => {
+          // Access systemSize safely, default to 0 if missing/invalid
+          const size = parseFloat(project?.systemSize) || 0;
+          return sum + size;
+      }, 0);
+      const formattedTotal = total.toFixed(2);
+  
+      return formattedTotal;
+    }
+  },
+  methods: {
+    handleDragEnter(event) {
+      event.preventDefault();
+      this.isDragOver = true;
+
+    },
+    handleDragOver(event) {
+      event.preventDefault(); // Necessary to allow dropping
+      this.isDragOver = true; // Ensure it stays true if moving within column
+      // console.log(`KanbanColumn (${this.stage.title}): Drag Over`); // Can be noisy
+    },
+    handleDragLeave(event) {
+      // Be careful with dragleave, it fires when moving over child elements
+      // A common check is to see if relatedTarget is outside the column element
+      if (!this.$el.contains(event.relatedTarget)) {
+          this.isDragOver = false;
+          console.log(`KanbanColumn (${this.stage.title}): Drag Leave`);
+      }
+    },
+    handleDrop(event) {
+      event.preventDefault();
+      this.isDragOver = false;
+      console.log(`KanbanColumn (${this.stage.title}): Drop`);
+      // Emit event to notify the parent (KanbanBoard) about the drop
+      this.$emit('column-drop'); // KanbanBoard already knows the target stage ID
+    },
+    // --- Child Card Event Handling ---
+    onCardDragStart(cardId) {
+        console.log(`KanbanColumn (${this.stage.title}): Emitting card-drag-start for ${cardId}`);
+        this.$emit('card-drag-start', cardId, this.stage.ID); // Pass cardId and stageId up
+    },
+    onCardDragEnd() {
+        console.log(`KanbanColumn (${this.stage.title}): Emitting card-drag-end`);
+        this.$emit('card-drag-end');
+    },
+    // Placeholder for handling card clicks (e.g., opening modal)
+    onCardClick(projectId) {
+    
+        // Likely dispatch a store action to set the current project and show the modal
+        // this.$store.dispatch('modal/openProjectModal', projectId);
+    },
+    // Method to emit toggle event
+    toggleCollapse() {
+        this.$emit('toggle-collapse', this.stage.id);
+    }
+  },
+  // Updated template with collapse logic
+  template: `
+      <div
+        :class="[
+            'kanban-column flex flex-col max-h-full bg-gray-100 rounded-lg shadow transition-all duration-300 ease-in-out',
+            isCollapsed ? 'w-12 flex-shrink-0' : 'w-72 flex-shrink-0' 
+        ]"
+        @dragenter.prevent="handleDragEnter" 
+        @dragover.prevent="handleDragOver" 
+        @dragleave="handleDragLeave"
+        @drop.prevent="handleDrop"
+      >
+        <!-- Column Header -->
+        <div 
+          :class="[
+              'border-b border-gray-300 flex items-center justify-between cursor-pointer hover:bg-gray-200 flex-shrink-0',
+              isCollapsed ? 'p-2 h-full flex-col' : 'p-3'
+            ]" 
+          @click="toggleCollapse"
+          title="Click to toggle collapse"
+        >
+            <!-- Main Header Content -->
+            <div :class="['flex items-center gap-2 flex-grow', isCollapsed ? 'h-full justify-center' : 'min-w-0']">
+                <h3 
+                    :class="[
+                    'text-sm font-medium text-gray-700 uppercase',
+                    isCollapsed ? 'transform rotate-180 whitespace-nowrap' : 'whitespace-normal'
+                    ]"
+                    :style="isCollapsed ? { 'writing-mode': 'vertical-lr' } : {}"
+                >
+                    {{ stage.title || 'Unnamed Stage' }}
+                </h3>
+                <!-- Use BaseBadge for count/size (Not Collapsed) -->
+                <div v-if="!isCollapsed" class="flex items-center gap-1 flex-shrink-0">
+                    <base-badge color="gray">{{ projectCount }}</base-badge>
+                    <base-badge color="blue">{{ totalSystemSizeKw }} kW</base-badge>
+                </div>
+            </div>
+
+           <!-- Controls Container -->
+           <div :class="['flex items-center flex-shrink-0', isCollapsed ? 'flex-col-reverse space-y-1 space-y-reverse' : 'ml-1']">
+                <!-- Use BaseBadge for count/size (Collapsed) -->
+                 <div v-if="isCollapsed" class="flex flex-col space-y-0.5 items-center">
+                    <base-badge color="gray">{{ projectCount }}</base-badge>
+                    <base-badge color="blue">{{ totalSystemSizeKw }}</base-badge>
+                 </div>
+                 <!-- Collapse/Expand Button -->
+                 <button type="button" class="text-gray-400 hover:text-gray-600 focus:outline-none p-1" :title="isCollapsed ? 'Expand' : 'Collapse'" :class="isCollapsed ? 'mb-auto' : ''">
+                     <svg v-if="isCollapsed" class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" /></svg>
+                     <svg v-else class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" /></svg>
+                 </button>
+           </div>
+        </div>
+
+        <!-- Column Body -->
+        <div v-if="!isCollapsed" class="flex-grow overflow-y-auto p-2 space-y-2 min-h-[100px]">
+          <kanban-card
+            v-for="project in projects"
+            :key="project.id" 
+            :project="project"
+            @dragstart="onCardDragStart(project.id)"
+            @dragend="onCardDragEnd"
+            @click="onCardClick(project.id)"
+            >
+          </kanban-card>
+          
+          <div v-if="isDragOver" class="h-16 border-2 border-dashed border-blue-300 rounded-md bg-blue-50 flex items-center justify-center text-blue-500 text-sm">
+             Drop here
+          </div>
+
+           <div v-if="!projects.length && !isDragOver" class="text-center text-gray-500 text-sm py-4">
+            No projects in this stage.
+          </div>
+        </div>
+      </div>
+    `
+};
+
+// Expose the component definition globally within the AppComponents object
+// window.AppComponents = window.AppComponents || {};
+// window.AppComponents.KanbanColumn = KanbanColumn; 
+export default KanbanColumn; 

@@ -1,0 +1,29 @@
+export const navigateToURL = async (url, windowType = "new") => {
+    try {
+ 
+        
+        // Special handling for mailto: links
+        if (url.startsWith('mailto')) {
+            const config = {
+                action: "open",
+                url: url,
+                window: "new" // Use same window for email client
+            };
+            
+            await ZOHO.CREATOR.UTIL.navigateParentURL(config);
+            return;
+        }
+        
+        // For all other URLs
+        const config = {
+            action: "open",
+            url: url,
+            window: windowType
+        };
+        
+        await ZOHO.CREATOR.UTIL.navigateParentURL(config);
+    } catch (error) {
+        console.error('Navigation error:', error);
+        // Fallback to direct navigation if Zoho navigation fails
+    }
+};

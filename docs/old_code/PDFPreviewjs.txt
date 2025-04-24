@@ -1,0 +1,86 @@
+/* global React */
+import React from 'react';
+
+const PDFPreview = ({ 
+    pdfData, 
+    fileName, 
+    onClose, 
+    onDownload 
+}) => {
+    return React.createElement('div',
+        {
+            className: 'fixed inset-0 z-50 flex flex-col bg-black',
+            onClick: onClose
+        },
+        React.createElement('div',
+            {
+                className: 'relative w-full h-full flex flex-col bg-white',
+                onClick: e => e.stopPropagation()
+            },
+            [
+                // Header with filename and close button
+                React.createElement('div',
+                    {
+                        className: 'px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50'
+                    },
+                    [
+                        React.createElement('h3',
+                            {
+                                className: 'text-lg font-medium text-gray-900 truncate max-w-lg'
+                            },
+                            fileName
+                        ),
+                        React.createElement('button',
+                            {
+                                onClick: onClose,
+                                className: 'flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors',
+                                title: 'Close preview'
+                            },
+                            [
+                                React.createElement('i', {
+                                    className: 'fas fa-times'
+                                }),
+                                'Close'
+                            ]
+                        )
+                    ]
+                ),
+                // PDF viewer container
+                React.createElement('div',
+                    {
+                        className: 'flex-grow flex items-center justify-center bg-gray-100 relative'
+                    },
+                    React.createElement('iframe', {
+                        src: pdfData,
+                        className: 'absolute inset-0 w-full h-full',
+                        title: fileName,
+                        allowFullScreen: true,
+                        toolbar: false
+                    })
+                ),
+                // Footer with download button
+                React.createElement('div',
+                    {
+                        className: 'px-6 py-4 border-t border-gray-200 flex justify-end bg-gray-50'
+                    },
+                    React.createElement('button',
+                        {
+                            onClick: onDownload,
+                            className: 'inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors gap-2',
+                        },
+                        [
+                            React.createElement('i',
+                                {
+                                    className: 'fas fa-download'
+                                }
+                            ),
+                            'Download'
+                        ]
+                    )
+                )
+            ]
+        )
+    );
+};
+
+export default PDFPreview; 

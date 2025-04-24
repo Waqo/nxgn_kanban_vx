@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-white w-full h-screen">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- Mobile web app support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    
+    <title>NexGen Portal - Kanban VX</title>
+    
+    <!-- External Libraries -->
+    <link href="https://cdn.jsdelivr.net/npm/@tailwindcss/ui@latest/dist/tailwind-ui.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/vuex@4/dist/vuex.global.js"></script>
+    <script src="https://js.zohostatic.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+
+    <!-- Custom Styles -->
+    <style>
+      /* Hide scrollbar while maintaining functionality */
+      .scrollbar-hide {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;     /* Firefox */
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+          display: none;             /* Chrome, Safari and Opera */
+      }
+      /* Add any other global custom styles here */
+    </style>
+
+    <!-- Main App (Will handle importing everything else) -->
+  
+  </head>
+  
+  <body class="bg-white w-full h-screen">
+    <div id="app" class="w-full h-full">
+      <!-- Vue app will mount here. Can add a simple loading message -->
+      <!-- Vue app mounts here. Content removed to avoid flicker. -->
+    </div>
+
+    <!-- Component templates are now defined within their respective .js files -->
+    <script type="module" src="./App.js"></script>
+  </body>
+</html>
+
+

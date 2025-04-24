@@ -1,0 +1,651 @@
+/* global React */
+import React, { useState, useEffect } from 'react';
+import SystemApprovalModal from './SystemApprovalModal.js';
+import AddMaterialForm from './AddMaterialForm.js';
+import { fetchProjectDetails } from '../utils/dataFetching.js';
+import { deleteRecord } from '../utils/deleteRecord.js';
+import { updateRecord } from '../utils/recordUpdates.js';
+import { MoreVertical } from 'lucide-react';
+
+const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(amount);
+};
+
+// Helper function for number formatting
+const formatNumber = (value, decimals = 0, addCommas = true) => {
+    if (!value && value !== 0) return '0';
+    const num = Number(value).toFixed(decimals);
+    return addCommas ? num.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : num;
+};
+
+const SystemsTab = ({ project, fetchModalData, equipmentData }) => {
+    // Now project contains all the processed data
+    const materials = project.materials || [];
+
+    
+    // Move state declarations here
+    const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+    const [isAddMaterialModalOpen, setIsAddMaterialModalOpen] = useState(false);
+    const [editingMaterialId, setEditingMaterialId] = useState(null);
+    const [showActionMenu, setShowActionMenu] = useState(null);
+    const [availableManufacturers, setAvailableManufacturers] = useState([]);
+    const [availableModels, setAvailableModels] = useState([]);
+    const [editFormData, setEditFormData] = useState({
+        manufacturer: '',
+        model: '',
+        quantity: 0,
+        unitPrice: 0,
+        totalPrice: 0
+    });
+
+    // Group materials by category
+    const groupedMaterials = materials.reduce((acc, material) => {
+        // Normalize category - map both 'Other' and 'Other Component' to 'Other Component'
+        const category = material.Category === 'Other' ? 'Other Component' : (material.Category || 'Other Component');
+        if (!acc[category]) {
+            acc[category] = [];
+        }
+        acc[category].push(material);
+        return acc;
+    }, {});
+    
+
+    // Calculate totals
+    const totalCost = materials.reduce((sum, material) => 
+        sum + (parseFloat(material.Total_Price) || 0), 0
+    );
+
+    // Add Material button handler
+    const handleAddMaterial = () => {
+        setIsAddMaterialModalOpen(true);
+    };
+
+    // Refresh materials after adding new one
+    const handleMaterialAdded = async () => {
+        if (project.id) {
+            await fetchModalData(project.id);
+            setIsAddMaterialModalOpen(false);  // Close the modal after successful add
+        }
+    };
+
+    // Add the handleEditClick function
+    const handleEditClick = () => {
+        
+        setIsApprovalModalOpen(true);
+       
+    };
+
+    const handleDeleteMaterial = async (materialId) => {
+        try {
+            console.log('Deleting material:', materialId);
+            await deleteRecord('PM_Kanban_Materials', materialId);
+            await fetchModalData(project.id); // Refresh the data
+            setShowActionMenu(null);
+        } catch (error) {
+            console.error('Error deleting material:', error);
+        }
+    };
+
+    const handleEditMaterial = (materialId) => {
+        console.log('Editing material:', materialId);
+        setEditingMaterialId(materialId);
+        setShowActionMenu(null);
+    };
+
+    // Update manufacturers when editing starts
+    useEffect(() => {
+        if (editingMaterialId && materials) {
+            const material = materials.find(m => m.ID === editingMaterialId);
+            if (material && equipmentData[material.Category]) {
+                const manufacturers = [...new Set(
+                    equipmentData[material.Category].map(item => item.manufacturer)
+                )];
+                setAvailableManufacturers(manufacturers);
+                
+                if (manufacturers.includes(material.Manufacturer)) {
+                    const models = equipmentData[material.Category]
+                        .filter(item => item.manufacturer === material.Manufacturer)
+                        .map(item => ({
+                            model: item.model,
+                            cost: item.cost
+                        }));
+                    setAvailableModels(models);
+                    setEditFormData({
+                        manufacturer: material.Manufacturer,
+                        model: material.Model,
+                        quantity: parseInt(material.Quantity) || 0,
+                        unitPrice: parseFloat(material.Unit_Price) || 0,
+                        totalPrice: parseFloat(material.Total_Price) || 0
+                    });
+                }
+            }
+        }
+    }, [editingMaterialId, materials, equipmentData]);
+
+    // Update models when manufacturer changes
+    useEffect(() => {
+        if (editingMaterialId && editFormData.manufacturer) {
+            const material = materials.find(m => m.ID === editingMaterialId);
+            if (material && material.Category && equipmentData[material.Category]) {
+                const models = equipmentData[material.Category]
+                    .filter(item => item.manufacturer === editFormData.manufacturer)
+                    .map(item => ({
+                        model: item.model,
+                        cost: item.cost
+                    }));
+                setAvailableModels(models);
+            }
+        }
+    }, [editFormData.manufacturer, editingMaterialId, materials, equipmentData]);
+
+    // Update total price when quantity or unit price changes
+    useEffect(() => {
+        if (editingMaterialId) {
+            const total = editFormData.quantity * editFormData.unitPrice;
+            setEditFormData(prev => ({
+                ...prev,
+                totalPrice: total
+            }));
+        }
+    }, [editFormData.quantity, editFormData.unitPrice, editingMaterialId]);
+
+    // Move renderMaterialItem here and update it to use the state from above
+    const renderMaterialItem = (material) => {
+        const isEditing = editingMaterialId === material.ID;
+
+        if (isEditing) {
+            return React.createElement('div',
+                { 
+                    key: material.ID,
+                    className: 'relative flex items-center justify-between p-4 bg-white rounded-lg shadow' 
+                },
+                [
+                    React.createElement('div',
+                        { className: 'flex-1' },
+                        [
+                            // Manufacturer and Model dropdowns
+                            React.createElement('div',
+                                { className: 'grid grid-cols-2 gap-4 mb-4' },
+                                [
+                                    React.createElement('select',
+                                        {
+                                            className: 'p-2 border rounded',
+                                            value: editFormData.manufacturer || '',  // Ensure value is set
+                                            onChange: (e) => setEditFormData(prev => ({
+                                                ...prev,
+                                                manufacturer: e.target.value,
+                                                model: '',  // Clear model when manufacturer changes
+                                                unitPrice: 0
+                                            }))
+                                        },
+                                        [
+                                            React.createElement('option', { value: '' }, 'Select Manufacturer'),
+                                            ...availableManufacturers.map(mfr =>
+                                                React.createElement('option',
+                                                    { value: mfr, key: mfr },
+                                                    mfr
+                                                )
+                                            )
+                                        ]
+                                    ),
+                                    React.createElement('select',
+                                        {
+                                            className: 'p-2 border rounded',
+                                            value: editFormData.model || '',  // Ensure value is set
+                                            onChange: (e) => {
+                                                const selectedModel = availableModels.find(m => m.model === e.target.value);
+                                                setEditFormData(prev => ({
+                                                    ...prev,
+                                                    model: e.target.value,
+                                                    unitPrice: selectedModel?.cost || 0,
+                                                    totalPrice: (selectedModel?.cost || 0) * prev.quantity
+                                                }));
+                                            }
+                                        },
+                                        [
+                                            React.createElement('option', { value: '' }, 'Select Model'),
+                                            ...availableModels.map(model =>
+                                                React.createElement('option',
+                                                    { value: model.model, key: model.model },
+                                                    model.model
+                                                )
+                                            )
+                                        ]
+                                    )
+                                ]
+                            ),
+                            // Quantity input and Total Price display
+                            React.createElement('div',
+                                { className: 'grid grid-cols-2 gap-4' },
+                                [
+                                    React.createElement('input',
+                                        {
+                                            type: 'number',
+                                            className: 'p-2 border rounded',
+                                            value: editFormData.quantity,
+                                            onChange: (e) => setEditFormData(prev => ({
+                                                ...prev,
+                                                quantity: Math.max(1, parseInt(e.target.value) || 0),
+                                                totalPrice: (prev.unitPrice || 0) * Math.max(1, parseInt(e.target.value) || 0)
+                                            })),
+                                            min: 1
+                                        }
+                                    ),
+                                    React.createElement('input',
+                                        {
+                                            type: 'text',
+                                            className: 'p-2 border rounded bg-gray-50',
+                                            value: `$${Number(editFormData.totalPrice).toFixed(2)}`,
+                                            readOnly: true
+                                        }
+                                    )
+                                ]
+                            ),
+                            // Save/Cancel buttons
+                            React.createElement('div',
+                                { className: 'flex justify-end gap-2 mt-4' },
+                                [
+                                    React.createElement('button',
+                                        {
+                                            className: 'px-3 py-1 text-sm bg-gray-100 text-gray-600 rounded hover:bg-gray-200',
+                                            onClick: () => setEditingMaterialId(null)
+                                        },
+                                        'Cancel'
+                                    ),
+                                    React.createElement('button',
+                                        {
+                                            className: 'px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600',
+                                            onClick: async () => {
+                                                const updatedMaterial = {
+                                                    data: {
+                                                        Manufacturer: editFormData.manufacturer,
+                                                        Model: editFormData.model,
+                                                        Quantity: editFormData.quantity,
+                                                        Unit_Price: editFormData.unitPrice,
+                                                        Total_Price: editFormData.totalPrice
+                                                    }
+                                                };
+                                                try {
+                                                    await updateRecord('PM_Kanban_Materials', material.ID, updatedMaterial);
+                                                    await fetchModalData(project.id);
+                                                    setEditingMaterialId(null);
+                                                } catch (error) {
+                                                    console.error('Error updating material:', error);
+                                                }
+                                            }
+                                        },
+                                        'Save'
+                                    )
+                                ]
+                            )
+                        ]
+                    )
+                ]
+            );
+        }
+
+        // Regular view (non-editing) remains the same
+        return React.createElement('div',
+            { 
+                key: material.ID,
+                className: 'relative flex items-center justify-between p-4 bg-white rounded-lg shadow' 
+            },
+            [
+                // Material info
+                React.createElement('div',
+                    { className: 'flex-1' },
+                    [
+                        React.createElement('div',
+                            { className: 'flex justify-between items-start' },
+                            [
+                                React.createElement('div', null, [
+                                    React.createElement('h4',
+                                        { className: 'font-medium text-gray-900' },
+                                        `${material.Manufacturer} - ${material.Model}`
+                                    ),
+                                    React.createElement('p',
+                                        { className: 'text-sm text-gray-500' },
+                                        `Category: ${material.Category}`
+                                    )
+                                ])
+                            ]
+                        ),
+                        // Quantity and price info
+                        React.createElement('div',
+                            { className: 'mt-2 flex items-center gap-4 text-sm text-gray-600' },
+                            [
+                                React.createElement('span', null, `Quantity: ${material.Quantity}`),
+                                React.createElement('span', null, `Unit Price: $${material.Unit_Price}`),
+                                React.createElement('span', null, `Total: $${material.Total_Price}`)
+                            ]
+                        )
+                    ]
+                )
+            ]
+        );
+    };
+
+    // Create the modal component using the same pattern as the issue modal
+    const approvalModal = isApprovalModalOpen && React.createElement(SystemApprovalModal, {
+        isOpen: true,
+        onClose: () => {
+            setIsApprovalModalOpen(false);
+        },
+        system: {
+            kw_STC: parseFloat(project.kw_STC) || 0,
+            annualOutput: parseFloat(project.annualOutput) || 0,
+            annualUsage: project.annualUsage,
+            offset: Number(project.offset || 0).toFixed(2),
+            yield: Number(project.yield || 0).toFixed(2),
+            isApproved: project.isApproved === true || project.isApproved === "true",
+            yieldLessThan1050: project.yieldLessThan1050 === "true",
+            Project: project.id  // Make sure to pass the project ID
+        },
+        materials: materials,
+        onUpdate: async () => {
+            await fetchModalData(project.id);
+            setIsApprovalModalOpen(false);
+        }
+    });
+
+    // Add click outside handler
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showActionMenu && !event.target.closest('.action-menu-container')) {
+                setShowActionMenu(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showActionMenu]);
+
+    return React.createElement('div',
+        { className: "p-6 max-w-5xl mx-auto" },
+        [
+            // System Overview Section
+            React.createElement('div',
+                { className: "max-w-4xl mx-auto mb-8" },
+                React.createElement('div', 
+                    { className: "bg-white rounded-lg shadow-sm" },
+                    [
+                        // Header with buttons
+                        React.createElement('div',
+                            { className: "flex justify-between items-center p-4 border-b" },
+                            [
+                                React.createElement('h3',
+                                    { className: "text-lg font-medium text-gray-900" },
+                                    "System Overview"
+                                ),
+                                React.createElement('div',
+                                    { className: "flex items-center gap-2" },
+                                    [
+                                        React.createElement('span',
+                                            { 
+                                                className: `px-2 py-1 text-sm rounded ${
+                                                    project.isApproved 
+                                                        ? "bg-green-50 text-green-700" 
+                                                        : "bg-red-50 text-red-700"
+                                                }`
+                                            },
+                                            project.isApproved ? "Approved" : "Not Approved"
+                                        ),
+                                        React.createElement('button',
+                                            { 
+                                                className: "px-3 py-1 text-sm rounded bg-blue-50 text-blue-600 hover:bg-blue-100",
+                                                onClick: handleEditClick
+                                            },
+                                            "Edit"
+                                        )
+                                    ]
+                                )
+                            ]
+                        ),
+                        // Metrics Grid with bottom-right aligned values
+                        React.createElement('div',
+                            { className: "grid grid-cols-5 gap-6 p-6" },
+                            [
+                                // System Size
+                                React.createElement('div',
+                                    { className: "bg-gray-50 p-4 rounded-lg border border-gray-100 flex flex-col h-24" },
+                                    [
+                                        React.createElement('span',
+                                            { className: "block text-xs font-medium text-gray-500 uppercase tracking-wide" },
+                                            "System Size [kW]"
+                                        ),
+                                        React.createElement('span',
+                                            { className: "mt-auto block text-lg font-semibold text-gray-900 text-right" },
+                                            formatNumber(project.kw_STC, 2)
+                                        )
+                                    ]
+                                ),
+                                // Annual Output
+                                React.createElement('div',
+                                    { className: "bg-gray-50 p-4 rounded-lg border border-gray-100 flex flex-col h-24" },
+                                    [
+                                        React.createElement('span',
+                                            { className: "block text-xs font-medium text-gray-500 uppercase tracking-wide" },
+                                            "Annual Output [kWh]"
+                                        ),
+                                        React.createElement('span',
+                                            { className: "mt-auto block text-lg font-semibold text-gray-900 text-right" },
+                                            formatNumber(project.annualOutput)
+                                        )
+                                    ]
+                                ),
+                                // Annual Usage
+                                React.createElement('div',
+                                    { className: "bg-gray-50 p-4 rounded-lg border border-gray-100 flex flex-col h-24" },
+                                    [
+                                        React.createElement('span',
+                                            { className: "block text-xs font-medium text-gray-500 uppercase tracking-wide" },
+                                            "Annual Usage [kWh]"
+                                        ),
+                                        React.createElement('span',
+                                            { className: "mt-auto block text-lg font-semibold text-gray-900 text-right" },
+                                            formatNumber(project.annualUsage)
+                                        )
+                                    ]
+                                ),
+                                // Yield
+                                React.createElement('div',
+                                    { className: "bg-gray-50 p-4 rounded-lg border border-gray-100 flex flex-col h-24" },
+                                    [
+                                        React.createElement('span',
+                                            { className: "block text-xs font-medium text-gray-500 uppercase tracking-wide" },
+                                            "Yield [kWh/kW]"
+                                        ),
+                                        React.createElement('span',
+                                            { className: "mt-auto block text-lg font-semibold text-gray-900 text-right" },
+                                            formatNumber(project.yield, 0)
+                                        )
+                                    ]
+                                ),
+                                // Offset
+                                React.createElement('div',
+                                    { className: "bg-gray-50 p-4 rounded-lg border border-gray-100 flex flex-col h-24" },
+                                    [
+                                        React.createElement('span',
+                                            { className: "block text-xs font-medium text-gray-500 uppercase tracking-wide" },
+                                            "Offset [%]"
+                                        ),
+                                        React.createElement('span',
+                                            { className: "mt-auto block text-lg font-semibold text-gray-900 text-right" },
+                                            `${formatNumber(project.offset, 1)}`
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ),
+
+            // Components Header with Add Material Button
+            React.createElement('div',
+                { className: "mb-8 flex justify-between items-center" },
+                [
+                    React.createElement('div',
+                        { className: "flex items-center gap-3" },
+                        [
+                            React.createElement('i',
+                                { className: "fas fa-solar-panel text-blue-500 text-xl" }
+                            ),
+                            React.createElement('h3',
+                                { className: "text-xl font-semibold text-gray-900" },
+                                "System Components"
+                            ),
+                            React.createElement('span',
+                                { className: "ml-4 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-sm font-medium" },
+                                `Total: ${formatCurrency(totalCost)}`
+                            )
+                        ]
+                    ),
+                    // Add Material Button
+                    React.createElement('button',
+                        {
+                            onClick: handleAddMaterial,
+                            className: "px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-2"
+                        },
+                        [
+                            React.createElement('i',
+                                { className: "fas fa-plus" }
+                            ),
+                            "Add Material"
+                        ]
+                    )
+                ]
+            ),
+
+      // Materials Grid
+React.createElement('div',
+    { className: "grid grid-cols-1 gap-6" },
+    materials.length > 0 
+        ? ['Module', 'Inverter', 'Battery', 'Other Component'].map(category => {
+            const categoryMaterials = groupedMaterials[category] || [];
+            if (categoryMaterials.length === 0) return null;
+            return React.createElement('div',
+                { 
+                    key: category,
+                    className: "bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+                },
+                [
+                    // Category Header
+                    React.createElement('div',
+                        { className: "px-6 py-4 bg-gray-50 border-b border-gray-200" },
+                        React.createElement('div',
+                            { className: "flex justify-between items-center" },
+                            [
+                                // Left side: Header with icon
+                                React.createElement('h4',
+                                    { className: "text-lg font-medium text-gray-900 flex items-center" },
+                                    [
+                                        React.createElement('i',
+                                            { 
+                                                className: `fas ${
+                                                    category === 'Module' ? 'fa-solar-panel' :
+                                                    category === 'Inverter' ? 'fa-plug' :
+                                                    category === 'Battery' ? 'fa-battery-full' :
+                                                    'fa-box'
+                                                } mr-2 text-blue-500`
+                                            }
+                                        ),
+                                        category
+                                    ]
+                                ),
+                                
+                                // Right side: Actions Menu
+                                React.createElement('div', 
+                                    { className: 'relative action-menu-container' },
+                                    [
+                                        React.createElement('button',
+                                            {
+                                                className: 'p-1 rounded-full hover:bg-gray-100',
+                                                onClick: () => setShowActionMenu(
+                                                    showActionMenu === category ? null : category
+                                                )
+                                            },
+                                            React.createElement(MoreVertical, { 
+                                                className: 'w-5 h-5 text-gray-500' 
+                                            })
+                                        ),
+                                        // Dropdown menu
+                                        showActionMenu === category && React.createElement('div',
+                                            {
+                                                className: 'absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10'
+                                            },
+                                            categoryMaterials.map(material => 
+                                                React.createElement('div', 
+                                                    { key: material.ID },
+                                                    [
+                                                        React.createElement('button',
+                                                            {
+                                                                className: 'w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100',
+                                                                onClick: () => handleEditMaterial(material.ID)
+                                                            },
+                                                            `Edit ${material.Category}`
+                                                        ),
+                                                        React.createElement('button',
+                                                            {
+                                                                className: 'w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100',
+                                                                onClick: () => handleDeleteMaterial(material.ID)
+                                                            },
+                                                            `Delete ${material.Category}`
+                                                        )
+                                                    ]
+                                                )
+                                            )
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ),
+                  
+                    // Materials List
+                    React.createElement('div',
+                        { className: "divide-y divide-gray-200" },
+                        categoryMaterials.map(material =>
+                            renderMaterialItem(material))
+                    )
+                ]
+            );
+        }).filter(Boolean)
+        : React.createElement('div',
+            { className: "text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200" },
+            [
+                React.createElement('i',
+                    { className: "fas fa-box-open text-gray-400 text-4xl mb-3" }
+                ),
+                React.createElement('p',
+                    { className: "text-gray-500 font-medium" },
+                    "No system components available"
+                ),
+                React.createElement('p',
+                    { className: "text-sm text-gray-400 mt-1" },
+                    "Components added to this project will appear here"
+                )
+            ]
+        )
+),
+
+
+            // Modals
+            isAddMaterialModalOpen && React.createElement(AddMaterialForm, {
+                isOpen: true,
+                onClose: () => setIsAddMaterialModalOpen(false),
+                equipmentData: equipmentData,
+                existingMaterials: materials,
+                projectId: project.id,
+                onMaterialAdded: handleMaterialAdded
+            }),
+
+            approvalModal
+        ]
+    );
+};
+
+export default SystemsTab;

@@ -1,0 +1,998 @@
+/* global React, WorkRequirementBars, EventsSection, NoteItem, DocumentsTab, IssuesSection, ActivitiesTab */
+
+import React, { useState } from "react";
+import { navigateToURL } from "../utils/navigation.js";
+import { getQueryParams } from "../utils/queryParams.js";
+import { logError } from "../utils/errorHandling.js";
+import { fetchProjectDetails } from "../utils/dataFetching.js";
+import { updateUserCallStatus, updateRecord } from "../utils/recordUpdates.js";
+import { updateProjectTranche } from "../utils/stagecardUpdate.js";
+import { createRecord } from "../utils/recordCreation.js";
+import { getDocTypes } from "../utils/zohoApi.js";
+// import WorkRequirementBars from "./WorkRequirementBars.js";
+// import EventsSection from "./EventsSection.js";
+// import NoteItem from "./NoteItem.js";
+import DocumentsTab from "./DocumentsTab.js";
+// import IssuesSection from "./IssuesSection.js";
+import ActivitiesTab from "./ActivitiesTab.js";
+import SystemsTab from "./SystemsTab.js";
+// import NotesSection from "./NotesSection.js";
+import IssueModal from "./IssueModal.js";
+// import SalesRepInfo from "./SalesRepInfo.js";
+import CommunicationTab from "./CommunicationTab.js";
+// import CommSection from "./CommSection.js";
+import TagModal from "./TagModal.js";
+import SalesRepTab from "./SalesRepTab.js";
+import OverviewTab from "./OverviewTab.js";
+// import Counters from "./Counters.js";
+import ModalHeader from "./ModalHeader.js";
+import PermittingTab from "./PermittingTab.js";
+// import { updateProjectStage } from "../utils/stagecardUpdate.js";
+import Toast from "./Toast.js";
+import ContactTab from "./ContactTab.js";
+// import {
+//   Mail,
+//   Phone,
+//   RefreshCw,
+//   X,
+//   ExternalLink,
+//   MoreVertical,
+//   Plus,
+// } from "lucide-react";
+import { useToast } from "../contexts/ToastContext.js";
+import SurveyTab from "./SurveyTab.js";
+// import CommissionNotes from "./CommissionNotes.js";
+import InvestorsTab from "./InvestorsTab.js";
+import PDFPreview from "./PDFPreview.js";
+
+// const INITIAL_REPLIES_SHOWN = 2;
+
+// const formatDate = (dateString) => {
+//   if (!dateString) return "";
+//   return new Date(dateString).toLocaleDateString("en-US", {
+//     month: "2-digit",
+//     day: "2-digit",
+//     year: "2-digit",
+//   });
+// };
+
+// const formatPhoneNumber = (phoneNumber) => {
+//   if (!phoneNumber) return { display: "", link: "" };
+
+//   const cleaned = phoneNumber.replace(/\D/g, "");
+
+//   if (cleaned.length === 10) {
+//     const display = `(${cleaned.slice(0, 3)}) ${cleaned.slice(
+//       3,
+//       6
+//     )}-${cleaned.slice(6)}`;
+//     const link = cleaned;
+//     return { display, link };
+//   }
+
+//   return {
+//     display: phoneNumber,
+//     link: cleaned,
+//   };
+// };
+
+const getStageDisplay = (project, stages) => {
+  if (!project || !stages) return "";
+
+  // If project.stageField is a string, return it directly
+  if (typeof project.stageField === 'string') {
+    return project.stageField;
+  }
+
+  // If project.stageField is an object, use its title or display_value
+  const stageTitle = project.stageField?.title || project.stageField?.display_value || "";
+  
+  // Find matching stage
+  const stage = stages.find((s) => s.title === stageTitle);
+  return stage ? stage.title : stageTitle;
+};
+
+const getTrancheDisplay = (project, tranches) => {
+  if (!project?.tranche?.ID) return "No Tranche";
+  const tranche = tranches.find((t) => t.id === project.tranche.ID);
+  return tranche ? `Tranche ${tranche.number}` : "No Tranche";
+};
+
+export const ProjectDetailsModal = ({
+  project,
+  stages,
+  onClose,
+  fetchModalData,
+  openHelpModal,
+  isRefreshing,
+  setIsRefreshing,
+  users,
+  currentUser,
+  equipmentData,
+  tagMap,
+  salesReps,
+  tranchesData,
+  showToast,
+  previewDoc,
+  setPreviewDoc
+}) => {
+  const [activeTab, setActiveTab] = React.useState("overview");
+  const [noteInput, setNoteInput] = React.useState("");
+  const [replyInput, setReplyInput] = React.useState("");
+  const [replyingTo, setReplyingTo] = React.useState(null);
+  const [notifySales, setNotifySales] = React.useState(false);
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [isAddingEvent, setIsAddingEvent] = React.useState(false);
+  const [docTypes, setDocTypes] = React.useState([]);
+  const [isLoadingDocTypes, setIsLoadingDocTypes] = React.useState(true);
+  const [newEvent, setNewEvent] = React.useState({
+    type: "",
+    startTime: "",
+    details: "",
+  });
+  const [isAddingTag, setIsAddingTag] = React.useState(false);
+  const [selectedTagToAdd, setSelectedTagToAdd] = React.useState("");
+  const [expandedNotes, setExpandedNotes] = React.useState(new Set());
+  const [isAddingIssue, setIsAddingIssue] = React.useState(false);
+  const [issueInput, setIssueInput] = React.useState("");
+  const [projectData, setProjectData] = React.useState(project);
+  const [selectedUsers, setSelectedUsers] = React.useState([]);
+  const [showUserDropdown, setShowUserDropdown] = React.useState(false);
+  const [showAllNotes, setShowAllNotes] = React.useState(false);
+  const [showAllReplies, setShowAllReplies] = React.useState({});
+  const [selectedIssueUsers, setSelectedIssueUsers] = React.useState([]);
+  const [showIssueUserDropdown, setShowIssueUserDropdown] =
+    React.useState(false);
+  const [isTagLoading, setIsTagLoading] = React.useState(false);
+  const [isRemovingTag, setIsRemovingTag] = React.useState(false);
+//   const [isIssueLoading, setIsIssueLoading] = React.useState(false);
+  const [isChangingStage, setIsChangingStage] = React.useState(false);
+  const [isChangingTranche, setIsChangingTranche] = React.useState(false);
+  const [stageUpdateError, setStageUpdateError] = React.useState(null);
+//   const [stageSearchTerm, setStageSearchTerm] = useState("");
+  const [toast, setToast] = React.useState({
+    message: "",
+    type: "info",
+    isVisible: false,
+  });
+  //   const [showActionsMenu, setShowActionsMenu] = React.useState(false);
+  const [issueNotifySales, setIssueNotifySales] = useState(false);
+  const [isCreatingFolders, setIsCreatingFolders] = React.useState(false);
+
+  const { showToast: useToastShowToast } = useToast();
+
+  const availableTags = React.useMemo(() => {
+    return Array.from(tagMap.entries())
+      .map(([id, data]) => ({
+        name: data.name,
+        color: data.color,
+        ID: id,
+      }))
+      .filter(
+        (tag) =>
+          !projectData?.processedTags?.some(
+            (existingTag) => existingTag.ID === tag.ID
+          )
+      );
+  }, [tagMap, projectData?.processedTags]);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showUserDropdown && !event.target.closest(".relative")) {
+        setShowUserDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showUserDropdown]);
+
+  const handleReply = (noteId) => {
+    if (replyingTo === noteId) {
+      setReplyingTo(null);
+      setReplyInput("");
+    } else {
+      setReplyingTo(noteId);
+      setReplyInput("");
+    }
+  };
+
+  const handleAddNote = async (projectId) => {
+    try {
+      await fetchModalData(projectId);
+    } catch (error) {
+      console.error("Error refreshing notes:", error);
+      throw error;
+    }
+  };
+
+  const handleAddEvent = async (e) => {
+    e.preventDefault();
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+    } catch (error) {
+      logError(error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleEmailClick = (project) => {
+    console.log("Email click handler triggered");
+    const email = project.contactEmail;
+    if (email) {
+      try {
+        navigateToURL(`mailto:${email}`);
+        setTimeout(() => {
+          if (!document.hasFocus()) {
+            return;
+          }
+          setToast({
+            message:
+              "Unable to open email client. You may need to:\n1. Configure your default email client\n2. Allow email links in your browser settings\n3. Try copying the email address manually",
+            type: "warning",
+            isVisible: true,
+          });
+        }, 1000);
+      } catch (error) {
+        setToast({
+          message:
+            "Failed to open email client. Please check your browser settings.",
+          type: "error",
+          isVisible: true,
+        });
+      }
+    } else {
+      console.warn("No email address available for this contact.");
+      setToast({
+        message: "No email address available for this contact.",
+        type: "error",
+        isVisible: true,
+      });
+    }
+  };
+
+  const handlePhoneClick = (project) => {
+    const phone = project.contactPhone;
+    if (phone) {
+      navigateToURL(`tel:${phone}`, "same");
+    } else {
+      console.warn("No phone number available for this contact.");
+    }
+  };
+
+  const handleAddressClick = (project) => {
+    if (project.latitude && project.longitude) {
+      const mapsUrl = `https://www.google.com/maps?q=${project.latitude},${project.longitude}`;
+      navigateToURL(mapsUrl, "new");
+    } else if (project.address) {
+      const encodedAddress = encodeURIComponent(project.address);
+      const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+      navigateToURL(mapsUrl, "new");
+    } else {
+      console.warn("No address or coordinates available for this project.");
+    }
+  };
+
+  const handleRemoveTag = async (tagId) => {
+    try {
+      // Immediately update local state
+      setProjectData((prev) => ({
+        ...prev,
+        processedTags: prev.processedTags.filter((tag) => tag.ID !== tagId),
+      }));
+
+      useToastShowToast("Removing tag...", "loading");
+
+      const updatedTagIds = projectData?.processedTags
+        .filter((tag) => tag.ID !== tagId)
+        .map((tag) => tag.ID);
+
+      await updateRecord(
+        "PM_Kanban_Projects",
+        project.id,
+        {
+          data: {
+            Tags: updatedTagIds,
+          },
+        },
+        useToastShowToast,
+        {
+          loadingMessage: "Removing tag...",
+          successMessage: "Tag removed successfully",
+          errorMessage: "Failed to remove tag:",
+        }
+      );
+
+    } catch (error) {
+      console.error("Error removing tag:", error);
+      // Revert local state on error
+      setProjectData((prev) => ({
+        ...prev,
+        processedTags: project.processedTags,
+      }));
+      useToastShowToast("Failed to remove tag: " + error.message, "error");
+    }
+  };
+
+  // Modified handleAddTag function
+  const handleAddTag = async () => {
+    if (!selectedTagToAdd) return;
+
+    setIsAddingTag(false);
+    setIsTagLoading(true);
+
+    try {
+      const selectedTag = availableTags.find(
+        (tag) => tag.name === selectedTagToAdd
+      );
+      if (!selectedTag?.ID) {
+        console.error("Could not find ID for selected tag");
+        return;
+      }
+
+      // Immediately update local state
+      setProjectData((prev) => ({
+        ...prev,
+        processedTags: [
+          ...(prev.processedTags || []),
+          {
+            ID: selectedTag.ID,
+            name: selectedTag.name,
+            color: selectedTag.color,
+          },
+        ],
+      }));
+
+      const existingTagIds =
+        projectData?.processedTags?.map((tag) => tag.ID) || [];
+      const updatedTagIds = [...existingTagIds, selectedTag.ID];
+
+      await updateRecord(
+        "PM_Kanban_Projects",
+        projectData?.id,
+        {
+          data: {
+            Tags: updatedTagIds,
+          },
+        },
+        useToastShowToast,
+        {
+          loadingMessage: "Adding tag...",
+          successMessage: "Tag added successfully",
+          errorMessage: "Failed to add tag:",
+        }
+      );
+
+    } catch (error) {
+      console.error("Error adding tag:", error);
+      // Revert to original tags on error
+      setProjectData((prev) => ({
+        ...prev,
+        processedTags: project.processedTags,
+      }));
+      useToastShowToast("Failed to add tag: " + error.message, "error");
+    } finally {
+      setIsTagLoading(false);
+      setSelectedTagToAdd("");
+    }
+  };
+
+  const handleEventAdded = async () => {
+    try {
+      await fetchModalData(projectData?.id);
+    } catch (error) {
+      console.error("Error refreshing project data:", error);
+    }
+  };
+
+  const handleExpandNote = (noteId) => {
+    setExpandedNotes((prev) => {
+      const newSet = new Set(prev);
+      newSet.add(noteId);
+      return newSet;
+    });
+  };
+
+  const handleResolveIssue = async (issueId) => {
+    try {
+      console.log('Attempting to resolve issue with ID:', issueId);
+      if (!issueId) {
+        throw new Error('Issue ID is required');
+      }
+
+      await updateRecord(
+        "PM_Kanban_Issues",
+        issueId,
+        {
+          data: {
+            Is_Resolved: "true",
+            Resolved_By: currentUser?.id
+          }
+        },
+        useToastShowToast,
+        {
+          loadingMessage: "Resolving issue...",
+          successMessage: "Issue resolved successfully",
+          errorMessage: "Failed to resolve issue:"
+        }
+      );
+
+      // Fetch fresh data after successful update
+      await fetchModalData(projectData?.id);
+
+    } catch (error) {
+      console.error("Error resolving issue:", error);
+      useToastShowToast("Failed to resolve issue: " + error.message, "error");
+    }
+  };
+
+  const handleAddIssue = async () => {
+    if (!issueInput.trim()) return;
+
+    try {
+      const issueData = {
+        Issue: issueInput,
+        Project: project.id,
+        Author: currentUser.name,
+        User_Lookup: currentUser.id,
+        Notify_Sales: issueNotifySales,
+        Tagged_Users: selectedIssueUsers.map((user) => user.id),
+      };
+
+      const response = await createRecord("Add_Issue", issueData);
+      await fetchModalData(projectData?.id);
+      setIsAddingIssue(false);
+      setIssueInput("");
+      setSelectedIssueUsers([]);
+      setShowIssueUserDropdown(false);
+      setIssueNotifySales(false);
+    } catch (error) {
+      console.error("Error creating issue:", error);
+    }
+  };
+
+  const raiseIssueButton = React.createElement(
+    "button",
+    {
+      className:
+        "inline-flex items-center px-3 py-1.5 bg-red-500 text-white rounded-md hover:bg-red-600",
+      onClick: () => setIsAddingIssue(true),
+    },
+    [
+      React.createElement("i", { className: "fas fa-exclamation-circle mr-2" }),
+      "Raise Issue",
+    ]
+  );
+
+  React.useEffect(() => {
+    setProjectData(project);
+  }, [project]);
+
+  const handleRaiseIssue = () => {
+    console.log("handleRaiseIssue called");
+    setIsAddingIssue(true);
+    console.log("isAddingIssue set to:", true);
+  };
+
+  const handleStageChange = async (newStage) => {
+    setIsChangingStage(true);
+    setStageUpdateError(null);
+
+    const originalStage = projectData?.stageField;
+
+    try {
+      setProjectData((prev) => ({
+        ...prev,
+        stageField: newStage,
+        stageID: stages.find((s) => s.title === newStage)?.id,
+      }));
+
+      const stageData = stages.find((stage) => stage.title === newStage);
+      if (!stageData) {
+        throw new Error("Stage not found");
+      }
+
+      await updateRecord(
+        "PM_Kanban_Projects",
+        projectData?.id,
+        {
+          data: {
+            New_Stage: stageData.id,
+          },
+        },
+        useToastShowToast,
+        {
+          loadingMessage: "Updating project stage...",
+          successMessage: "Project stage updated successfully",
+          errorMessage: "Failed to update project stage:",
+        }
+      );
+
+      const updatedProject = await fetchModalData(projectData?.id);
+      setProjectData(updatedProject);
+    } catch (error) {
+      console.error("Error updating stage:", error);
+      setStageUpdateError("Failed to update stage");
+      setProjectData((prev) => ({
+        ...prev,
+        stageField: originalStage,
+        stageID: stages.find((s) => s.title === originalStage)?.id,
+      }));
+    } finally {
+      setIsChangingStage(false);
+    }
+  };
+
+  const currentStage = getStageDisplay(projectData, stages);
+
+  React.useEffect(() => {
+    if (!project?.tags || !Array.isArray(project?.tags)) return;
+
+    const processedTags = project?.tags.map((tag) => {
+      const tagName = tag.zc_display_value?.trim() || "";
+      const tagId = tag.ID || "";
+      const masterTagData = tagMap?.get(tagId);
+
+      return {
+        ID: tag.ID || "",
+        name: tagName,
+        color: masterTagData?.color || "#9CA3AF",
+      };
+    });
+
+    setProjectData((prev) => ({
+      ...prev,
+      processedTags,
+    }));
+  }, [project?.tags, tagMap]);
+
+  const handleTrancheChange = async (trancheId) => {
+    try {
+      setIsChangingTranche(true);
+      await updateProjectTranche(projectData?.id, trancheId);
+      useToastShowToast("Tranche updated successfully", "success");
+    } catch (error) {
+      console.error("Error updating tranche:", error);
+      useToastShowToast("Failed to update tranche", "error");
+      throw error; // Re-throw to trigger the revert in ModalHeader
+    } finally {
+      setIsChangingTranche(false);
+    }
+  };
+
+  const handleFundedByRedballChange = async (checked) => {
+    try {
+      await updateRecord(
+        "PM_Kanban_Projects",
+        project.id,
+        {
+          data: {
+            Funded_By_Redball: checked.toString(),
+          },
+        },
+        useToastShowToast,
+        {
+          loadingMessage: "Updating funding status...",
+          successMessage: "Funding status updated successfully",
+          errorMessage: "Failed to update funding status:",
+        }
+      );
+      await fetchModalData(project.id);
+    } catch (error) {
+      console.error("Error updating funded by redball status:", error);
+    }
+  };
+
+  const handleCreateFolders = async () => {
+    if (isCreatingFolders) return;
+    
+    setIsCreatingFolders(true);
+    showToast('Creating project folders...', 'loading');
+    
+    try {
+        // Update the trigger field to initiate folder creation
+        await updateRecord(
+            "PM_Kanban_Projects",
+            project.id,
+            {
+                data: {
+                    TRIG_Create_Project_Folders: "true"
+                }
+            },
+            showToast,
+            {
+                loadingMessage: "Initiating folder creation...",
+                successMessage: "Project folders creation initiated",
+                errorMessage: "Failed to initiate folder creation:"
+            }
+        );
+
+        await fetchModalData(project.id); // Refresh project data to get new folder IDs
+    } catch (error) {
+        console.error('Error initiating folder creation:', error);
+        showToast('Failed to initiate project folders creation', 'error');
+    } finally {
+        setIsCreatingFolders(false);
+    }
+  };
+
+  const tabs = [
+    { id: "overview", label: "Overview" },
+    { id: "contacts", label: "Contacts" },
+    { id: "documents", label: "Documents" },
+    { id: "survey", label: "Survey" },
+    { id: "system", label: "System" },
+    { id: "permitting", label: "Permitting" },
+    { id: "salesRep", label: "Sales Rep" },
+    { id: "propertyinfo", label: "Property Info" },
+    { id: "activity", label: "Activity" },
+    { id: "communications", label: "Communications" },
+    { id: "investors", label: "Investors" },
+  ];
+
+  // Add useEffect to fetch document types when mounted
+  React.useEffect(() => {
+    const fetchDocTypes = async () => {
+      try {
+        setIsLoadingDocTypes(true);
+        const types = await getDocTypes();
+        setDocTypes(types);
+        console.log('Fetched document types:', types); // For debugging
+      } catch (error) {
+        console.error('Error fetching document types:', error);
+        showToast('Failed to load document types', 'error');
+      } finally {
+        setIsLoadingDocTypes(false);
+      }
+    };
+
+    fetchDocTypes();
+  }, []);
+
+  const getTabContent = () => {
+    switch (activeTab) {
+      case "survey":
+        return React.createElement(SurveyTab, {
+          project: projectData,
+          fetchModalData: fetchModalData,
+        });
+      case "overview":
+        return React.createElement(OverviewTab, {
+          project,
+          onEventAdded: handleEventAdded,
+          noteInput,
+          setNoteInput,
+          handleAddNote,
+          handleReply,
+          replyingTo,
+          notifySales,
+          setNotifySales,
+          replyInput,
+          setReplyInput,
+          expandedNotes,
+          setExpandedNotes,
+          handleExpandNote,
+          handleResolveIssue,
+          selectedUsers,
+          setSelectedUsers,
+          users,
+          showUserDropdown,
+          setShowUserDropdown,
+          showAllNotes,
+          setShowAllNotes,
+          showAllReplies,
+          setShowAllReplies,
+          handleRaiseIssue,
+          setActiveTab,
+          currentUser,
+        });
+      case "contacts":
+        return React.createElement(ContactTab, {
+          project: projectData,
+          onRefresh: async () => {
+            try {
+              await fetchModalData(projectData?.id);
+            } catch (error) {
+              console.error("Error refreshing contacts:", error);
+            }
+          },
+        });
+      case "propertyinfo":
+        return React.createElement("div", { className: "p-6" }, [
+          React.createElement(
+            "div",
+            { className: "mb-4 pb-2 border-b border-gray-200" },
+            React.createElement(
+              "h3",
+              { className: "text-lg font-medium text-gray-900" },
+              "Property Information"
+            )
+          ),
+          projectData?.propertyInfo
+            ? React.createElement(
+                "div",
+                { className: "bg-white rounded-lg shadow-sm p-4" },
+                React.createElement(
+                  "pre",
+                  {
+                    className:
+                      "whitespace-pre-wrap text-sm text-gray-700 font-mono",
+                    style: { maxWidth: "100%", overflowX: "auto" },
+                  },
+                  projectData?.propertyInfo
+                )
+              )
+            : React.createElement(
+                "p",
+                { className: "text-sm text-gray-500 text-center py-4" },
+                "No property information available"
+              ),
+        ]);
+      case "activity":
+        return React.createElement(ActivitiesTab, {
+          project,
+        });
+      case "system":
+        return React.createElement(SystemsTab, {
+          project: projectData,
+          fetchModalData: fetchModalData,
+          equipmentData: equipmentData,
+        });
+      case "documents":
+        return React.createElement(DocumentsTab, {
+          project: projectData,
+          onRefresh: async () => {
+            try {
+              await fetchModalData(projectData?.id);
+            } catch (error) {
+              console.error("Error refreshing documents:", error);
+            }
+          },
+          currentUser,
+          users,
+          previewDoc,
+          setPreviewDoc,
+          docTypes,
+          isLoadingDocTypes
+        });
+      case "communications":
+        return React.createElement(CommunicationTab, {
+          communications: project.communications,
+          project: project,
+          currentUser: currentUser,
+          fetchModalData: fetchModalData,
+        });
+      case "salesrep":
+        return React.createElement(SalesRepTab, {
+          project: project,
+          salesReps: salesReps,
+          fetchModalData: fetchModalData,
+          users,
+          currentUser,
+        });
+      case "permitting":
+        return React.createElement(PermittingTab, {
+          project: project,
+          fetchModalData: fetchModalData,
+        });
+      case "investors":
+        return React.createElement(InvestorsTab, {
+          project: project,
+          fetchModalData: fetchModalData,
+        });
+      default:
+        return React.createElement(EventsTab, {
+          project: projectData,
+          isAddingEvent,
+          setIsAddingEvent,
+          newEvent,
+          setNewEvent,
+          handleAddEvent,
+        });
+    }
+  };
+
+  return React.createElement(
+    "div",
+    { className: "fixed inset-0 z-50 overflow-y-auto" },
+    [
+      React.createElement(
+        "div",
+        { className: "absolute inset-0 bg-gray-500 bg-opacity-75" },
+        React.createElement(
+          "div",
+          { className: "fixed inset-0 overflow-y-auto" },
+          React.createElement(
+            "div",
+            { className: "absolute inset-0 overflow-y-auto" },
+            React.createElement(
+              "div",
+              {
+                className:
+                  "pointer-events-none fixed flex max-w-full rounded-lg",
+                style: {
+                  top: "2%",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  height: "96%",
+                },
+              },
+              React.createElement(
+                "div",
+                {
+                  className:
+                    "pointer-events-auto w-screen max-w-6xl rounded-lg relative",
+                },
+                [
+                  React.createElement(
+                    "div",
+                    {
+                      className:
+                        "flex h-full flex-col bg-white shadow-xl rounded-lg overflow-y-auto scrollbar-hide relative",
+                    },
+                    [
+                      React.createElement(ModalHeader, {
+                        project,
+                        projectData,
+                        stages,
+                        stageUpdateError,
+                        handleStageChange,
+                        getStageDisplay,
+                        getTrancheDisplay,
+                        onClose,
+                        handleEmailClick,
+                        handlePhoneClick,
+                        handleAddressClick,
+                        handleAddTag,
+                        handleRemoveTag,
+                        isRefreshing,
+                        setIsRefreshing,
+                        fetchModalData,
+                        activeTab,
+                        setActiveTab,
+                        updateUserCallStatus,
+                        availableTags,
+                        isAddingTag,
+                        setIsAddingTag,
+                        selectedTagToAdd,
+                        setSelectedTagToAdd,
+                        isTagLoading,
+                        isChangingStage,
+                        setIsChangingStage,
+                        tranchesData,
+                        handleTrancheChange,
+                        handleFundedByRedballChange,
+                        isChangingTranche,
+                        setIsChangingTranche,
+                        showToast,
+                        handleCreateFolders,
+                      }),
+                      React.createElement(
+                        "div",
+                        { className: "flex-1" },
+                        getTabContent()
+                      ),
+                    ]
+                  ),
+                  // Blurry overlay when project is null
+                  !project &&
+                    React.createElement(
+                      "div",
+                      {
+                        className:
+                          "absolute inset-0 bg-gray-900 bg-opacity-30 flex items-center justify-center z-50 rounded-lg",
+                        style: {
+                          backdropFilter: "blur(4px)", // Direct CSS for better compatibility
+                          WebkitBackdropFilter: "blur(4px)", // Vendor prefix for Safari
+                        },
+                      },
+                      React.createElement(
+                        "div",
+                        { className: "flex flex-col items-center gap-3" },
+                        [
+                          React.createElement(
+                            "div",
+                            { className: "relative w-12 h-12" },
+                            [
+                              // White background circle
+                              React.createElement("div", {
+                                className:
+                                  "absolute inset-0 rounded-full bg-white",
+                              }),
+                              // Blue rotating segment
+                              React.createElement("div", {
+                                className: "absolute inset-0 animate-spin",
+                                children: React.createElement("div", {
+                                  className:
+                                    "w-6 h-6 bg-blue-600 rounded-full absolute top-0 left-1/2 transform -translate-x-1/2",
+                                }),
+                              }),
+                            ]
+                          ),
+                          React.createElement(
+                            "div",
+                            { className: "text-white text-sm font-medium" },
+                            "Loading project details..."
+                          ),
+                        ]
+                      )
+                    ),
+                ]
+              )
+            )
+          )
+        )
+      ),
+      React.createElement(IssueModal, {
+        isOpen: isAddingIssue,
+        onClose: () => {
+          setIsAddingIssue(false);
+          setIssueInput("");
+          setSelectedIssueUsers([]);
+          setShowIssueUserDropdown(false);
+          setIssueNotifySales(false);
+        },
+        issueInput,
+        setIssueInput,
+        selectedUsers: selectedIssueUsers,
+        setSelectedUsers: setSelectedIssueUsers,
+        users,
+        currentUser,
+        onSubmit: handleAddIssue,
+        showUserDropdown: showIssueUserDropdown,
+        setShowUserDropdown: setShowIssueUserDropdown,
+        notifySales: issueNotifySales,
+        setNotifySales: setIssueNotifySales,
+      }),
+      React.createElement(TagModal, {
+        isOpen: isAddingTag,
+        onClose: () => {
+          setIsAddingTag(false);
+          setSelectedTagToAdd("");
+        },
+        selectedTag: selectedTagToAdd,
+        setSelectedTag: setSelectedTagToAdd,
+        availableTags: availableTags,
+        onSubmit: handleAddTag,
+        isLoading: isTagLoading,
+      }),
+      isRemovingTag &&
+        React.createElement(
+          "div",
+          {
+            className:
+              "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50",
+          },
+          React.createElement(
+            "div",
+            { className: "flex flex-col items-center gap-3" },
+            [
+              React.createElement("div", {
+                className:
+                  "animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent shadow-lg",
+              }),
+              React.createElement(
+                "div",
+                { className: "text-white text-sm font-medium" },
+                "Removing tag..."
+              ),
+            ]
+          )
+        ),
+      React.createElement(Toast, {
+        message: toast.message,
+        type: toast.type,
+        isVisible: toast.isVisible,
+        onClose: () => setToast((prev) => ({ ...prev, isVisible: false })),
+      }),
+    ]
+  );
+};
+
+export default ProjectDetailsModal;

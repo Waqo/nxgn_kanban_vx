@@ -1,0 +1,803 @@
+# Zoho Creator JS API v2 Documentation
+
+This document consolidates information about the Zoho Creator JavaScript API v2 for use within custom widgets.
+
+## 1. General
+
+### 1.1 Setup
+
+To use the JS API v2 tasks within your widget, configure the HTML and JS files of the widget ZIP as follows:
+
+**1. Widget ZIP HTML File:**
+Include the v2 CDN URL in a script tag:
+```html
+<script src="https://js.zohostatic.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+```
+
+**2. Widget ZIP JS File:**
+Use the `ZOHO.CREATOR` object to access API methods within your JavaScript logic. 
+
+### 1.2 Points to Note
+
+*   **Versioning:** Using the v2 CDN enables v2 API calls. Using the v1 CDN enables v1 calls. Mixing versions requires changing the CDN and updating API call syntax accordingly. Modified widget files must be re-uploaded.
+*   **Mandatory Parameters:** Ensure all required parameters for an API call are provided in the configuration object.
+*   **Permissions:** API call success depends on the permissions granted to the user accessing the widget in the target application.
+*   **Published Components:** Only Publish API tasks work in published pages accessible by non-Zoho Creator account holders.
+*   **Updates:** Direct changes to the widget's JS file require re-uploading the modified widget ZIP file.
+
+## 2. Data APIs
+
+Perform CRUD operations on records in Zoho Creator forms/reports. Based on REST API v2.1.
+
+### 2.1 Add Records
+
+Adds one or more records to a form.
+
+*   **Syntax:** `ZOHO.CREATOR.DATA.addRecords(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application. Required only if targeting a different app in the same account.
+        *   `form_name` (string): Link name of the target form.
+        *   `payload` (object): JSON containing the data for the new record(s).
+            *   `data` (object or array): A single JSON object for one record or an array of JSON objects for multiple records. Field link names are keys.
+            *   `skip_workflow` (list, Optional): List of workflows to skip (`"form_workflow"`, `"schedules"`, `"all"`).
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "data": {
+        "ID": "2000000245119" // ID of the newly added record
+      },
+      "message": "success"
+    }
+    ```
+*   **Considerations:**
+    *   Maximum 200 records per request.
+    *   Subject to form data validations.
+    *   Cannot set values for Formula, File Upload, Image fields directly (use File APIs for files).
+
+### 2.2 Get Record by ID
+
+Fetches a specific record by its ID.
+
+*   **Syntax:** `ZOHO.CREATOR.DATA.getRecordById(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application.
+        *   `report_name` (string): Link name of the report to fetch from.
+        *   `id` (string): Record ID of the record to retrieve.
+        *   `field_config` (string, Optional): Specifies which fields to fetch (`"detail_view"`, `"quick_view"` (default), `"custom"`, `"all"`).
+        *   `fields` (string, Optional): Comma-separated field link names. Required if `field_config` is `"custom"`.
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "data": {
+        "ID": "2000000193171",
+        "Name": {
+          "first_name": "James",
+          "last_name": "Kyle",
+          "display_value": "James Kyle"
+        }
+        // ... other fields based on field_config/fields
+      }
+    }
+    ```
+*   **Considerations:** User needs view permission.
+
+### 2.3 Get Records
+
+Fetches records based on criteria.
+
+*   **Syntax:** `ZOHO.CREATOR.DATA.getRecords(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application.
+        *   `report_name` (string): Link name of the report to fetch from.
+        *   `criteria` (string, Optional): Filter criteria (e.g., `"(Single_Line == \"Value\")"`). Fetches first 200/500/1000 if omitted.
+        *   `field_config` (string, Optional): Specifies which fields to fetch (`"detail_view"`, `"quick_view"` (default), `"custom"`, `"all"`).
+        *   `fields` (string, Optional): Comma-separated field link names. Required if `field_config` is `"custom"`.
+        *   `max_records` (int, Optional): Max records per request (200, 500, or 1000 (default)).
+        *   `record_cursor` (string, Optional): Key from previous response to fetch the next batch of records.
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "data": [
+        {
+          "ID": "2000000193171",
+          "Name": { /* ... */ }
+        },
+        {
+          "ID": "2000000193173",
+          "Name": { /* ... */ }
+        }
+      ],
+      "record_cursor": "unique_key_if_more_records_exist" // Present only if more records match
+    }
+    ```
+*   **Considerations:**
+    *   Maximum 1000 records per request (configurable via `max_records`). Use `record_cursor` for pagination.
+    *   User needs view permission.
+
+### 2.4 Get Record Count
+
+Gets the count of records in a report, potentially based on criteria.
+
+*   **Syntax:** `ZOHO.CREATOR.DATA.getRecordCount(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application.
+        *   `report_name` (string): Link name of the report.
+        *   `criteria` (string, Optional): Filter criteria.
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "result": {
+        "records_count": "4" // Count as a string
+      }
+    }
+    ```
+*   **Considerations:** User needs view permission.
+
+### 2.5 Update Record by ID
+
+Updates a specific record identified by its ID.
+
+*   **Syntax:** `ZOHO.CREATOR.DATA.updateRecordById(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application.
+        *   `report_name` (string): Link name of the report containing the record.
+        *   `id` (string): Record ID of the record to update.
+        *   `payload` (object): JSON containing the update data.
+            *   `data` (object): JSON object with field link names as keys and new values.
+            *   `skip_workflow` (list, Optional): List of workflows to skip (`"form_workflow"`, `"schedules"`, `"all"`).
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "data": {
+        "ID": "2000000245119" // ID of the updated record
+      },
+      "message": "success"
+    }
+    ```
+*   **Considerations:**
+    *   Subject to data validations.
+    *   Cannot update Formula fields. Use File APIs to update File Upload/Image fields.
+    *   User needs update permission.
+
+### 2.6 Update Records
+
+Updates multiple records based on criteria.
+
+*   **Syntax:** `ZOHO.CREATOR.DATA.updateRecords(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application.
+        *   `report_name` (string): Link name of the report containing records to update.
+        *   `payload` (object): JSON containing the update data and criteria.
+            *   `criteria` (string): Filter criteria (e.g., `"(Status == \"Open\")"`). **Mandatory.** Use `ID!=0` to update all.
+            *   `data` (object): JSON object with field link names as keys and new values to apply to matching records.
+            *   `skip_workflow` (list, Optional): List of workflows to skip (`"form_workflow"`, `"schedules"`, `"all"`).
+        *   `process_until_limit` (boolean, Optional - Deprecated? Check REST docs. Full docs mention `process_until_limit` as string in `deleteRecords`): Process up to 200 matching records.
+        *   `more_records` (string, Optional - In Response, not Request. Check REST docs. Full docs mention `more_records` key in `deleteRecords` request? Seems wrong.): Key from previous response to update next batch.
+*   **Sample Response (Illustrative - depends on actual updates):**
+    ```javascript
+    {
+      "result": [
+        {
+          "code": 3000,
+          "data": { "ID": "3888833000000114023", /* ... other fields ... */ },
+          "message": "Data Updated Successfully!"
+        },
+        {
+          "code": 3000,
+          "data": { "ID": "3888833000000114047", /* ... other fields ... */ },
+          "message": "Data Updated Successfully!"
+        }
+        // ... more results up to limit
+      ],
+      "code": 3000,
+      "more_records": "unique_key_if_more_records_match" // Present only if more records match the criteria beyond the limit
+    }
+    ```
+*   **Considerations:**
+    *   Maximum 200 records per request. Use `process_until_limit: true` (if applicable) and loop requests if `more_records` key appears in response.
+    *   Subject to data validations.
+    *   User needs update permission.
+
+### 2.7 Delete Record by ID
+
+Deletes a specific record identified by its ID.
+
+*   **Syntax:** `ZOHO.CREATOR.DATA.deleteRecordById(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application.
+        *   `report_name` (string): Link name of the report containing the record.
+        *   `id` (string): Record ID of the record to delete.
+        *   `payload` (object, Optional): Contains optional parameters.
+            *   `skip_workflow` (list, Optional): List of workflows to skip (`"form_workflow"`, `"schedules"`, `"all"`).
+*   **Sample Response:**
+    ```javascript
+    {
+      "result": [ // Note: Response is an array even for single ID deletion
+        {
+          "code": 3000,
+          "data": {
+            "ID": "2000000245119" // ID of the deleted record
+          },
+          "message": "success"
+        }
+      ],
+      "code": 3000
+    }
+    ```
+*   **Considerations:** User needs delete permission.
+
+### 2.8 Delete Records
+
+Deletes multiple records based on criteria.
+
+*   **Syntax:** `ZOHO.CREATOR.DATA.deleteRecords(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application.
+        *   `report_name` (string): Link name of the report containing records to delete.
+        *   `criteria` (string): Filter criteria (e.g., `"(Status == \"Invalid\")"`). **Mandatory.** Use `ID!=0` to delete all.
+        *   `process_until_limit` (string, Optional): Set to `"true"` to delete the first 200 matching records if more exist. Response will contain `more_records` key.
+        *   `more_records` (string, Optional): Key from previous response (when `process_until_limit` was true) to delete the next batch of 200 records.
+        *   `payload` (object, Optional): Contains optional parameters.
+            *   `skip_workflow` (list, Optional): List of workflows to skip (`"form_workflow"`, `"schedules"`, `"all"`).
+*   **Sample Response (Illustrative):**
+    ```javascript
+    {
+      "result": [
+        {
+          "code": 3000,
+          "data": { "ID": "66359000000021016" },
+          "message": "success"
+        },
+        {
+          "code": 3000,
+          "data": { "ID": "66359000000024309" },
+          "message": "success"
+        }
+        // ... more results up to limit
+      ],
+      "code": 3000,
+      "more_records": "unique_key_if_more_records_match" // Present only if process_until_limit was true and more records matched
+    }
+    ```
+*   **Considerations:**
+    *   Maximum 200 records per request. Use `process_until_limit: "true"` and loop requests using the `more_records` key from the response if needed.
+    *   User needs delete permission.
+
+## 3. Publish APIs
+
+Interact with published components. Can be used in widgets on published pages accessed by users without Zoho accounts.
+
+### 3.1 Add Records (Publish)
+
+Adds records to a form within a published component.
+
+*   **Syntax:** `ZOHO.CREATOR.PUBLISH.addRecords(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application.
+        *   `form_name` (string): Link name of the published form.
+        *   `private_link` (string): The private key/perma link identifier of the published form.
+        *   `payload` (object): JSON containing the data for the new record(s).
+            *   `data` (object or array): Single JSON object or array of JSON objects.
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "data": {
+        "ID": "2000000245119"
+      },
+      "message": "success"
+    }
+    ```
+*   **Considerations:** Works on published pages. Subject to form validations.
+
+### 3.2 Get Record by ID (Publish)
+
+Fetches a specific record by ID from a published report.
+
+*   **Syntax:** `ZOHO.CREATOR.PUBLISH.getRecordById(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application.
+        *   `report_name` (string): Link name of the published report.
+        *   `id` (string): Record ID to retrieve.
+        *   `private_link` (string): The private key/perma link identifier of the published report.
+        *   `field_config` (string, Optional): Specifies which fields to fetch (`"detail_view"`, `"quick_view"` (default), `"custom"`, `"all"`).
+        *   `fields` (string, Optional): Comma-separated field link names. Required if `field_config` is `"custom"`.
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "data": {
+        "ID": "2000000193171",
+        "Name": { /* ... */ }
+        // ... other fields
+      }
+    }
+    ```
+*   **Considerations:** Works on published pages.
+
+### 3.3 Get Records (Publish)
+
+Fetches records based on criteria from a published report.
+
+*   **Syntax:** `ZOHO.CREATOR.PUBLISH.getRecords(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application.
+        *   `report_name` (string): Link name of the published report.
+        *   `private_link` (string): The private key/perma link identifier of the published report.
+        *   `criteria` (string, Optional): Filter criteria.
+        *   `field_config` (string, Optional): Specifies fields to fetch.
+        *   `fields` (string, Optional): Comma-separated field link names.
+        *   `max_records` (int, Optional): Max records per request (200, 500, or 1000 (default)).
+        *   `record_cursor` (string, Optional): Key from previous response for pagination.
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "data": [
+        { "ID": "2000000193171", "Name": { /* ... */ } },
+        { "ID": "2000000193173", "Name": { /* ... */ } }
+      ],
+      "record_cursor": "unique_key_if_more_records_exist" // Present only if more records match
+    }
+    ```
+*   **Considerations:** Works on published pages. Max 1000 records per request.
+
+## 4. File APIs
+
+Upload and manage files within records.
+
+### 4.1 Upload File
+
+Uploads a file to a File Upload, Image, Audio, Video, or Signature field in a record.
+
+*   **Syntax:** `ZOHO.CREATOR.FILE.uploadFile(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application.
+        *   `report_name` (string): Link name of the report containing the record.
+        *   `id` (string): Record ID of the target record.
+        *   `field_name` (string): Link name of the target file/image field. Use `subform_link_name.field_link_name` for subform fields.
+        *   `parent_id` (string, Optional): Required if `field_name` is in a subform; the ID of the main form record.
+        *   `file` (File object): The JavaScript File object to upload (e.g., from `<input type="file">`).
+        *   `skip_workflow` (list, Optional): List of workflows to skip (`"form_workflow"`, `"schedules"`, `"all"`).
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "data": {
+        "filename": "Rental Agreement-March.pdf",
+        "filepath": "1587402896598_Rental_Agreement-March.pdf", // Relative path used internally
+        "message": "success"
+      }
+    }
+    ```
+*   **Considerations:**
+    *   Requires permission to update the record.
+    *   Max file size: 10 MB (Image/Signature), 50 MB (File/Audio/Video).
+    *   Target field must be a file-type field.
+
+### 4.2 Read File
+
+Reads/downloads a file from a File Upload, Image, Audio, Video, or Signature field. The response is the raw file content/blob.
+
+*   **Syntax:** `ZOHO.CREATOR.FILE.readFile(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application.
+        *   `report_name` (string): Link name of the report containing the record.
+        *   `id` (string): Record ID of the target record.
+        *   `field_name` (string): Link name of the target file/image field. Use `subform_link_name.field_link_name` for subform fields.
+        *   `parent_id` (string, Optional): Required if `field_name` is in a subform; the ID of the main form record.
+*   **Sample Response:**
+    ```javascript
+    // The 'response' variable in the .then() callback contains the raw file content
+    // (e.g., Blob, ArrayBuffer, depending on browser and file type).
+    // Example usage:
+    // ZOHO.CREATOR.FILE.readFile(config).then(function (fileData) {
+    //   if (fileData instanceof Blob) {
+    //     var url = URL.createObjectURL(fileData);
+    //     // Use the URL (e.g., set as src for an img tag, or create a download link)
+    //     console.log("File Blob URL:", url);
+    //     // Remember to revoke the URL when no longer needed: URL.revokeObjectURL(url);
+    //   } else {
+    //     console.log("Received file data:", fileData);
+    //   }
+    // });
+    ```
+*   **Considerations:** Requires permission to view the record.
+
+## 5. Meta APIs
+
+Fetch metadata about the application structure (forms, fields, etc.).
+
+### 5.1 Get Fields
+
+Fetches details about fields within a specific form.
+
+*   **Syntax:** `ZOHO.CREATOR.META.getFields(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application.
+        *   `form_name` (string): Link name of the form.
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "fields": [
+        {
+          "unique": false,
+          "display_name": "Phone",
+          "link_name": "Phone_Number",
+          "type": 27, // Field type code (refer to docs for mapping)
+          "mandatory": false
+        },
+        {
+          "unique": false,
+          "display_name": "File Upload",
+          "link_name": "File_upload",
+          "type": 19,
+          "mandatory": false
+        }
+        // ... other fields
+      ]
+    }
+    ```
+*   **Considerations:** Requires permission to access the application/form.
+
+### 5.2 Get Forms
+
+Fetches a list of forms in the application.
+
+*   **Syntax:** `ZOHO.CREATOR.META.getForms(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string, Optional): Link name of the application. If omitted, uses the current application context.
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "forms": [
+        {
+          "display_name": "timesheet",
+          "link_name": "timesheet",
+          "type": 1 // Form type code (refer to docs)
+        },
+        {
+          "display_name": "products",
+          "link_name": "products",
+          "type": 1
+        }
+        // ... other forms
+      ]
+    }
+    ```
+*   **Considerations:** Requires permission to access the application.
+
+### 5.3 Get Reports
+
+Fetches a list of reports in the application.
+
+*   **Syntax:** `ZOHO.CREATOR.META.getReports(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string): Link name of the application. *Note: Full docs sample implies optional, but table says required. Assuming required based on REST.*
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "reports": [
+        {
+          "display_name": "All Timesheet",
+          "link_name": "All-Timesheet",
+          "type": 1 // Report type code (refer to docs)
+        },
+        {
+          "display_name": "All Products",
+          "link_name": "All-Products",
+          "type": 1
+        }
+        // ... other reports
+      ]
+    }
+    ```
+*   **Considerations:** Requires permission to access the application.
+
+### 5.4 Get Pages
+
+Fetches a list of pages in the application.
+
+*   **Syntax:** `ZOHO.CREATOR.META.getPages(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string): Link name of the application. *Note: Full docs sample implies optional, but table says required. Assuming required based on REST.*
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "pages": [
+        {
+          "display_name": "Customer Dashboard",
+          "link_name": "Customer_Dashboard"
+        },
+        {
+          "display_name": "Vendor Dashboard",
+          "link_name": "Vendor_Dashboard"
+        }
+        // ... other pages
+      ]
+    }
+    ```
+*   **Considerations:** Requires permission to access the application.
+
+### 5.5 Get Sections
+
+Fetches details about sections and their components within an application (not a specific page, unlike REST API).
+
+*   **Syntax:** `ZOHO.CREATOR.META.getSections(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `app_name` (string): Link name of the application. *Note: Full docs sample implies optional, but table says required. Assuming required based on REST.*
+*   **Sample Response (Structure based on full docs):**
+    ```javascript
+    {
+      "code": 3000,
+      "sections": [ // Renamed from 's' in full docs for clarity
+        {
+          "display_name": "reports check",
+          "link_name": "reports_check",
+          "components": [
+            { "type": 1, "link_name": "reports_check", "display_name": "reports check" }, // Type 1: Form
+            { "type": 2, "report_type": 1, "link_name": "reports_check_Report", "display_name": "reports check Report" }, // Type 2: Report
+            // ... other components (reports, pages)
+          ]
+        },
+        {
+          "display_name": "Dashboard",
+          "link_name": "Dashboard",
+          "components": [
+             { "type": 3, "page_type": 2, "link_name": "Dashboard", "display_name": "Dashboard" } // Type 3: Page
+          ]
+        },
+        {
+            "display_name": "Approval Tasks",
+            "is_approval": "true", // Indicates an approval section
+            "components": [ // Components under approval (e.g., pending/completed views)
+                { "display_name": "Pending Tasks", "link_name": "Pending" },
+                { "display_name": "Completed Tasks", "link_name": "Completed" }
+            ]
+        }
+        // ... other sections
+      ]
+    }
+    ```
+*   **Considerations:** Requires permission to access the application. Provides component metadata within sections.
+
+### 5.6 Get Applications
+
+Fetches a list of applications accessible to the user across all workspaces.
+
+*   **Syntax:** `ZOHO.CREATOR.META.getApplications().then(function(response) { ... });`
+*   **Syntax Details:** None (no config object).
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "applications": [
+        {
+          "application_name": "Library Management",
+          "date_format": "dd-MMM-yyyy",
+          "creation_date": "31-Jan-2024 20:30:20",
+          "link_name": "librarymanagement",
+          "category": 1, // Application category code
+          "time_zone": "Asia/Kolkata",
+          "created_by": "zylker", // Account owner/creator
+          "workspace_name": "zylker" // Workspace link name
+        }
+        // ... other accessible applications
+      ]
+    }
+    ```
+*   **Considerations:** Lists applications the user has access to.
+
+### 5.7 Get Applications by Workspace
+
+Fetches applications within a specific workspace accessible to the user.
+
+*   **Syntax:** `ZOHO.CREATOR.META.getApplicationsByWorkspace(config).then(function(response) { ... });`
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `workspace_name` (string): Link name of the target workspace.
+*   **Sample Response:**
+    ```javascript
+    {
+      "code": 3000,
+      "applications": [
+        {
+          "application_name": "Library Management",
+          "date_format": "dd-MMM-yyyy",
+          "creation_date": "31-Jan-2024 20:30:20",
+          "link_name": "librarymanagement",
+          "category": 1,
+          "time_zone": "Asia/Kolkata",
+          "created_by": "zylker",
+          "workspace_name": "zylker" // Should match the requested workspace_name
+        }
+        // ... other accessible applications in this workspace
+      ]
+    }
+    ```
+*   **Considerations:** Requires appropriate permissions for the workspace.
+
+## 6. Util APIs
+
+Utility functions for widget interactions.
+
+### 6.1 Set Image Data
+
+Embeds an image (from a URL or Creator field download URL) into an HTML `<img>` tag within the widget.
+
+*   **Syntax:** `ZOHO.CREATOR.UTIL.setImageData(image_tag, source_url, callback);` (Note: This is not promise-based according to full docs)
+*   **Syntax Details:**
+    *   `image_tag` (HTML element): The target `<img>` DOM element (e.g., `document.getElementById("myImage")`).
+    *   `source_url` (string): The direct public URL of the image OR the relative download URL obtained from a Creator file/image field (e.g., via `getRecordById` or `readFile` is not needed, just the path).
+    *   `callback` (function, Optional): A function to execute after the image is potentially set (though the timing/success guarantee is unclear without promise).
+*   **Response:** No direct return value mentioned. Success/failure might need inference or callback handling.
+*   **Considerations:** Useful for displaying images stored in Creator records directly in the widget UI.
+
+### 6.2 Navigate Parent URL
+
+Navigates the parent browser window (containing the widget) or opens new windows/tabs.
+
+*   **Syntax:** `ZOHO.CREATOR.UTIL.navigateParentUrl(config);` (Does not return a promise).
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `action` (string): The navigation action (`"open"`, `"reload"`, `"back"`, `"close"`, `"close all"`).
+        *   `url` (string, Optional): Required if `action` is `"open"`. The target URL (e.g., another Creator page URL or external URL).
+        *   `window` (string, Optional): Required if `action` is `"open"`. Target window (`"new"` (default) or `"same"`).
+*   **Response:** None (browser navigates).
+*   **Considerations:** Essential for linking out from the widget.
+
+### 6.3 Get Init Params
+
+Fetches initialization parameters passed to the widget context, including the logged-in user's email.
+
+*   **Syntax:** `ZOHO.CREATOR.UTIL.getInitParams().then(function(response) { ... });`
+*   **Syntax Details:** None (no config object).
+*   **Sample Response:**
+    ```javascript
+    {
+      "scope": "zylkercorp", // Account/Org identifier?
+      "envUrlFragment": "/environment/development", // Environment identifier
+      "appLinkName": "widgetapp", // Link name of the current application
+      "loginUser": "john@zylker.com" // Email of the logged-in user
+    }
+    ```
+*   **Considerations:** Crucial first call to identify the user and application context.
+
+### 6.4 Get Query Params
+
+Fetches query parameters from the URL of the parent page hosting the widget.
+
+*   **Syntax:** `ZOHO.CREATOR.UTIL.getQueryParams().then(function(response) { ... });`
+*   **Syntax Details:** None (no config object).
+*   **Sample Response (Example: if parent URL is ...?Name=Zylker&Position=Lead):**
+    ```javascript
+    {
+      "Name": "Zylker",
+      "Position": "Lead"
+    }
+    ```
+*   **Considerations:** Useful for passing external context into the widget via the page URL.
+
+### 6.5 Get Widget Params
+
+Fetches parameters specifically configured for this widget instance when it was added to the Creator page via the builder.
+
+*   **Syntax:** `ZOHO.CREATOR.UTIL.getWidgetParams().then(function(response) { ... });`
+*   **Syntax Details:** None (no config object).
+*   **Sample Response (Example):**
+    ```javascript
+    {
+      "App_Name": "Zylker", // Example custom param named 'App_Name'
+      "Details_Report": "Reporting_To_Details", // Example param 'Details_Report'
+      "Title": "Tracker" // Example param 'Title'
+    }
+    ```
+*   **Considerations:** Allows making widgets configurable and reusable.
+
+## 7. Custom API
+
+Invoke custom APIs (like Deluge functions exposed via API) configured in the Creator application.
+
+### 7.1 Invoke Custom API
+
+Calls a pre-defined custom API endpoint (typically wrapping a Deluge function) configured in the Creator application.
+
+*   **Syntax:** `ZOHO.CREATOR.DATA.invokeCustomApi(config).then(function(response) { ... });` (Note: Namespace is `DATA`, not `CUSTOM`)
+*   **Syntax Details:**
+    *   `<config>` (object):
+        *   `api_name` (string): Link name of the custom API.
+        *   `workspace_name` (string, Optional): Link name of the workspace (defaults if omitted?).
+        *   `http_method` (string): The method the API was configured with (`"GET"`, `"POST"`, `"PUT"`, `"DELETE"`).
+        *   `content_type` (string, Optional): `"application/json"` (default) or `"multipart/form-data"`. Applies to POST/PUT.
+        *   `payload` (object, Optional): Data object for POST/PUT requests. Keys should match function arguments.
+        *   `query_params` (object, Optional): Key-value pairs for GET/DELETE requests, appended to URL.
+        *   `public_key` (string, Optional): Required if the custom API uses Public Key authentication.
+*   **Response:** The response returned by the underlying custom API/Deluge function. Structure depends entirely on the function's implementation.
+*   **Considerations:** Powerful way to execute custom server-side logic (Deluge) from the widget. Requires the custom API to be pre-configured in Creator.
+
+## 8. API Error Codes
+
+The success or failure of an API request is conveyed by the code and message in its response.
+
+| HTTP Status Code | HTTP Status         | Code | Message                                                                                                                         | Description                                                                                                                                                                                                                                                           |
+| :--------------- | :------------------ | :--- | :------------------------------------------------------------------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 200              | OK                  | 8012 | Input format does not match the required format for the field                                                                   | Occurs when input for Decimal, Percentage, Currency fields doesn't match required format.                                                                                                                                                                             |
+| 200              | OK                  | 8011 | 'fieldlinkname' has exceeded its maximum digits.                                                                                | Occurs when max digits exceeded for Decimal, Percentage, Currency, Number fields.                                                                                                                                                                                   |
+| 200              | OK                  | 4000 | Account's Developer API limit has been reached. Please upgrade...                                                               | Daily REST API limit reached for the subscription. Upgrade or wait.                                                                                                                                                                                                   |
+| 200              | OK                  | 3970 | A maximum of 200 records can be fetched per request.                                                                            | `getRecords` limit. Use `from` parameter for pagination.                                                                                                                                                                                                                |
+| 200              | OK                  | 3960 | A maximum of 200 records can be processed per request. Include "process_until_limit"...                                       | `updateRecords`/`deleteRecords` limit. Use `process_until_limit=true` for first 200. Loop if `more_records` is true.                                                                                                                                                 |
+| 200              | OK                  | 3950 | A maximum of 200 records can be added per request.                                                                              | `addRecords` limit. Break down input if > 200 records.                                                                                                                                                                                                                |
+| 200              | OK                  | 3930 | No reports available.                                                                                                           | Target application has no reports.                                                                                                                                                                                                                                    |
+| 200              | OK                  | 3920 | No pages available.                                                                                                             | Target application has no pages.                                                                                                                                                                                                                                      |
+| 200              | OK                  | 3910 | No forms available.                                                                                                             | Target application has no forms.                                                                                                                                                                                                                                      |
+| 200              | OK                  | 3830 | You do not have permission to transfer files to/from the field "<FIELD_NAME>". ...                                              | User lacks permission to upload to the specified file/image field (needs add/update permission on the form).                                                                                                                                                           |
+| 200              | OK                  | 3780 | No subform named "<LINK_NAME"> found. ...                                                                                      | Target form has no subform with the given link name.                                                                                                                                                                                                                  |
+| 200              | OK                  | 3750 | "<LINK_NAME>" is not a file type field. ...                                                                                    | Field link name in request is not a file upload, image, audio, video, or signature field.                                                                                                                                                                            |
+| 200              | OK                  | 3730 | No file found in the record with ID "<RECORD_ID>".                                                                              | Target field is empty or file size is 0 KB.                                                                                                                                                                                                                          |
+| 200              | OK                  | 3710 | No field named "<LINK_NAME>" found. ...                                                                                        | Field link name does not exist in the target form/report.                                                                                                                                                                                                            |
+| 200              | OK                  | 3660 | No file found in the request. ...                                                                                               | `uploadFile` request is missing the file input.                                                                                                                                                                                                                        |
+| 200              | OK                  | 3630 | Input file exceeds the 50 MB limit. ...                                                                                         | File provided to `uploadFile` exceeds 50 MB limit.                                                                                                                                                                                                                   |
+| 200              | OK                  | 3190 | No record with ID "<RECORD_ID>" found.                                                                                          | Target form/report has no record with the given ID.                                                                                                                                                                                                                   |
+| 404              | NOT FOUND           | 3100 | No records found for the given criteria.                                                                                        | No records match the search criteria provided.                                                                                                                                                                                                                        |
+| 200              | OK                  | 3090 | Criteria is required / Invalid criteria specified / Criteria refers to an invalid field...                                        | Error related to the `criteria` parameter in API calls: required but missing, invalid format, or references a non-existent field.                                                                                                                                        |
+| 200              | OK                  | 3050 | Passing values for Formula, File Upload and Image type fields is not allowed. Use Upload File API...                            | Cannot set Formula values directly. Use `uploadFile` API for File Upload/Image fields in `add`/`update` calls.                                                                                                                                                       |
+| 400              | BAD REQUEST         | 3020 | API request's body is either missing or incomplete.                                                                             | Request body content is missing.                                                                                                                                                                                                                                      |
+| 403              | FORBIDDEN           | 3002 | The "<FEATURE_NAME>" feature is currently not available... Please contact support@zohocreator.com...                              | Operation requires a feature not available in the current Creator subscription plan.                                                                                                                                                                                          |
+| 200              | OK                  | 3001 | 'fieldlinkname' has exceeded the maximum character length.                                                                      | Max character length exceeded for Single Line, Email, Radio, Drop Down fields.                                                                                                                                                                                        |
+| 200              | OK                  | 3001 | Value cannot be specified for formula field.                                                                                    | Attempted to provide a value for a formula field (which is calculated automatically).                                                                                                                                                                                  |
+| 403              | FORBIDDEN           | 2965 | No more entries allowed as per the form validation.                                                                             | Form configured to disable after a certain number of entries reached.                                                                                                                                                                                                 |
+| 405              | METHOD NOT ALLOWED  | 2945 | <http method> is not a valid method for this request.                                                                           | Irrelevant HTTP method used for the REST API endpoint (less common for JS API calls directly).                                                                                                                                                                         |
+| 401              | AUTHORIZATION ERROR | 2945 | Please enter a valid input for '%s' key.                                                                                        | Invalid value entered for a specified key (likely authentication/config related).                                                                                                                                                                                       |
+| 401              | AUTHORIZATION ERROR | 2945 | ERROR This is an invalid OAuth scope...                                                                                         | OAuth token used does not have the required scope for the API call. Regenerate token with correct scopes.                                                                                                                                                             |
+| 403              | FORBIDDEN           | 2933 | You do not have permission to access this application.                                                                          | User accessing the widget doesn't have the application shared with them.                                                                                                                                                                                              |
+| 403              | FORBIDDEN           | 2930 | Error Occurred. We are sorry for the inconvenience.                                                                             | General error. Contact support@zohocreator.com.                                                                                                                                                                                                                      |
+| 200              | OK                  | 2902 | Invalid column value for fieldlinkname                                                                                          | Invalid value entered for Drop Down, Lookup, Multi Select, URL, etc. fields.                                                                                                                                                                                         |
+| 403              | FORBIDDEN           | 2899 | Permission denied to add record(s).                                                                                             | User lacks permission to add records to the target form/report.                                                                                                                                                                                                       |
+| 403              | FORBIDDEN           | 2898 | Permission denied to view record(s).                                                                                            | User lacks permission to view records in the target form/report.                                                                                                                                                                                                      |
+| 403              | FORBIDDEN           | 2897 | Permission denied to update record(s).                                                                                          | User lacks permission to update records in the target form/report.                                                                                                                                                                                                    |
+| 403              | FORBIDDEN           | 2896 | Permission denied to delete record(s).                                                                                          | User lacks permission to delete records in the target form/report.                                                                                                                                                                                                    |
+| 404              | NOT FOUND           | 2894 | No report named "<REPORT_NAME>" found. ...                                                                                     | Report link name provided does not exist in the application.                                                                                                                                                                                                           |
+| 404              | NOT FOUND           | 2893 | No form named "<FORM_NAME>" found. ...                                                                                         | Form link name provided does not exist in the application.                                                                                                                                                                                                             |
+| 404              | NOT FOUND           | 2892 | No application named "<APPLICATION_NAME>" found. ...                                                                           | Application link name provided does not exist in the account.                                                                                                                                                                                                         |
+| 403              | FORBIDDEN           | 1130 | You do not have permission to access this application's APIs. ...                                                               | API access permission is disabled for the user (via Permission Set).                                                                                                                                                                                                  |
+| 403              | FORBIDDEN           | 1100 | You do not have permission to access this component. ...                                                                        | User lacks permission to access the specific target form, report, or page.                                                                                                                                                                                           |
+| 403              | FORBIDDEN           | 1080 | API calls cannot be made to disabled applications. ...                                                                          | Target application is disabled (possibly due to subscription changes).                                                                                                                                                                                                |
+| 403              | FORBIDDEN           | 1060 | Invalid request parameter found - 'paramname'                                                                                   | Invalid parameter included in the request configuration.                                                                                                                                                                                                              |
+| 404              | NOT FOUND           | 1040 | There is no such user.                                                                                                          | User account name specified (likely in context/auth) is not valid.                                                                                                                                                                                                   |
+| 401              | AUTHORIZATION ERROR | 1030 | Authorization Failure. The access token is either invalid or has expired. ...                                                     | Access token (OAuth) is invalid or expired. Refresh needed.                                                                                                                                                                                                           |
+| 401              | AUTHORIZATION ERROR | 1000 | A mandatory parameter - 'paramname' is either absent or has been used twice. ...                                                | Mandatory parameter missing or duplicated in the request configuration.                                                                                                                                                                                               |
+| 404              | NOT FOUND           | 1000 | Invalid API URL format.                                                                                                         | (Less likely for JS API) Underlying REST API URL format is invalid.                                                                                                                                                                                                   |
+| 200              | OK                  | 3000 | Message "Data Added Successfully" or custom message.                                                                            | Standard success message for Add Records. Can be customized in form settings.                                                                                                                                                                                         |
+| 429              | TOO MANY REQUESTS   | 2955 | You have reached your API call limit for a minute. Please try again after sometime.                                               | Per-minute API call limit (stated as 50 calls/min) has been exceeded. Wait before retrying.                                                                                                                                                                           |
+| 200              | OK                  | 9030 | API looping to same component exceeded the specified limit of 1...                                                            | Workflow triggered an API call that added a record back to the *same* form, causing a loop. Limited to 1 iteration to prevent infinite loops. Use functions for repetitive actions.                                                                                  |
+| 200              | OK                  | 9040 | API looping to other component exceeded the specified limit of 3...                                                           | Workflow triggered API calls between *different* forms in a loop (A->B->A...). Limited to 3 iterations. Use functions for repetitive actions.                                                                                                                       |
+| 429              | TOO MANY REQUESTS   | 2955 | You have reached the maximum number of API calls that can be simultaneously initiated... Please wait...                         | Maximum concurrent API call limit (stated as 6) reached. Wait for ongoing requests to complete before initiating new ones.                                                                                                                                            |
+
+</rewritten_file> 

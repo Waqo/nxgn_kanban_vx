@@ -1,0 +1,324 @@
+import React, { useState, useEffect } from 'react';
+import { updateRecord } from '../utils/recordUpdates.js';
+import { createRecord } from '../utils/recordCreation.js';
+
+const SystemApprovalModal = ({ isOpen, onClose, system = {}, materials = [], onUpdate, fetchModalData }) => {
+
+
+
+    // Add loading state
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Track original and current values to detect changes
+    const [formData, setFormData] = useState({
+        kW_STC: system?.kw_STC || 0,
+        annualOutput: system?.annualOutput || 0,
+        annualUsage: system?.annualUsage || 0,
+        isApproved: system?.isApproved === true || system?.isApproved === "true" || system?.isApproved === true,
+        materials: (materials || []).map(mat => ({
+            ...mat,
+            originalQuantity: mat?.Quantity ?? 0
+        }))
+    });
+
+    // Track what's been modified
+    const [modifications, setModifications] = useState({
+        system: false,
+        materials: new Set()
+    });
+
+    // Update form data when system prop changes
+    useEffect(() => {
+     
+        setFormData(prev => ({
+            ...prev,
+            kW_STC: system?.kw_STC || prev.kW_STC || 0,
+            annualOutput: system?.annualOutput || prev.annualOutput || 0,
+            annualUsage: system?.annualUsage || prev.annualUsage || 0,
+            isApproved: system?.isApproved === true || system?.isApproved === "true" || system?.isApproved === true
+        }));
+    }, [system, system?.kw_STC, system?.annualOutput, system?.annualUsage, system?.isApproved]);
+
+    const handleSystemChange = (field, value) => {
+        setFormData(prev => ({
+            ...prev,
+            [field]: value
+        }));
+        setModifications(prev => ({
+            ...prev,
+            system: true
+        }));
+    };
+
+    const handleMaterialChange = (materialId, value) => {
+        setFormData(prev => ({
+            ...prev,
+            materials: prev.materials.map(mat => 
+                mat.ID === materialId 
+                    ? { ...mat, Quantity: value }
+                    : mat
+            )
+        }));
+
+        setModifications(prev => {
+            const newMods = new Set(prev.materials);
+            const material = formData.materials.find(m => m.ID === materialId);
+            
+            if (value !== material.originalQuantity) {
+                newMods.add(materialId);
+            } else {
+                newMods.delete(materialId);
+            }
+            
+            return { ...prev, materials: newMods };
+        });
+    };
+
+    const handleSubmit = async () => {
+        setIsSaving(true);  // Add loading state
+        try {
+            // Get project ID and validate it exists
+            const projectId = system?.Project;
+            if (!projectId) {
+                console.error('Missing projectId in system data:', system);
+                return;
+            }
+
+            // Update project record with all system fields
+            await updateRecord(
+                "PM_Kanban_Projects",
+                projectId,
+                {
+                    data: {
+                        kW_STC: formData.kW_STC,
+                        Annual_Output_kWh: formData.annualOutput.toString(),
+                        Is_Approved: Boolean(formData.isApproved),
+                        Annual_Usage: formData.annualUsage
+                    }
+                }
+            );
+
+            // Update materials if modified
+            if (modifications.materials.size > 0) {
+                const materialUpdates = formData.materials
+                    .filter(mat => modifications.materials.has(mat.ID))
+                    .map(mat => updateRecord(
+                        "PM_Kanban_Materials",
+                        mat.ID,
+                        {
+                            data: {
+                                Quantity: mat.Quantity
+                            }
+                        }
+                    ));
+
+                await Promise.all(materialUpdates);
+            }
+
+            // Call onUpdate callback after successful save
+            await onUpdate();
+            
+        } catch (error) {
+            console.error('Error in handleSubmit:', error);
+            // Could add error toast here
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return React.createElement('div',
+        { 
+            className: "fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[9999]",
+            style: { 
+                display: isOpen ? 'block' : 'none',
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0
+            },
+            onClick: (e) => {
+                if (e.target === e.currentTarget) {
+                    onClose();
+                }
+            }
+        },
+        React.createElement('div',
+            { className: "relative top-20 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-md bg-white" },
+            [
+                // Header
+                React.createElement('h3',
+                    { className: "text-lg font-medium text-gray-900 mb-4" },
+                    "System Approval"
+                ),
+                
+                // System Fields Grid
+                React.createElement('div', 
+                    { className: "grid grid-cols-3 gap-4 mb-4" },
+                    [
+                        // System Size Input
+                        React.createElement('div', 
+                            { className: "flex flex-col" },
+                            [
+                                React.createElement('label',
+                                    { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                    "System Size (kW)"
+                                ),
+                                React.createElement('input',
+                                    {
+                                        type: "number",
+                                        value: formData.kW_STC,
+                                        onChange: (e) => handleSystemChange('kW_STC', parseFloat(e.target.value)),
+                                        className: "w-full p-2 border rounded"
+                                    }
+                                )
+                            ]
+                        ),
+                        // Annual Output Input
+                        React.createElement('div',
+                            { className: "flex flex-col" },
+                            [
+                                React.createElement('label',
+                                    { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                    "Annual Output (kWh)"
+                                ),
+                                React.createElement('input',
+                                    {
+                                        type: "number",
+                                        value: formData.annualOutput,
+                                        onChange: (e) => handleSystemChange('annualOutput', parseFloat(e.target.value)),
+                                        className: "w-full p-2 border rounded"
+                                    }
+                                )
+                            ]
+                        ),
+                        // Annual Usage Input
+                        React.createElement('div',
+                            { className: "flex flex-col" },
+                            [
+                                React.createElement('label',
+                                    { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                    "Annual Usage (kWh)"
+                                ),
+                                React.createElement('input',
+                                    {
+                                        type: "number",
+                                        value: formData.annualUsage,
+                                        onChange: (e) => handleSystemChange('annualUsage', parseFloat(e.target.value)),
+                                        className: "w-full p-2 border rounded"
+                                    }
+                                )
+                            ]
+                        )
+                    ]
+                ),
+
+                // Materials List
+                React.createElement('div',
+                    { className: "mb-4" },
+                    [
+                        React.createElement('h4',
+                            { className: "text-md font-medium text-gray-900 mb-2" },
+                            "Components"
+                        ),
+                        ...formData.materials.map(material =>
+                            React.createElement('div',
+                                { 
+                                    key: material.ID,
+                                    className: "grid grid-cols-2 gap-4 mb-2 p-2 border rounded"
+                                },
+                                [
+                                    // Model name with label
+                                    React.createElement('div', 
+                                        { className: "flex flex-col" },
+                                        [
+                                            React.createElement('label',
+                                                { className: "text-sm font-medium text-gray-700 mb-1" },
+                                                "Model"
+                                            ),
+                                            React.createElement('span', 
+                                                { className: "text-gray-900" },
+                                                material.Model
+                                            )
+                                        ]
+                                    ),
+                                    // Quantity input with label
+                                    React.createElement('div',
+                                        { className: "flex flex-col" },
+                                        [
+                                            React.createElement('label',
+                                                { 
+                                                    className: "text-sm font-medium text-gray-700 mb-1",
+                                                    htmlFor: `quantity-${material.ID}`
+                                                },
+                                                "Quantity"
+                                            ),
+                                            React.createElement('input',
+                                                {
+                                                    id: `quantity-${material.ID}`,
+                                                    type: "number",
+                                                    value: material.Quantity,
+                                                    onChange: (e) => handleMaterialChange(
+                                                        material.ID,
+                                                        parseInt(e.target.value)
+                                                    ),
+                                                    className: "p-1 border rounded"
+                                                }
+                                            )
+                                        ]
+                                    )
+                                ]
+                            )
+                        )
+                    ]
+                ),
+
+                // Approval Checkbox
+                React.createElement('div',
+                    { className: "mb-4" },
+                    React.createElement('label',
+                        { className: "flex items-center" },
+                        [
+                            React.createElement('input',
+                                {
+                                    type: "checkbox",
+                                    checked: Boolean(formData.isApproved),
+                                    onChange: (e) => setFormData(prev => ({
+                                        ...prev,
+                                        isApproved: Boolean(e.target.checked)
+                                    })),
+                                    className: "mr-2"
+                                }
+                            ),
+                            "Approve System"
+                        ]
+                    )
+                ),
+
+                // Action Buttons
+                React.createElement('div',
+                    { className: "flex justify-end gap-2" },
+                    [
+                        React.createElement('button',
+                            {
+                                onClick: onClose,
+                                className: "px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                            },
+                            "Cancel"
+                        ),
+                        React.createElement('button',
+                            {
+                                onClick: handleSubmit,
+                                className: "px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50",
+                                disabled: isSaving
+                            },
+                            isSaving ? "Saving..." : "Save Changes"
+                        )
+                    ]
+                )
+            ]
+        )
+    );
+};
+
+export default SystemApprovalModal;

@@ -1,0 +1,241 @@
+import React from 'react';
+import { createRecord } from '../utils/recordCreation.js';
+import { getQueryParams } from '../utils/queryParams.js';
+
+// Add helper functions at the top
+const getInitials = (name) => {
+    if (!name) return '??';
+    return name.split(' ')
+        .map(word => word[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+};
+
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString('en-US', { 
+        month: '2-digit', 
+        day: '2-digit', 
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+};
+
+const CommissionNotes = ({ project, fetchModalData, users, currentUser }) => {
+    const [noteInput, setNoteInput] = React.useState('');
+    const [isAddingNote, setIsAddingNote] = React.useState(false);
+
+    React.useEffect(() => {
+       // console.log('CommissionNotes received new project data:', project);
+       // console.log('Project ID:', project?.id);
+       // console.log('All notes:', project?.notes);
+      //  console.log('Notes with context:', project?.notes?.map(note => ({
+      //      id: note.ID,
+      //      context: note.context,
+      //      content: note.content?.substring(0, 50) // first 50 chars
+      //  })));
+    }, [project]);
+
+    const handleNoteSubmit = async () => {
+        if (!noteInput.trim()) return;
+        setIsAddingNote(true);
+        try {
+            const noteData = {
+                Note: noteInput,
+                Project: project.id,
+                Context: 'Commissions',
+                Author: currentUser.name,
+                User_Lookup: currentUser.id,
+                Viewed_By: [currentUser.id],
+                Department: "Project Management"
+            };
+
+          //  console.log('Submitting commission note with data:', noteData);
+
+            const noteResponse = await createRecord("Add_Note", noteData);
+          //  console.log('Commission note creation response:', noteResponse);
+
+            if (!noteResponse || (!noteResponse.data && noteResponse.code !== 3000)) {
+                console.error('Failed to create commission note:', noteResponse);
+                throw new Error(`Failed to create note: ${noteResponse?.message || 'Unknown error'}`);
+            }
+
+            setNoteInput('');
+         //   console.log('Refreshing project data after commission note creation');
+            if (fetchModalData) await fetchModalData(project.id);
+          //  console.log('Project data refreshed successfully');
+        } catch (error) {
+            console.error('Error adding commission note:', error);
+        } finally {
+            setIsAddingNote(false);
+        }
+    };
+
+    const commissionNotes = (project?.notes || [])
+        .filter(note => {
+            const noteContext = (note.context || '').toLowerCase().trim();
+          //  console.log('Note context check:', {
+          //      id: note.ID,
+          //      rawContext: note.context,
+          //      normalizedContext: noteContext,
+          //      isCommission: noteContext === 'commissions'
+          //  });
+            return noteContext === 'commissions';
+        })
+        .sort((a, b) => new Date(b.addedTime) - new Date(a.addedTime));
+
+    // Log filtered results
+ //   console.log('Filtered commission notes:', commissionNotes.length);
+
+    // Add debug logging
+ //   console.log('Project notes:', project.notes);
+  //  console.log('Filtered commission notes:', commissionNotes);
+  //  console.log('Note contexts:', project.notes?.map(note => note.context));
+
+    return React.createElement('div',
+        { className: "bg-white rounded-xl border border-gray-200" },
+        [
+            React.createElement('div',
+                { 
+                    className: "px-6 py-4 flex justify-between items-center border-b border-gray-200"
+                },
+                [
+                    React.createElement('div',
+                        { className: "flex items-center gap-3" },
+                        [
+                            React.createElement('i',
+                                { className: "fas fa-dollar-sign text-blue-600 text-xl" }
+                            ),
+                            React.createElement('h3',
+                                { className: "text-xl font-semibold text-gray-900" },
+                                "Commission Notes"
+                            )
+                        ]
+                    ),
+                    commissionNotes.length > 0 && React.createElement('span',
+                        { className: "px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-sm font-medium" },
+                        `${commissionNotes.length} Note${commissionNotes.length !== 1 ? 's' : ''}`
+                    )
+                ]
+            ),
+
+            React.createElement('div',
+                { 
+                    className: "p-6 border-b border-gray-200"
+                },
+                React.createElement('div',
+                    { className: "space-y-3" },
+                    [
+                        React.createElement('textarea',
+                            {
+                                className: "w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none",
+                                placeholder: "Add a commission note...",
+                                value: noteInput,
+                                onChange: (e) => setNoteInput(e.target.value),
+                                rows: 3
+                            }
+                        ),
+                        React.createElement('div',
+                            { className: "flex justify-end" },
+                            React.createElement('button',
+                                {
+                                    className: "px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium",
+                                    onClick: handleNoteSubmit,
+                                    disabled: isAddingNote
+                                },
+                                isAddingNote ? 
+                                    React.createElement('div', 
+                                        { className: "flex items-center gap-2" },
+                                        [
+                                            React.createElement('div', 
+                                                { className: "animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" }
+                                            ),
+                                            "Adding..."
+                                        ]
+                                    ) : 
+                                    React.createElement('div',
+                                        { className: "flex items-center gap-2" },
+                                        [
+                                            React.createElement('i',
+                                                { className: "fas fa-plus text-sm" }
+                                            ),
+                                            "Add Note"
+                                        ]
+                                    )
+                            )
+                        )
+                    ]
+                )
+            ),
+
+            React.createElement('div',
+                { className: "p-6" },
+                commissionNotes.length > 0 ? React.createElement('div',
+                    { className: "space-y-4" },
+                    commissionNotes.map(note => {
+                        // Find the note creator using User_Lookup ID
+                        const noteUser = users.find(user => user.id === note.user);
+                        
+                        return React.createElement('div',
+                            {
+                                key: note.ID,
+                                className: "bg-gray-50 rounded-lg border border-gray-200 p-4 hover:border-gray-300 transition-colors"
+                            },
+                            [
+                                React.createElement('div',
+                                    { className: "flex items-center justify-between mb-3" },
+                                    [
+                                        React.createElement('div',
+                                            { className: "flex items-center gap-3" },
+                                            [
+                                                // Always use initials avatar
+                                                React.createElement('div', {
+                                                    className: "bg-gradient-to-br from-blue-50 to-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center text-sm font-medium flex-shrink-0 shadow-sm"
+                                                }, getInitials(noteUser?.name || note.author)),
+                                                React.createElement('span',
+                                                    { className: "font-medium text-gray-900" },
+                                                    note.author
+                                                )
+                                            ]
+                                        ),
+                                        React.createElement('span',
+                                            { className: "text-sm text-gray-500" },
+                                            formatDate(note.addedTime)
+                                        )
+                                    ]
+                                ),
+                                React.createElement('div',
+                                    { className: "pl-11" },
+                                    React.createElement('p',
+                                        { className: "text-gray-700 whitespace-pre-wrap leading-relaxed" },
+                                        note.content
+                                    )
+                                )
+                            ]
+                        );
+                    })
+                ) : React.createElement('div',
+                    { className: "text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200" },
+                    [
+                        React.createElement('i',
+                            { className: "fas fa-dollar-sign text-gray-400 text-3xl mb-3" }
+                        ),
+                        React.createElement('p',
+                            { className: "text-gray-500 font-medium" },
+                            "No commission notes yet"
+                        ),
+                        React.createElement('p',
+                            { className: "text-sm text-gray-400 mt-1" },
+                            "Add a note to track commission-related information"
+                        )
+                    ]
+                )
+            )
+        ]
+    );
+};
+
+export default CommissionNotes;

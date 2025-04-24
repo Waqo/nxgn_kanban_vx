@@ -1,0 +1,720 @@
+Getting started
+Prerequisites
+The multiselect from version 3.x requires Vue 3.0. If you need a version of the multiselect to support an older version of Vue, check out 2.x versions
+
+Installation
+via npm
+              
+npm install vue-multiselect --save
+
+            
+via CDN
+              
+<script src="https://unpkg.com/vue-multiselect"></script>
+<link rel="stylesheet" href="https://unpkg.com/vue-multiselect/dist/vue-multiselect.min.css">
+
+            
+Basic usage
+via npm
+<!-- Vue component -->
+<template>
+  <div>
+    <multiselect v-model="value" :options="options"></multiselect>
+  </div>
+</template>
+
+<script>
+  import Multiselect from 'vue-multiselect'
+
+  export default {
+    // OR register locally
+    components: { Multiselect },
+    data () {
+      return {
+        value: null,
+        options: ['list', 'of', 'options']
+      }
+    }
+  }
+</script>
+
+<!-- Add Multiselect CSS. Can be added as a static asset or inside a component. -->
+<style src="vue-multiselect/dist/vue-multiselect.min.css"></style>
+
+<style>
+  your styles
+</style>
+via CDN
+// register globally
+app.component('vue-multiselect', window.VueMultiselect.default)
+Migration Guide
+If you are upgrading from vue-multiselect 2.x, there are only Vue 2 to Vue 3 Migration tasks to complete. These include:
+
+value prop is now modelValue
+@input event is now @update:modelValue
+If you are having issues with your migration, here are some tips and tricks to apply:
+
+Change props use kebab-case style
+If you are using slots, check if your templates are setup correctly based of the examples below
+Examples
+Single select
+The basic single select / dropdown doesn’t require much configuration.
+
+The options prop must be an Array.
+
+Optional configuration flags:
+:searchable="false" – disables the search functionality
+:close-on-select="false" – the dropdown stays open after selecting an option
+:show-labels="false" – the highlighted option doesn’t have a label on it
+Single select
+Pick a value
+Code sample
+import Multiselect from 'vue-multiselect'
+
+export default {
+  components: {
+    Multiselect
+  },
+  data () {
+    return {
+      value: '',
+      options: ['Select option', 'options', 'selected', 'multiple', 'label', 'searchable', 'clearOnSelect', 'hideSelected', 'maxHeight', 'allowEmpty', 'showLabels', 'onChange', 'touched']
+    }
+  }
+}
+<div><label class="typo__label">Single select</label>
+    <multiselect v-model="value" :options="options" :searchable="false" :close-on-select="false" :show-labels="false"
+                 placeholder="Pick a value" aria-label="pick a value"></multiselect>
+    <pre class="language-json"><code>{{ value }}</code></pre>
+  </div>
+Single select (object)
+When working with objects, you must provide additional props: label and track-by.
+
+track-by is used to identify the option within the options list thus it’s value has to be unique. In this example the name property is unique across all options, so it can be used as track-by value.
+
+label is used to display the option.
+
+Optional configuration flags:
+:searchable="false" – disables the search functionality
+:allow-empty="false" – once there is a value it can’t be deselected
+deselect-label="Can't remove this value" – when highlighted, the already selected option will have the Can't remove this value helper label. Useful for single selects that don’t allow empty selection.
+Single select / dropdown
+Select one
+Code sample
+import Multiselect from 'vue-multiselect'
+
+export default {
+  components: {
+    Multiselect
+  },
+  data () {
+    return {
+      value: null,
+      options: [
+        {name: 'Vue.js', language: 'JavaScript'},
+        {name: 'Rails', language: 'Ruby'},
+        {name: 'Sinatra', language: 'Ruby'},
+        {name: 'Laravel', language: 'PHP', $isDisabled: true},
+        {name: 'Phoenix', language: 'Elixir'}
+      ]
+    }
+  }
+}
+<div><label class="typo__label">Single select / dropdown</label>
+    <multiselect id="single-select-object" v-model="value" deselect-label="Can't remove this value" track-by="name" label="name"
+                 placeholder="Select one" :options="options" :searchable="false" :allow-empty="false"
+                 aria-label="pick a value">
+      <template v-slot:singleLabel="{ option }"><strong>{{ option.name }}</strong> is written in <strong>
+        {{ option.language }}</strong></template>
+    </multiselect>
+    <pre class="language-json"><code>{{ value }}</code></pre>
+  </div>
+Select with search
+By default searchable is set to true, thus using search doesn’t require any prop.
+
+The internal search engine is based on the label prop. In other words – when searching, vue-multiselect only compares the option labels with the current search query. If you want to search inside other object properties look at the ajax search example.
+
+custom-label accepts a function with the option object as the first param. It should return a string which is then used to display a custom label.
+
+When sorting a filtered list, filteringSortFunc accepts a function for use in Array.sort(). By default, it orders by the ascending length of each option.
+
+Select with search
+Vue.js — [JavaScript]
+{
+  "name": "Vue.js",
+  "language": "JavaScript"
+}
+Code sample
+import Multiselect from 'vue-multiselect'
+
+export default {
+  components: {
+    Multiselect
+  },
+  data () {
+    return {
+      value: {name: 'Vue.js', language: 'JavaScript'},
+      options: [
+        {name: 'Vue.js', language: 'JavaScript'},
+        {name: 'Rails', language: 'Ruby'},
+        {name: 'Sinatra', language: 'Ruby'},
+        {name: 'Laravel', language: 'PHP'},
+        {name: 'Phoenix', language: 'Elixir'}
+      ]
+    }
+  },
+  methods: {
+    nameWithLang ({name, language}) {
+      return `${name} — [${language}]`
+    }
+  }
+}
+<div><label class="typo__label">Select with search</label>
+    <multiselect id="single-select-search" v-model="value" :options="options" :custom-label="nameWithLang" placeholder="Select one" label="name"
+                 track-by="name" aria-label="pick a value"></multiselect>
+    <pre class="language-json"><code>{{ value }}</code></pre>
+  </div>
+Multiple select
+To allow multiple selections pass the :multiple="true" prop.
+
+Optional configuration flags:
+:close-on-select="false" – the dropdown stays open after selecting an option
+:clear-on-select="false" – the search query stays the same after selecting an option
+You can pass <template v-slot:tag="props"><Your code></template> to use a different markup for selected options (tags)
+Simple select / dropdown
+1 options selected
+[
+  {
+    "name": "Vue.js",
+    "language": "JavaScript"
+  }
+]
+Code sample
+import Multiselect from 'vue-multiselect'
+
+export default {
+  components: {
+    Multiselect
+  },
+  data () {
+    return {
+      value: [],
+      options: [
+        {name: 'Vue.js', language: 'JavaScript'},
+        {name: 'Adonis', language: 'JavaScript'},
+        {name: 'Rails', language: 'Ruby'},
+        {name: 'Sinatra', language: 'Ruby'},
+        {name: 'Laravel', language: 'PHP'},
+        {name: 'Phoenix', language: 'Elixir'}
+      ]
+    }
+  }
+}
+<div><label class="typo__label">Simple select / dropdown</label>
+    <multiselect id="multiselect" v-model="value" :options="options" :multiple="true" :close-on-select="false" :clear-on-select="false"
+                 :preserve-search="true" placeholder="Pick some" label="name" track-by="name" :preselect-first="true">
+      <template #selection="{ values, search, isOpen }">
+        <span class="multiselect__single"
+              v-if="values.length"
+              v-show="!isOpen">{{ values.length }} options selected</span>
+      </template>
+    </multiselect>
+    <pre class="language-json"><code>{{ value }}</code></pre>
+  </div>
+Asynchronous select
+Vue-Multiselect supports changing the option list on the fly, thus can be also used a type-a-head search box.
+
+To react to the search query changes, set a handler function on the @search-change event. It receives the searchQuery as the first param, which can be used to make an asynchronous API call.
+
+It is convenient to set the :loading prop to true, whenever a request is in progress. Look at the provided asyncFind method for an example usage.
+
+Optional configuration flags:
+:hide-selected="true" – already selected options will not be displayed in the dropdown
+:internal-search="false" – disables the multiselect’s internal search engine. If you do that, you have to manually update the available :options.
+:limit="3" – limits the visible results to 3.
+:limit-text="limitText" – function that receives the current selected options count and should return a string to show when the :limit count is exceed
+:options-limit="300" – limits the displayed options to 300. Useful for optimisations purposes.
+id="ajax" – every event is emitted with this as the second param. Useful for identification which component instance triggered the method (in loops for example). NEW: Can also be used for pointing with <label :for="id">.
+open-direction="bottom" – forces the multiselect to always open below. Use top or above to always open above. By default the multiselect will open whereever there is more space once there is not enough space below to open at maxHeight.
+Async multiselect
+Type to search
+[]
+Code sample
+import Multiselect from 'vue-multiselect'
+import {ajaxFindCountry} from './js/countriesApi.js'
+
+export default {
+  components: {
+    Multiselect
+  },
+  data () {
+    return {
+      selectedCountries: [],
+      countries: [],
+      isLoading: false
+    }
+  },
+  methods: {
+    limitText (count) {
+      return `and ${count} other countries`
+    },
+    asyncFind (query) {
+      this.isLoading = true
+      ajaxFindCountry(query).then(response => {
+        this.countries = response
+        this.isLoading = false
+      })
+    },
+    clearAll () {
+      this.selectedCountries = []
+    }
+  }
+}
+<div><label class="typo__label" for="ajax">Async multiselect</label>
+    <multiselect v-model="selectedCountries" id="ajax" label="name" track-by="code" placeholder="Type to search"
+                 open-direction="bottom" :options="countries" :multiple="true" :searchable="true" :loading="isLoading"
+                 :internal-search="false" :clear-on-select="false" :close-on-select="false" :options-limit="300"
+                 :limit="3" :limit-text="limitText" :max-height="600" :show-no-results="false" :hide-selected="true"
+                 @search-change="asyncFind">
+      <template #tag="{ option, remove }"><span class="custom__tag"><span>{{ option.name }}</span><span
+        class="custom__remove" @click="remove(option)">❌</span></span></template>
+      <template #clear="props">
+        <div class="multiselect__clear" v-if="selectedCountries.length"
+             @mousedown.prevent.stop="clearAll(props.search)"></div>
+      </template>
+      <template #noResult>
+        <span>Oops! No elements found. Consider changing the search query.</span>
+      </template>
+    </multiselect>
+    <pre class="language-json"><code>{{ selectedCountries }}</code></pre>
+  </div>
+Tagging
+To add tagging functionality to single/multiple selects, set the :taggable prop to true. This will add an additional option at the beginning of the options list whenever you type a phrase that doesn’t have an exact match in the available options. Selecting this temporary option will emit the @tag event with the current typed search query as the first param. The event handler should add the received tag to both the options list and the value.
+
+Remember that when working with objects as options, you have to transform the received tag string to an object that matches the objects structure of the options list. In this example, the addTag method generates an object with a unique code property.
+
+Optional configuration flags:
+tag-placeholder="Add this as new tag" – A helper label that will be displayed when highlighting the just typed tag suggestion.
+tag-position="bottom" – By default the tag position will be set to 'top' and new tags will appear above the search results. Changing the tag positon to 'bottom' will revert this behaviour and will prioritize the search results.
+Code sample
+import Multiselect from 'vue-multiselect'
+
+export default {
+  components: {
+    Multiselect
+  },
+  data () {
+    return {
+      value: [
+        {name: 'Javascript', code: 'js'}
+      ],
+      options: [
+        {name: 'Vue.js', code: 'vu'},
+        {name: 'Javascript', code: 'js'},
+        {name: 'Open Source', code: 'os'}
+      ]
+    }
+  },
+  methods: {
+    addTag (newTag) {
+      const tag = {
+        name: newTag,
+        code: newTag.substring(0, 2) + Math.floor((Math.random() * 10000000))
+      }
+      this.options.push(tag)
+      this.value.push(tag)
+    }
+  }
+}
+<div><label class="typo__label">Tagging</label>
+    <multiselect id="tagging" v-model="value" tag-placeholder="Add this as new tag" placeholder="Search or add a tag" label="name"
+                 track-by="code" :options="options" :multiple="true" :taggable="true" @tag="addTag"></multiselect>
+    <pre class="language-json"><code>{{ value }}</code></pre>
+  </div>
+Custom option template
+You can use option scoped slot to provide a custom option template. The available props include props.option and props.search. Look at the provided example for more details.
+
+To ensure the keyboard navigation works properly, remember to set the :option-height so it equals the height of the option template. By default, the component assumes an option height of 40px.
+
+Optional configuration flags:
+:option-height="104" – The height of the custom option template.
+Custom option template
+No Man’s SkyExplorer
+{
+  "title": "Explorer",
+  "desc": "Discovering new species!",
+  "img": "assets/posters/creatures.png"
+}
+Code sample
+import Multiselect from 'vue-multiselect'
+
+export default {
+  components: {
+    Multiselect
+  },
+  data () {
+    return {
+      value: {title: 'Explorer', desc: 'Discovering new species!', img: 'assets/posters/creatures.png'},
+      options: [
+        {title: 'Space Pirate', desc: 'More space battles!', img: 'assets/posters/fleet.png'},
+        {title: 'Merchant', desc: 'PROFIT!', img: 'assets/posters/trading_post.png'},
+        {title: 'Explorer', desc: 'Discovering new species!', img: 'assets/posters/creatures.png'},
+        {title: 'Miner', desc: 'We need to go deeper!', img: 'assets/posters/resource_lab.png'}
+      ]
+    }
+  },
+  methods: {
+    customLabel ({title, desc}) {
+      return `${title} – ${desc}`
+    }
+  }
+}
+<div><label class="typo__label">Custom option template</label>
+    <multiselect id="custom-options" v-model="value" placeholder="Fav No Man’s Sky path" label="title" track-by="title" :options="options"
+                 :option-height="104" :custom-label="customLabel" :show-labels="false">
+      <template #singleLabel="props"><img class="option__image" :src="props.option.img"
+                                                           alt="No Man’s Sky"/><span class="option__desc"><span
+        class="option__title">{{ props.option.title }}</span></span></template>
+      <template #option="props"><img class="option__image" :src="props.option.img" alt="No Man’s Sky"/>
+        <div class="option__desc"><span class="option__title">{{ props.option.title }}</span><span
+          class="option__small">{{ props.option.desc }}</span></div>
+      </template>
+    </multiselect>
+    <pre class="language-json"><code>{{ value }}</code></pre>
+  </div>
+Option groups
+The options list can also contain groups. It requires passing 3 additional props: group-label, group-values and group-select. group-label is used to locate the group label. group-values should point to the group’s option list. group-select is used to define if selecting the group label should select/unselect all values in the group, or do nothing.
+
+Despite that the available options are grouped, the selected options are stored as a flat array of objects.
+
+Please look at the provided example for a example options list structure.
+
+Groups
+Type to search
+[]
+Code sample
+import Multiselect from 'vue-multiselect'
+
+export default {
+  components: {
+    Multiselect
+  },
+  data () {
+    return {
+      options: [
+        {
+          language: 'Javascript',
+          libs: [
+            {name: 'Vue.js', category: 'Front-end'},
+            {name: 'Adonis', category: 'Backend'}
+          ]
+        },
+        {
+          language: 'Ruby',
+          libs: [
+            {name: 'Rails', category: 'Backend'},
+            {name: 'Sinatra', category: 'Backend'}
+          ]
+        },
+        {
+          language: 'Other',
+          libs: [
+            {name: 'Laravel', category: 'Backend'},
+            {name: 'Phoenix', category: 'Backend'}
+          ]
+        }
+      ],
+      value: []
+    }
+  }
+}
+<div><label class="typo__label">Groups</label>
+    <multiselect id="option-groups" v-model="value" :options="options" :multiple="true" group-values="libs" group-label="language"
+                 :group-select="true" placeholder="Type to search" track-by="name" label="name"><template v-slot:noResult>Oops! No elements found. Consider changing the search query.</template>
+    </multiselect>
+    <pre class="language-json"><code>{{ value }}</code></pre>
+  </div>
+Vuex support
+Due to the one-way data-flow enforced by Vuex you should not be using v-model for manipulating the currently selected value. Because Vue-Multiselect always uses it’s own internal copy of the value it never mutates the :modelValue by itself, which means it can can safely used with Vuex or even Redux.
+
+In Vue 3.0 v-model is just a syntax sugar for :modelValue and @update:modelValue. Because of this we can use the @update:modelValue event to trigger Vuex actions or mutations. Whenever we mutate the :modelValue in Vuex, Multiselect’s internal value will update.
+
+Vuex example.
+Vuex
+Code sample
+/* Example of store setup
+const store = createStore({
+  state () {
+    return {
+      value: 'Vuex',
+      options: ['Vuex', 'Vue', 'Vuelidate', 'Vue-Multiselect', 'Vue-Router']
+    }
+  },
+  mutations: {
+    updateValue (state, value) {
+      state.value = value
+    }
+  },
+  actions: {
+    updateValueAction ({ commit }, value) {
+      commit('updateValue', value)
+    }
+  }
+})
+ */
+
+import Multiselect from 'vue-multiselect'
+import {mapActions, mapState} from 'vuex'
+
+export default {
+  components: {
+    Multiselect
+  },
+  computed: {
+    ...mapState(['value', 'options'])
+  },
+  methods: {
+    ...mapActions(['updateValueAction'])
+  }
+}
+<div><label class="typo__label">Vuex example.</label>
+    <multiselect id="vuex-support" placeholder="Pick action" :modelValue="value" :options="options" :searchable="false" @update:modelValue="updateValueAction" aria-label="pick a action"></multiselect>
+</div>
+Action dispatcher
+The component may also act as dispatcher for different actions/methods. In this case there is no need for the :modelValue prop. Instead of @update:modelValue you can listen on the @select event. The difference between the two is that @select only receives the currently selected value instead of the whole list of selected values (if select is multiple).
+
+Optional configuration flags:
+:reset-after="true" – Resets the internal value after each select action inside the component.
+Open console to see logs.
+Pick action
+Code sample
+import Multiselect from 'vue-multiselect'
+
+export default {
+  components: {
+    Multiselect
+  },
+  data () {
+    return {
+      actions: ['alert', 'console.log', 'scrollTop']
+    }
+  },
+  methods: {
+    dispatchAction (actionName) {
+      switch (actionName) {
+        case 'alert':
+          window.alert('You just dispatched "alert" action!')
+          break
+        case 'console.log':
+          console.log('You just dispatched "console.log" action!')
+          break
+        case 'scrollTop':
+          window.scrollTo(0, 0)
+          break
+      }
+    }
+  }
+}
+<div>
+  <label class="typo__label">Open console to see logs.</label>
+  <multiselect id="action-dispatcher" placeholder="Pick action" :options="actions" :searchable="false" :reset-after="true" @select="dispatchAction" aria-label="pick a action"></multiselect>
+</div>
+Custom configuration
+Shows error when touched, but nothing is selected.
+
+Optional configuration flags:
+:max-height="150" – Set the dropdown height to 150px
+:max="3" – Set the maximal number of selections
+:allow-empty="false" – Doesn’t allow to remove the last option if it exists
+:prevent-autofocus="true" – Doesn’t focus to input search on open
+:block-keys="['Tab', 'Enter']" – Block the Tab and Enter keys from triggering their default behaviour
+@close="onTouch" – Event emitted when closing the dropdown
+Customized multiselect
+Pick at least one
+Code sample
+import Multiselect from 'vue-multiselect'
+
+export default {
+  components: {
+    Multiselect
+  },
+  data () {
+    return {
+      isDisabled: false,
+      isTouched: false,
+      value: [],
+      options: ['Select option', 'Disable me!', 'Reset me!', 'mulitple', 'label', 'searchable']
+    }
+  },
+  computed: {
+    isInvalid () {
+      return this.isTouched && this.value.length === 0
+    }
+  },
+  methods: {
+    onChange (value) {
+      this.value = value
+      if (value.indexOf('Reset me!') !== -1) this.value = []
+    },
+    onSelect (option) {
+      if (option === 'Disable me!') this.isDisabled = true
+    },
+    onTouch () {
+      this.isTouched = true
+    }
+  }
+}
+<div :class="{ 'invalid': isInvalid }">
+  <label class="typo__label">Customized multiselect</label>
+  <multiselect id="custom-configuration" placeholder="Pick at least one" select-label="Enter doesn’t work here!" :model-value="value" :options="options" :multiple="true" :searchable="true" :allow-empty="false" :prevent-autofocus="true" :hide-selected="true" :max-height="150" :max="3" :disabled="isDisabled" :block-keys="['Tab', 'Enter']" @update:modelValue="onChange" @close="onTouch" @select="onSelect"></multiselect>
+  <label class="typo__label form__label" v-show="isInvalid">Must have at least one value</label>
+</div>
+Programmatic control
+In some cases, you might to programmatically open and close your multiselect. There are various ways you can do this:
+
+activate() and deactivate() – You can access these methods on the multiselect.
+focus() – You can dispatch a focus event on the multiselects $el or on the search input directly.
+ToggleOpenClose
+Multiselect Open: false
+Controlling multiselect programmatically
+Pick at least one
+Code sample
+import Multiselect from 'vue-multiselect'
+
+export default {
+  components: {
+    Multiselect
+  },
+  data () {
+    return {
+      isOpen: false,
+      value: [],
+      options: ['Select option', 'Option 1', 'Option 2', 'Option 3', 'Option 4', 'Option 5']
+    }
+  },
+  methods: {
+    toggle () {
+      this.$refs.multiselect.$el.focus()
+
+      setTimeout(() => {
+        this.$refs.multiselect.$refs.search.blur()
+      }, 1000)
+    },
+    open () {
+      this.$refs.multiselect.activate()
+    },
+    close () {
+      this.$refs.multiselect.deactivate()
+    }
+  }
+}
+<div>
+    <button @click="toggle" class="button button-small">Toggle</button>
+    <button @click="open" class="button button-small">Open</button>
+    <button @click="close" class="button button-small">Close</button>
+    <pre>Multiselect Open: {{ isOpen }}</pre>
+    <label class="typo__label">Controlling multiselect programmatically</label>
+    <multiselect id="programmatic-control" ref="multiselect" placeholder="Pick at least one" :value="value" :options="options" :multiple="true"
+                 :searchable="true" :allow-empty="false" :hide-selected="true" :max-height="150" :max="3"
+                 @open="isOpen = true" @close="isOpen = false"></multiselect>
+  </div>
+Props
+Name	Type	Default	Description
+multiselectMixin.js
+id	Integer||String		Used to identify the component in events.
+options	Array		Array of available options: Objects, Strings or Integers. If array of objects, visible label will default to option.label.
+modelValue	Object||Array||String||Integer		Presets the selected options.
+multiple	Boolean	false	Equivalent to the multiple attribute on a <select> input.
+trackBy	String		Used to compare objects. Only use if options are objects.
+label	String		Label from option Object, that will be visible in the dropdown.
+searchable	Boolean	true	Add / removes search input.
+clearOnSelect	Boolean	true	Clear the search input after select(). Use only when multiple is true.
+hideSelected	Boolean	false	Hide already selected options
+placeholder	String	'Select option'	Equivalent to the placeholder attribute on a <select> input.
+allowEmpty	Boolean	true	Allows to remove all selected values. Otherwise one must be left selected.
+resetAfter	Boolean	false	Reset this.modelValue, this.search, this.selected after this.modelValue changes.
+closeOnSelect	Boolean	true	Enable/disable closing after selecting an option
+customLabel	Function => String		Function used to create a custom label
+taggable	Boolean	false	Disable / Enable tagging
+tagPlaceholder	String	'Press enter to create a tag'	String to show when highlighting a potential tag
+tagPosition	String	'top'	By default new tags will appear above the search results. Changing to 'bottom' will revert this behaviour and will proritize the search results
+max	Number		Number of allowed selected options.
+optionsLimit	Number	1000	Limits the options displayed in the dropdown to the first X options.
+groupValues	String		Name of the property containing the group values
+groupLabel	String		Name of the property containing the group label
+groupSelect	Boolean	false	Allow to select all group values by selecting the group label
+blockKeys	Array	[]	Array of keyboard key aliases to block when selecting
+internalSearch	Boolean	true	Decide whether to filter the results internally based on search query. Useful for async filtering, where we search through more complex data.
+preserveSearch	Boolean	false	If set to true, will preserve the search query when opening/closing the component.
+preselectFirst	Boolean	false	Selects the first option if initial value is empty
+preventAutofocus	Boolean	false	Disabled the search input focusing when the multiselect opens
+filteringSortFunc	Function => Int		Allows a custom sorting function when the user searching. This function will be the compareFn argument for Array.sort() function, so will require two arguments.
+Added in v3.2.0
+Multiselect.vue
+name	String	''	Name attribute to match optional label element
+selectLabel	String	'Press enter to select'	String to show when pointing to an option
+selectGroupLabel	String	'Press enter to select group'	String to show when pointing to an option
+selectedLabel	String	'Selected'	String to show next to selected option
+deselectLabel	String	'Press enter to remove'	String to show when pointing to an already selected option
+deselectGroupLabel	String	'Press enter to deselect group'	String to show when pointing to an already selected group
+showLabels	Boolean	true	Decide whether to show labels on highlighted options
+limit	Number	99999	Limit the display of selected options. The rest will be hidden within the limitText string.
+limitText	Function => String	count => `and ${count} more`	Function that process the message shown when selected elements pass the defined limit.
+loading	Boolean	false	Show/hide the loading spinner.
+disabled	Boolean	false	Enable/disable the multiselect.
+maxHeight	Integer	300	Sets max-height style value of the dropdown
+openDirection	String	''	Fixed opening direction (instead of auto). Options are "above"/"top" or "below"/"bottom"
+showNoOptions	Boolean	true	Show the showNoOptions slot if list is empty.
+showNoResults	Boolean	true	Show the noResult slot if no results are found.
+tabindex	Number	0	Specify the tabindex of the Multiselect component
+spellcheck	Boolean	false	Enables search input's browser spellcheck if true.
+Added in v3.1.0
+required	Boolean	false	Passes the Boolean value to the inbuilt input element.
+Added in v3.1.0
+pointerMixin.js
+showPointer	Boolean	true	Enable/disable highlighting of the pointed value.
+optionHeight	Number	40	The height of the option element. Required for proper scrolling.
+Events
+Name	Attributes	Listen to	Description
+Update ModelValue	(value, id)	@update:modelValue	Emitted after this.modelValue changes
+Select	(selectedOption, id)	@select	Emitted after selecting an option
+Remove	(removedOption, id)	@remove	Emitted after removing an option
+SearchChange	(searchQuery, id)	@search-change	Emitted after the search query changes
+Tag	(searchQuery, id)	@tag	Emitted after user attempts to add a tag
+Open	(id)	@open	Emitted when the dropdown opens. Useful for detecting when touched.
+Close	(value, id)	@close	Emitted when the dropdown closes
+Slots
+Name	Description
+option	Slot for custom option template. See example.
+Default: Shows option label
+Slot-scope
+option – option
+search – current search value
+maxElements	Shows when the maximum options have been selected. Defaults to string:
+Default: Maximum of <max> options selected. First remove a selected option to select another.
+noResult	Shows when no elements match the search query. Defaults to string:
+Default: No elements found. Consider changing the search query.
+noOptions	Shows when no elements in options empty. Defaults to string:
+Default: List is empty.
+beforeList	Shows before the list, when dropdown is open.
+afterList	Shows after the list, when dropdown is open.
+caret	Element for opening and closing the dropdown.
+Slot-scope
+toggle: Function – toggles the dropdown.
+singleLabel	Slot for custom label template for single select
+placeholder	Slot for the placeholder (is not displayed when the dropdown is open and `searchable` is true)
+limit	Slot to display when the number of selected options is greater than `optionsLimit`.
+clear	Slot located before the tags
+Slot-scope
+search – the search value
+tag	Slot that is used for each selected option (tags)
+Slot-scope
+option – selected option
+search – the search value
+remove – method to remove the slot (pass the option)
+selection	Slot that can be used to show all selected tags. The main different between theselectionslot and thetagslot is that thetagslot renders per tag, however this slot renders just once, leaving the display of each tag to you (if you wish to display each one)
+Slot-scope
+search – the search value
+removeElement – method to remove the slot (pass the option)
+values – Array of selected values
+is-open – Boolean if the select is open

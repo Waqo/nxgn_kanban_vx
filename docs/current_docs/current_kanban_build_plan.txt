@@ -1,0 +1,212 @@
+# Kanban Widget Rebuild - Phase 2: Board Finalization Plan (current_kanban_build_plan.txt)
+
+## 1. Overall Goal
+
+Finalize the core Kanban board functionality, ensuring parity with (and improvements upon) the original widget's board view. Optimize for performance, structure, and user experience before implementing the Project Details modal. Establish robust error handling and a maintainable configuration system.
+
+## 2. Key Areas of Focus
+
+*   **Functionality Parity & Enhancement:** Replicate all essential features of the old board view and add requested enhancements.
+*   **Performance & Startup Optimization:** Ensure the widget loads quickly and operates smoothly, especially the initial data fetch.
+*   **Code Structure & Maintainability:** Refactor for clarity, implement a configuration system, and ensure adherence to best practices within the CDN/no-build-step constraint.
+*   **UI/UX Polish:** Refine the visual presentation and interactions for a better user experience.
+*   **Error Handling Robustness:** Implement comprehensive error handling and user feedback mechanisms.
+
+## 3. Detailed Task Breakdown
+
+### 3.1. Functionality Parity & Enhancement
+
+*   **Tranche View Drag & Drop:**
+    *   **Goal:** Allow users to drag projects between Tranche columns and update the project's `Tranche` lookup field in Zoho.
+    *   **Tasks:**
+        *   Modify `KanbanBoard.js` drag/drop handlers (`handleDrop`, `handleDragStart`) to detect if the `boardViewMode` is 'tranches'.
+        *   Create a new Vuex action in `projects.js` (e.g., `updateProjectTranche`) similar to `updateProjectStage`.
+        *   This action should take `projectId` and `newTrancheId` (or `null` for unassigned).
+        *   Implement optimistic UI update (move card visually).
+        *   Call `ZohoAPIService.updateRecordById` to update the `Tranche` lookup field (API Name: `Tranche`) on the Project record.
+        *   Handle success/error notifications and UI reversion on API failure.
+        *   Ensure `KanbanColumn.vue` correctly emits necessary data (target tranche ID) during drop events in tranche view.
+        *   Verify `BaseToggle` for switching views works correctly with the state (`ui.js` action/mutation/getter).
+*   **Toolbar Filter/Sort Completeness:**
+    *   **Goal:** Ensure all relevant filters and sort options from the old widget (and any new desired ones) are implemented and functional.
+    *   **Tasks:**
+        *   Review `docs/old_code/Toolbarjs.txt` and compare available filters/sorts with `app/components/kanban/KanbanToolbar.js`.
+        *   Verify `workRequired` filter is fully functional (state, UI, getter logic).
+        *   Verify `projectType` filter works correctly.
+        *   Verify `cashDeal` and `needHelp` toggle filters function as expected.
+        *   Ensure all selected sorting options (`sortByOptionsFormatted` in `KanbanToolbar.js`) work correctly with the `filteredSortedProjects` getter in `projects.js`.
+*   **Kanban Card Display Parity:**
+    *   **Goal:** Ensure all relevant data points and badges shown on the old Kanban card are present and accurate on the new one.
+    *   **Tasks:**
+        *   Compare `docs/old_code/KanbanCardjs.txt` rendering logic with `app/components/kanban/KanbanCard.js`.
+        *   Verify all required badges (work, system size, project type, survey, permit, interconnect, dates, yield, sales rep) are displayed correctly based on project data.
+        *   Confirm data formatting (dates, kW, yield) matches requirements.
+        *   Ensure tooltips are present where needed (e.g., full roof type, permit/IC status).
+*   **API Service Expansion:**
+    *   **Goal:** Add necessary API methods to `ZohoAPIService.js` for anticipated modal actions (notes, issues, documents, etc.) even if not used immediately by the board.
+    *   **Tasks:**
+        *   Implement `addRecord(formName, data, appName)` based on `ZOHO.CREATOR.DATA.addRecords`.
+        *   Implement `deleteRecordById(reportName, recordId, appName)` based on `ZOHO.CREATOR.DATA.deleteRecordById`.
+        *   Implement `uploadFile(reportName, recordId, fieldName, fileObject, appName)` based on `ZOHO.CREATOR.FILE.uploadFile`. (Requires handling File objects from input).
+        *   Implement `readFile(reportName, recordId, fieldName, appName)` based on `ZOHO.CREATOR.FILE.readFile`.
+        *   *(Optional)* Consider a generic `invokeFunction(functionName, data, appName)` if custom Deluge functions will be needed.
+
+### 3.2. Performance & Startup Optimization
+
+*   **Initial Load Analysis:**
+    *   **Goal:** Ensure the `fetchInitialData` action in the root store is efficient.
+    *   **Tasks:**
+        *   Review the `Promise.all` in `store/store.js` action `fetchInitialData`. Ensure only essential lookups and initial projects are fetched.
+        *   Analyze the `fetchRequiredLookups` action in `lookups.js`. Verify report names are correct and consider if any lookups can be deferred or loaded on demand (though less practical without dynamic imports/build step).
+        *   Use browser developer tools (Network tab) to measure the load time of the initial API calls.
+*   **Data Processing Efficiency:**
+    *   **Goal:** Optimize data transformation logic.
+    *   **Tasks:**
+        *   Review loops and data manipulation in `utils/processors.js`. Ensure they are efficient (avoid nested loops where possible, use efficient map/filter/reduce).
+*   **Rendering Performance:**
+    *   **Goal:** Ensure smooth rendering, especially with many cards.
+    *   **Tasks:**
+        *   Review computed properties, especially `filteredSortedProjects`. Ensure they are not doing excessive work on every update. Vue's caching helps, but complex logic can still be slow.
+        *   *(Advanced - Potential Library)* Consider if a virtual scrolling solution would be beneficial if boards commonly have hundreds of cards per column (e.g., `vue-virtual-scroller`, though integration without a build step might be complex). Assess necessity first.
+
+### 3.3. Code Structure & Maintainability
+
+*   **Configuration System (`config/` folder):**
+    *   **Goal:** Centralize application constants like API names, report names, form names, and dropdown options.
+    *   **Tasks:**
+        *   Create a new folder `app/config/`.
+        *   Create `app/config/constants.js`: Define and export constants for Zoho report names, form names, key field names (e.g., `REPORT_PROJECTS = 'PM_Kanban_Projects'`).
+        *   Create `app/config/options.js`: Define and export arrays/objects for static dropdown options (e.g., filter types, sort options, stage view options).
+        *   Refactor `app/store/modules/lookups.js` (actions), `app/services/zohoCreatorAPI.js`, `app/components/kanban/KanbanToolbar.js`, and potentially other files to import and use these constants/options instead of hardcoded strings.
+        *   Update `widget.html` to include `<script type="module" src="./config/constants.js"></script>` and `<script type="module" src="./config/options.js"></script>` *before* scripts that depend on them. Adjust paths in `App.js` imports if necessary (or decide on a global vs import strategy). *Self-correction:* ES Modules handle dependencies better; direct script includes in HTML might not be needed if `App.js` imports everything. Verify module loading order. A safer approach might be to load them early in `App.js` or pass them down if modules can't directly import others easily without a build step. Let's stick to ES Module imports for now.
+*   **Code Review & Refactoring:**
+    *   **Goal:** Improve clarity, remove redundancy, and ensure consistency.
+    *   **Tasks:**
+        *   Review all major components (`KanbanBoard`, `KanbanColumn`, `KanbanCard`, `KanbanToolbar`) and store modules (`projects`, `lookups`, `ui`, `user`) for clarity and potential refactoring opportunities.
+        *   Ensure consistent naming conventions.
+        *   Remove commented-out code and unused variables/functions.
+        *   Add JSDoc comments to complex functions or modules for better understanding.
+
+### 3.4. UI/UX Polish
+
+*   **Visual Consistency:**
+    *   **Goal:** Ensure a consistent look and feel across all board elements.
+    *   **Tasks:**
+        *   Review padding, margins, font sizes, and color usage in `KanbanColumn`, `KanbanCard`, and `KanbanToolbar`.
+        *   Ensure `BaseComponent` styles are applied consistently.
+        *   Refine the appearance of badges, buttons, and dropdowns.
+*   **Loading/Empty States:**
+    *   **Goal:** Provide clear visual feedback during loading and when no data exists.
+    *   **Tasks:**
+        *   Implement skeleton loaders (e.g., `KanbanBoardSkeleton.js` from old code, adapted for Vue) to show while initial data is fetching. Integrate this into `KanbanBoard.vue`.
+        *   Ensure "No projects in this stage" messages in `KanbanColumn.vue` are clear and well-styled.
+        *   Display a clear message in `KanbanBoard.vue` if no stages/tranches are available for the selected view.
+*   **Interaction Feedback:**
+    *   **Goal:** Improve feedback for user actions.
+    *   **Tasks:**
+        *   Refine hover states for cards and columns.
+        *   Enhance the visual distinction of the column being dragged over (`isDragOver` state in `KanbanColumn.js`).
+        *   Add subtle transitions for collapsing/expanding columns and potentially for card movements (if not impacting performance).
+*   **Responsiveness:**
+    *   **Goal:** Ensure the board is usable on different screen sizes (within reason for a widget).
+    *   **Tasks:**
+        *   Test the layout flow, especially the toolbar, on narrower views. Adjust flex-wrap or component sizing as needed.
+
+### 3.5. Error Handling Robustness
+
+*   **API Call Errors:**
+    *   **Goal:** Catch errors from all Zoho API calls and provide user feedback.
+    *   **Tasks:**
+        *   Review all calls to `ZohoAPIService` methods within Vuex actions (`projects.js`, `lookups.js`, `user.js`). Ensure `.catch()` blocks are present.
+        *   In catch blocks, commit error states (`SET_ERROR` in relevant modules, potentially `SET_GLOBAL_ERROR` in `ui.js` for critical failures).
+        *   Dispatch user-friendly notifications via the `ui/addNotification` action explaining the failure (e.g., "Failed to fetch projects", "Failed to update stage").
+        *   Ensure UI reverts correctly on update failures (already done for `updateProjectStage`, verify for future actions like `updateProjectTranche`).
+*   **Data Processing Errors:**
+    *   **Goal:** Handle errors during data transformation.
+    *   **Tasks:**
+        *   Wrap data processing logic within `utils/processors.js` functions in `try...catch` blocks.
+        *   Log errors clearly.
+        *   Return default/empty values (e.g., `[]`, `new Map()`) from processors on error to prevent crashes downstream.
+        *   Consider dispatching a notification if processing fails significantly (e.g., "Failed to process stage data").
+*   **UI Error Display:**
+    *   **Goal:** Display critical errors prominently.
+    *   **Tasks:**
+        *   Ensure the `globalError` state from `ui.js` is displayed clearly in `WidgetView.js` (already implemented, verify styling).
+        *   Ensure individual component/module errors (like project or lookup load errors) are handled gracefully, possibly showing a localized error message or relying on the global error display/notifications.
+
+## 4. Vue Ecosystem Library Recommendations
+
+Given the "no build step" constraint and the goal of improving speed/efficiency:
+
+*   **Vuex (Already Used):** Good choice for state management in this context. Continue leveraging its modularity.
+*   **Lodash/FP (via CDN):**
+    *   **Potential Benefit:** Can provide highly optimized utility functions for data manipulation (sorting, filtering, grouping, debouncing) which *might* be faster than hand-rolled equivalents, especially for complex operations. `lodash-es` can be loaded via CDNs like `esm.sh`.
+    *   **Consideration:** Adds another dependency. Assess if current data processing in `processors.js` or filtering in `projects.js` getters is a bottleneck first. Over-optimization can add complexity. Debouncing is already handled locally in the toolbar.
+*   **Day.js or date-fns (via CDN):**
+    *   **Potential Benefit:** Lightweight date/time manipulation libraries, potentially more efficient and feature-rich than native `Date` objects for complex formatting or calculations (though your current relative time function is likely fine).
+    *   **Consideration:** Adds a dependency for functionality that might already be adequately covered.
+*   **Virtual Scrolling (e.g., `vue-virtual-scroller`):**
+    *   **Potential Benefit:** Dramatically improves rendering performance if columns frequently contain hundreds or thousands of cards. Renders only the visible items.
+    *   **Consideration:** Can be complex to integrate without a build step (requires careful global registration or dynamic loading). Assess if the number of cards *per column* realistically warrants this complexity. Usually only needed for very large lists.
+
+**Recommendation:** Stick with Vue + Vuex for now. Introduce Lodash or Day.js *only* if specific performance bottlenecks related to data processing or date handling are identified. Avoid virtual scrolling unless absolutely necessary due to integration complexity in a CDN environment. Focus on optimizing the existing Vuex getters and processor functions first.
+
+## 5. Configuration System Plan (`config/`)
+
+*   **Folder:** `app/config/`
+*   **Files:**
+    *   `constants.js`: Exported JS constants.
+        *   `APP_NAME = "nexgen-portal"`
+        *   `REPORT_PROJECTS = "PM_Kanban_Projects"`
+        *   `REPORT_STAGES = "PM_Kanban_Stages"`
+        *   `REPORT_TAGS = "PM_Kanban_Tags"`
+        *   `REPORT_USERS = "PM_Kanban_Users"`
+        *   `REPORT_SALES_REPS = "PM_Kanban_Sales_Reps"`
+        *   `REPORT_SALES_ORGS = "All_Sales_Organizations"`
+        *   `REPORT_TRANCHES = "PM_Tranches_Report"`
+        *   `REPORT_EQUIPMENT = "PM_Kanban_Equipment"`
+        *   `FIELD_PROJECT_STAGE_LOOKUP = "New_Stage"`
+        *   `FIELD_PROJECT_TRANCHE_LOOKUP = "Tranche"`
+        *   `FIELD_USER_EMAIL = "Email"`
+        *   *(Add other frequently used report/form/field API names)*
+    *   `options.js`: Exported JS arrays/objects for UI options.
+        *   `FILTER_TYPE_OPTIONS = [...]` (from Toolbar)
+        *   `SORT_BY_OPTIONS = [...]` (raw options for Toolbar)
+        *   `STAGE_VIEW_OPTIONS = [...]` (from Toolbar)
+        *   `WORK_REQUIRED_OPTIONS = [...]` (from Toolbar)
+*   **Usage:**
+    *   Import constants/options into relevant `.js` files (services, store modules, components).
+    *   Example: `import { REPORT_PROJECTS, FIELD_PROJECT_STAGE_LOOKUP } from '../config/constants.js';`
+*   **Loading:** Ensure modules are loaded correctly. ES Module imports should handle dependencies. If issues arise with inter-module imports in the browser without a build step, alternative strategies might be needed (like attaching config to a global object early on, though less clean).
+
+## 6. Next Steps
+
+1.  **Implement Configuration System:** Create the `config/` folder and files, refactor existing code to use them. This cleans up the codebase early.
+2.  **Implement Tranche Drag & Drop:** Add the necessary store action and update `KanbanBoard.js` handlers.
+3.  **Expand API Service:** Add the placeholder methods for `addRecord`, `deleteRecordById`, `uploadFile`, `readFile`.
+4.  **Address Functionality/Display Gaps:** Systematically compare old card/toolbar features with the new implementation and fill any gaps identified in section 3.1.
+5.  **Enhance Error Handling:** Review API calls and data processing, adding robust error catching, state updates, and notifications.
+6.  **UI/UX Polish:** Implement skeleton loaders, refine visual consistency, and improve interaction feedback.
+7.  **Performance Review:** Analyze initial load and filtering/sorting performance. Optimize getters/processors if needed.
+8.  **Final Review:** Do a thorough review of the board functionality before declaring it "complete" for this phase.
+
+
+## 7. Development Notes
+- Created `app/config/constants.js` and `app/config/options.js` as per Next Steps item 1.
+- Refactored store modules and components to use constants/options (Verified).
+- Expanded `ZohoAPIService.js` with `addRecord`, `deleteRecordById`, `uploadFile`, `readFile` methods as per Next Steps item 3.
+- Completed review of Functionality/Display Gaps (Step 4). Added search for Address/OS_ID, added project count badge to toolbar, adjusted Install Date sort field. Minor difference in Tranche count display deemed acceptable.
+- Refactored processors.js and dependent components/store modules to use API-aligned field names (ID, New_Stage, Installation_Date_Time, etc.).
+- Reviewed Error Handling (Step 5) - Existing implementation deemed sufficient.
+- Implemented local storage persistence for collapsed columns (Step 6).
+- Added loading notification for project refresh (Step 6).
+- Fixed duplicate project detection logic and display (Step 6).
+- Fixed search results display (name and stage) (Step 6).
+- Refined total system size calculation for stage/tranche views (Step 6).
+- Filtered Pre-Sale stage from stage list lookup.
+- Fixed drag-and-drop initiation bug.
+- Optimized startup: Modified `fetchCurrentUser` (user store) to use data from `lookups` store, eliminating a redundant API call.
+- Optimized startup: Modified `KanbanBoard.js` to initialize collapsed column state only once in `mounted`, removing redundant calls from `watch` handlers.
+- Added user impersonation feature to Dev Toolbar (admin only).
+- Implemented phone icon click on Kanban card to update user record for CTI trigger.
+- Implemented email icon click on Kanban card using navigateParentUrl.

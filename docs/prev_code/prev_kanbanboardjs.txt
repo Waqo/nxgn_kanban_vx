@@ -1,0 +1,308 @@
+// app/components/kanban/KanbanBoard.js
+
+import KanbanColumn from './KanbanColumn.js';
+import KanbanToolbar from './KanbanToolbar.js';
+
+// Ensure Vuex is available for mapState
+if (typeof Vuex === 'undefined') {
+  console.warn('Vuex might not be loaded yet for mapState helper in KanbanBoard.');
+}
+
+const KanbanBoard = {
+  name: 'KanbanBoard',
+  components: {
+    KanbanColumn,
+    KanbanToolbar
+  },
+  // Props are removed as data will come from the store
+  data() {
+    return {
+      // Local state for the board, e.g., drag/drop state
+      draggedCardId: null,
+      sourceStageId: null,
+      collapsedColumns: {}, // Added: Object to store collapsed state { stageId: true/false }
+    };
+  },
+  computed: {
+    // Map state
+    ...(typeof Vuex !== 'undefined' ? Vuex.mapState({
+        isLoadingProjects: state => state.projects.isLoading,
+        projectError: state => state.projects.error,
+        stages: state => state.lookups.stages,
+        tranches: state => state.lookups.tranches,
+        isLoadingLookups: state => state.lookups.isLoading,
+        lookupsError: state => state.lookups.error,
+        currentStageView: state => state.ui.currentStageView, 
+    }) : {
+        // Fallbacks
+        isLoadingProjects: () => false,
+        projectError: () => null,
+        stages: () => [],
+        isLoadingLookups: () => false,
+        lookupsError: () => null,
+        currentStageView: () => 'all',
+        tranches: () => [], // Fallback
+    }),
+    // Access boardViewMode directly from store
+    boardViewMode() {
+        const mode = this.$store?.state?.ui?.boardViewMode || 'stages';
+        console.log(`[Board Computed Direct Access] boardViewMode is: ${mode}`);
+        return mode;
+    },
+    // Map getters
+    ...(typeof Vuex !== 'undefined' ? Vuex.mapGetters({
+        displayProjects: 'projects/filteredSortedProjects'
+    }) : {
+        // Fallback
+        displayProjects: () => { console.error("Vuex not loaded, cannot get projects"); return []; }
+    }),
+
+    // Combined loading state
+    isLoading() {
+        return this.isLoadingProjects || this.isLoadingLookups;
+    },
+    // Combined error state
+    error() {
+        return this.projectError || this.lookupsError;
+    },
+
+    // New getter to filter stages based on current view
+    displayedStages() {
+        console.log(`[Board] displayedStages computed. currentStageView = ${this.currentStageView}`); // Log evaluation
+        if (!Array.isArray(this.stages)) return [];
+        if (this.currentStageView === 'all') {
+            console.log("[Board] displayedStages returning all.");
+            return this.stages; // Show all if 'all' is selected
+        }
+        // Filter stages based on the view property (case-insensitive comparison)
+        const filtered = this.stages.filter(stage => 
+            stage.view?.toLowerCase() === this.currentStageView || stage.view?.toLowerCase() === 'both'
+        );
+        console.log(`[Board] displayedStages returning ${filtered.length} stages.`);
+        return filtered;
+    },
+
+    // Group projects by stage using the filtered/sorted list and DISPLAYED stages
+    projectsByStage() {
+      const grouped = {};
+      // Use displayedStages instead of this.stages
+      const stagesToGroup = this.displayedStages || []; 
+      if (!Array.isArray(stagesToGroup)) {
+          return grouped;
+      }
+      const projectsToFilter = this.displayProjects || [];
+      
+      stagesToGroup.forEach(stage => {
+        if (stage && stage.id) {
+            // Filter the already filtered/sorted displayProjects
+            grouped[stage.id] = projectsToFilter.filter(p => p.stageField && p.stageField.ID === stage.id);
+        } else {
+             console.warn("KanbanBoard: Skipping stage due to missing id:", stage);
+        }
+      });
+      return grouped;
+    },
+    // Group projects by tranche
+    projectsByTranche() {
+        const grouped = {};
+        if (!Array.isArray(this.tranches)) return grouped;
+        
+        const projectsToGroup = this.displayProjects || []; 
+        const assignedProjectIds = new Set(); // Keep track of assigned projects
+
+        // Group projects into existing tranches
+        this.tranches.forEach(tranche => {
+            if (tranche && tranche.id) {
+                const trancheProjects = projectsToGroup.filter(p => {
+                    const isMatch = p.Tranche?.ID === tranche.id;
+                    if (isMatch) {
+                        assignedProjectIds.add(p.id); // Mark project as assigned
+                    }
+                    return isMatch;
+                });
+                grouped[tranche.id] = trancheProjects;
+            } else {
+                 console.warn("KanbanBoard: Skipping tranche due to missing id:", tranche);
+            }
+        });
+        
+        // Group unassigned projects
+        grouped['unassigned'] = projectsToGroup.filter(p => !assignedProjectIds.has(p.id));
+        
+        console.log('KanbanBoard: Projects grouped by tranche (with unassigned):', grouped);
+        return grouped;
+    },
+  },
+  watch: {
+      // Watch displayedStages (covers stage view changes)
+      displayedStages: {
+          handler(newStages) {
+              this.initializeCollapsedState(newStages, this.projectsByStage);
+          },
+          immediate: true 
+      },
+      // Watch projectsByStage (covers filtering changes)
+      projectsByStage: {
+          handler(newGroups) {
+              this.initializeCollapsedState(this.displayedStages, newGroups); 
+          },
+          deep: true 
+      },
+       // ADD Watcher specifically for projectsByTranche
+       projectsByTranche: {
+            handler(newGroups) {
+                console.log("[Board Watcher] projectsByTranche updated.");
+                // Use this.tranches for initialization key matching if in tranche mode
+                 if (this.boardViewMode === 'tranches') {
+                     const columnList = [{id: 'unassigned'}, ...(this.tranches || [])]; // Include unassigned
+                     this.initializeCollapsedState(columnList, newGroups); 
+                 }
+            },
+            deep: true
+       }
+  },
+  methods: {
+    // Drag and Drop Handlers
+    handleDragStart(cardId, stageId) {
+      console.log(`KanbanBoard: Drag started - Card: ${cardId}, Source Stage: ${stageId}`);
+      this.draggedCardId = cardId;
+      this.sourceStageId = stageId;
+    },
+    handleDragEnd() {
+      console.log('KanbanBoard: Drag ended');
+      this.resetDragState(); 
+    },
+    handleDrop(targetStageId) {
+      console.log(`KanbanBoard: Drop detected - Card: ${this.draggedCardId}, Target Stage: ${targetStageId}`);
+      if (!this.draggedCardId || this.sourceStageId === targetStageId) {
+        console.log('KanbanBoard: Drop ignored (no card dragged or same stage).');
+        this.resetDragState(); 
+        return;
+      }
+      const cardIdToMove = this.draggedCardId;
+      const sourceStage = this.sourceStageId;
+      const targetStage = targetStageId;
+      this.resetDragState();
+      console.log(`KanbanBoard: Dispatching updateProjectStage - Move Card ${cardIdToMove} from Stage ${sourceStage} to Stage ${targetStage}`);
+      this.$store.dispatch('projects/updateProjectStage', {
+          projectId: cardIdToMove,
+          newStageId: targetStage
+      }).catch(error => {
+          console.error("KanbanBoard: Error dispatching updateProjectStage:", error);
+      });
+    },
+    resetDragState() {
+       this.draggedCardId = null;
+       this.sourceStageId = null;
+    },
+    // Method to handle the toggle event from KanbanColumn
+    handleToggleCollapse(stageId) {
+        console.log(`KanbanBoard: Toggling collapse for stage ${stageId}`);
+        // Create a new object for reactivity
+        const newCollapsedState = { ...this.collapsedColumns }; 
+        newCollapsedState[stageId] = !newCollapsedState[stageId];
+        this.collapsedColumns = newCollapsedState;
+    },
+    // Method to set initial/updated collapsed state
+    initializeCollapsedState(stages, projectsByStage) {
+         if (!Array.isArray(stages)) return;
+         console.log('KanbanBoard: Initializing/Updating collapsed state...');
+         const initialCollapsed = {};
+         stages.forEach(stage => {
+             if (stage && stage.id) {
+                 // Don't automatically collapse based on card count anymore.
+                 // Just preserve existing state or default to false.
+                 initialCollapsed[stage.id] = this.collapsedColumns[stage.id] || false;
+             }
+         });
+         // Only update if the object structure has changed (to avoid infinite loops with deep watcher)
+         // Using stringify is okay for simple boolean object, but consider more robust check if state gets complex
+         if (JSON.stringify(this.collapsedColumns) !== JSON.stringify(initialCollapsed)) {
+             this.collapsedColumns = initialCollapsed;
+             console.log('KanbanBoard: Collapsed state updated:', this.collapsedColumns);
+         }
+    }
+    // Other methods like handling card clicks/double-clicks for modal
+  },
+  // Reference the template defined in widget.html
+  template: `
+      <div class="kanban-board flex flex-col h-full">
+        <!-- Render the Kanban Toolbar -->
+        <kanban-toolbar class="flex-shrink-0"></kanban-toolbar>
+
+        <!-- Display error message if initialization failed -->
+        <div v-if="error" class="p-4 m-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          <strong class="font-bold">Error loading data:</strong>
+          <span class="block sm:inline">{{ error }}</span>
+        </div>
+
+        <div v-else-if="isLoading && (!displayedStages || displayedStages.length === 0)" class="flex-grow flex items-center justify-center">
+            Loading Stages and Projects...
+            <!-- Add Skeleton Loader later -->
+        </div>
+
+        <!-- Main Kanban columns area - Conditional based on view mode -->
+        <!-- Stage View -->
+        <div v-else-if="boardViewMode === 'stages'" class="flex-grow flex space-x-4 overflow-x-auto p-4 bg-gray-200 h-full items-start">
+          <kanban-column 
+            v-for="stage in displayedStages" 
+            :key="stage.id" 
+            :stage="stage" 
+            :projects="projectsByStage[stage.id] || []"
+            :is-collapsed="collapsedColumns[stage.id] || false" 
+            @card-drag-start="handleDragStart" 
+            @card-drag-end="handleDragEnd"
+            @column-drop="handleDrop(stage.id)"
+            @toggle-collapse="handleToggleCollapse" 
+            >
+          </kanban-column>
+           <!-- Update empty state message for stages -->
+           <div v-if="!isLoading && (!displayedStages || displayedStages.length === 0)" class="text-gray-500">
+               No stages found for the selected view.
+           </div>
+        </div>
+
+        <!-- Tranche View -->
+        <template v-else-if="boardViewMode === 'tranches'">
+           <div class="flex-grow flex space-x-4 overflow-x-auto p-4 bg-gray-200 h-full items-start"> <!-- Added wrapper div for styling consistency -->
+                <!-- Unassigned Column -->
+                <kanban-column 
+                  key="tranche-unassigned"
+                  :stage="{ id: 'unassigned', title: 'Unassigned' }" 
+                  :projects="projectsByTranche['unassigned'] || []"
+                  :is-collapsed="collapsedColumns['unassigned'] || false" 
+                  @card-drag-start="handleDragStart" 
+                  @drag-end="handleDragEnd"
+                  @column-drop="handleDrop('unassigned')"  
+                  @toggle-collapse="handleToggleCollapse('unassigned')" 
+                /> <!-- Use self-closing for simplicity -->
+                <!-- Existing Tranche Columns -->
+                <kanban-column 
+                  v-for="tranche in tranches" 
+                  :key="'tranche-' + tranche.id" 
+                  :stage="{ id: tranche.id, title: 'Tranche ' + tranche.number }" 
+                  :projects="projectsByTranche[tranche.id] || []"
+                  :is-collapsed="collapsedColumns[tranche.id] || false" 
+                  @card-drag-start="handleDragStart" 
+                  @drag-end="handleDragEnd"
+                  @column-drop="handleDrop(tranche.id)"
+                  @toggle-collapse="handleToggleCollapse(tranche.id)"
+                /> <!-- Use self-closing for simplicity -->
+                <!-- Update empty state message for tranches -->
+                <div v-if="!isLoading && (!tranches || tranches.length === 0) && (!projectsByTranche['unassigned'] || projectsByTranche['unassigned'].length === 0)" class="text-gray-500">
+                    No tranches or unassigned projects found.
+                </div>
+           </div> <!-- Close wrapper div -->
+        </template>
+        
+        <!-- Optional: Fallback for unknown view mode -->
+        <!-- <div v-else class="p-4 text-gray-500">Unknown board view mode: {{ boardViewMode }}</div> -->
+
+      </div>
+    `
+};
+
+// Expose the component definition globally within the AppComponents object
+// window.AppComponents = window.AppComponents || {};
+// window.AppComponents.KanbanBoard = KanbanBoard; 
+export default KanbanBoard; 

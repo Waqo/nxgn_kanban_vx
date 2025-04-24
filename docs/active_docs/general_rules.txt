@@ -1,0 +1,16 @@
+These are the most important rules, they supercede any other document.
+
+**1. Use Raw API Names:** Always use the API name from the raw project data as much as possible. Exceptions are constructed fields.
+
+**2. Consult API Docs:** Refer to @js_api_v2.mdc when constructing, altering or adjusting new API calls.
+
+**3. Keep Helper Functions Separate:**
+   *   General utility/formatting functions (e.g., date formatters, relative time calculators) should reside in `app/utils/helpers.js`.
+   *   Functions specifically designed to transform the structure of raw Zoho API responses should reside in `app/utils/processors.js`.
+   *   Import these functions where needed rather than defining them locally within components or store modules.
+
+**4. Maintain Project Directory:**
+   *   Keep the `docs/active_docs/project_directory.txt` file updated whenever new files are added, moved, or the folder structure is changed.
+
+**5. Use Project Directory for Navigation:**
+   *   Refer to `docs/active_docs/project_directory.txt` when unsure about the location of a specific file or the overall project structure. 

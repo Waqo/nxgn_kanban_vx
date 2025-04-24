@@ -1,0 +1,497 @@
+import React, { useState, useEffect } from 'react';
+import { updateRecord } from '../utils/recordUpdates.js';
+import { useToast } from '../contexts/ToastContext.js';
+import MilestonesInvestorsTab from './MilestonesInvestorsTab.js';
+
+
+const formatCurrency = (amount) => {
+    if (!amount) return '$0.00';
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(amount);
+};
+
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: '2-digit'
+    });
+};
+
+const calculateProjectedPayment = (projectCost, percentage) => {
+    if (!projectCost) return 0;
+    return (parseFloat(projectCost) * (percentage / 100));
+};
+
+const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    // Handle MM/DD/YYYY format
+    const [month, day, year] = dateString.split('/');
+    // Convert to YYYY-MM-DD for HTML date input
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+};
+
+const InvestorsTab = ({ project, fetchModalData }) => {
+    const { showToast } = useToast();
+    const [formData, setFormData] = useState({
+        isPPA: project.isPPA === "true",
+        ppaRate: project.ppaRate || "0.0",
+        rateYear: project.rateYear || "2024",
+        isDomesticContent: project.isDomesticContent === "true",
+        redballSubmissionDate: project.redballSubmissionDate || ''
+    });
+    
+    const [hasChanges, setHasChanges] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isEditingPayments, setIsEditingPayments] = useState(false);
+    const [isEditingRedball, setIsEditingRedball] = useState(false);
+    const [milestoneData, setMilestoneData] = useState({
+        m1: {
+            payment: project.investorM1Payment || '',
+            date: project.investorM1Date || ''
+        },
+        m2: {
+            payment: project.investorM2Payment || '',
+            date: project.investorM2Date || ''
+        },
+        m3: {
+            payment: project.investorM3Payment || '',
+            date: project.investorM3Date || ''
+        }
+    });
+
+    const PPA_RATES = ["0.0", "0.05", "0.06", "0.07", "0.08"];
+    const RATE_YEARS = ["2024", "2025"];
+
+    // Check for changes when formData updates
+    useEffect(() => {
+        const hasChanged = 
+            formData.isPPA !== (project.isPPA === "true") ||
+            formData.ppaRate !== (project.ppaRate || "0.0") ||
+            formData.rateYear !== (project.rateYear || "2024") ||
+            formData.isDomesticContent !== (project.isDomesticContent === "true") ||
+            formData.redballSubmissionDate !== (project.redballSubmissionDate || '');
+        
+        setHasChanges(hasChanged);
+    }, [formData, project]);
+
+    const handleSave = async () => {
+        try {
+            setIsSaving(true);
+            showToast("Updating PPA information...", "loading");
+            
+            await updateRecord(
+                "PM_Kanban_Projects",
+                project.id,
+                {
+                    data: {
+                        Is_PPA: formData.isPPA.toString(),
+                        PPA_Rate: formData.ppaRate,
+                        Rate_Year: formData.rateYear,
+                        Domestic_Content: formData.isDomesticContent.toString(),
+                        Submitted_to_Redball: formData.redballSubmissionDate || null
+                    }
+                }
+            );
+
+            if (typeof fetchModalData === 'function') {
+                await fetchModalData(project.id);
+                
+                // Update local state to match the new project data
+                setFormData({
+                    isPPA: project.isPPA === "true",
+                    ppaRate: project.ppaRate || "0.0",
+                    rateYear: project.rateYear || "2024",
+                    isDomesticContent: project.isDomesticContent === "true",
+                    redballSubmissionDate: project.redballSubmissionDate || ''
+                });
+            }
+            
+            setHasChanges(false);
+            showToast("PPA information updated successfully", "success");
+        } catch (error) {
+            console.error("Error updating PPA info:", error);
+            showToast("Failed to update PPA information", "error");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handlePPAToggle = (e) => {
+        setFormData(prev => ({
+            ...prev,
+            isPPA: e.target.checked,
+            ...((!e.target.checked) && {
+                ppaRate: "0.0",
+                rateYear: "2024",
+                isDomesticContent: false
+            })
+        }));
+    };
+
+    const handleDomesticContentToggle = (e) => {
+        setFormData(prev => ({
+            ...prev,
+            isDomesticContent: e.target.checked
+        }));
+    };
+
+    const handleMilestoneSave = async () => {
+        try {
+            setIsSaving(true);
+            showToast("Updating milestone payments...", "loading");
+
+            await updateRecord(
+                "PM_Kanban_Projects",
+                project.id,
+                {
+                    data: {
+                        Investor_M1_Payment: milestoneData.m1.payment,
+                        Investor_M1_Date: milestoneData.m1.date,
+                        Investor_M2_Payment: milestoneData.m2.payment,
+                        Investor_M2_Date: milestoneData.m2.date,
+                        Investor_M3_Payment: milestoneData.m3.payment,
+                        Investor_M3_Date: milestoneData.m3.date
+                    }
+                }
+            );
+
+            if (typeof fetchModalData === 'function') {
+                await fetchModalData(project.id);
+            }
+            
+            setIsEditingPayments(false);
+            showToast("Milestone payments updated successfully", "success");
+        } catch (error) {
+            console.error("Error updating milestone payments:", error);
+            showToast("Failed to update milestone payments", "error");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleMilestoneChange = (milestone, field, value) => {
+        setMilestoneData(prev => ({
+            ...prev,
+            [milestone]: {
+                ...prev[milestone],
+                [field]: value
+            }
+        }));
+    };
+
+    return React.createElement('div',
+        { className: "p-6 max-w-4xl mx-auto space-y-6" },
+        [
+            // Header with Save Button
+            React.createElement('div',
+                { className: "flex justify-between items-center mb-6" },
+                [
+                    React.createElement('h3',
+                        { className: "text-lg font-medium text-gray-900" },
+                        "Investor Information"
+                    ),
+                    hasChanges && React.createElement('button',
+                        {
+                            className: `px-4 py-2 text-sm font-medium text-white 
+                                bg-blue-600 rounded-lg hover:bg-blue-700 
+                                disabled:opacity-50 disabled:cursor-not-allowed`,
+                            onClick: handleSave,
+                            disabled: isSaving
+                        },
+                        isSaving ? "Saving..." : "Save Changes"
+                    )
+                ]
+            ),
+
+            // Main Content Card
+            React.createElement('div',
+                { className: "bg-white rounded-lg shadow-sm border border-gray-200" },
+                [
+                    // PPA Configuration Section
+                    React.createElement('div',
+                        { className: "p-6 border-b border-gray-200" },
+                        [
+                            React.createElement('h4',
+                                { className: "text-sm font-medium text-gray-900 mb-4" },
+                                "PPA Configuration"
+                            ),
+                            React.createElement('div',
+                                { className: "space-y-6" },
+                                [
+                                    // PPA Toggle
+                                    React.createElement('div',
+                                        { className: "flex items-center justify-between" },
+                                        [
+                                            React.createElement('div',
+                                                { className: "flex flex-col" },
+                                                [
+                                                    React.createElement('span',
+                                                        { className: "text-sm font-medium text-gray-900" },
+                                                        "PPA Project"
+                                                    ),
+                                                    React.createElement('span',
+                                                        { className: "text-sm text-gray-500" },
+                                                        "Select if this is a PPA project"
+                                                    )
+                                                ]
+                                            ),
+                                            React.createElement('div',
+                                                { className: "flex items-center" },
+                                                React.createElement('input',
+                                                    {
+                                                        type: "checkbox",
+                                                        id: "ppa-checkbox",
+                                                        checked: formData.isPPA,
+                                                        onChange: handlePPAToggle,
+                                                        className: "h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                    }
+                                                )
+                                            )
+                                        ]
+                                    ),
+
+                                    // Rate Configuration
+                                    React.createElement('div',
+                                        { className: "grid grid-cols-2 gap-6" },
+                                        [
+                                            // PPA Rate
+                                            React.createElement('div',
+                                                { className: "space-y-2" },
+                                                [
+                                                    React.createElement('label',
+                                                        { className: "block text-sm font-medium text-gray-700" },
+                                                        "PPA Rate"
+                                                    ),
+                                                    React.createElement('select',
+                                                        {
+                                                            className: `mt-1 block w-full rounded-md border-gray-300 shadow-sm
+                                                                ${!formData.isPPA ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'}`,
+                                                            value: formData.ppaRate,
+                                                            disabled: !formData.isPPA,
+                                                            onChange: (e) => setFormData(prev => ({
+                                                                ...prev,
+                                                                ppaRate: e.target.value
+                                                            }))
+                                                        },
+                                                        PPA_RATES.map(rate => 
+                                                            React.createElement('option',
+                                                                { key: rate, value: rate },
+                                                                `$${rate}/W`
+                                                            )
+                                                        )
+                                                    )
+                                                ]
+                                            ),
+                                            // Rate Year
+                                            React.createElement('div',
+                                                { className: "space-y-2" },
+                                                [
+                                                    React.createElement('label',
+                                                        { className: "block text-sm font-medium text-gray-700" },
+                                                        "Rate Year"
+                                                    ),
+                                                    React.createElement('select',
+                                                        {
+                                                            className: `mt-1 block w-full rounded-md border-gray-300 shadow-sm
+                                                                ${!formData.isPPA ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'}`,
+                                                            value: formData.rateYear,
+                                                            disabled: !formData.isPPA,
+                                                            onChange: (e) => setFormData(prev => ({
+                                                                ...prev,
+                                                                rateYear: e.target.value
+                                                            }))
+                                                        },
+                                                        RATE_YEARS.map(year => 
+                                                            React.createElement('option',
+                                                                { key: year, value: year },
+                                                                year
+                                                            )
+                                                        )
+                                                    )
+                                                ]
+                                            )
+                                        ]
+                                    ),
+
+                                    // Domestic Content Toggle
+                                    React.createElement('div',
+                                        { className: "flex items-center justify-between pt-4 border-t" },
+                                        [
+                                            React.createElement('div',
+                                                { className: "flex flex-col" },
+                                                [
+                                                    React.createElement('span',
+                                                        { className: "text-sm font-medium text-gray-900" },
+                                                        "Domestic Content"
+                                                    ),
+                                                    React.createElement('span',
+                                                        { className: "text-sm text-gray-500" },
+                                                        "Enable for domestic content qualification"
+                                                    )
+                                                ]
+                                            ),
+                                            React.createElement('div',
+                                                { className: "flex items-center" },
+                                                React.createElement('input',
+                                                    {
+                                                        type: "checkbox",
+                                                        id: "domestic-content-checkbox",
+                                                        checked: formData.isDomesticContent,
+                                                        disabled: !formData.isPPA,
+                                                        onChange: handleDomesticContentToggle,
+                                                        className: `h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500
+                                                            ${!formData.isPPA ? 'opacity-50 cursor-not-allowed' : ''}`
+                                                    }
+                                                )
+                                            )
+                                        ]
+                                    ),
+
+                                    // Redball Submission Date
+                                    React.createElement('div',
+                                        { className: "flex items-center justify-between pt-4 border-t" },
+                                        [
+                                            // Left side - Label
+                                            React.createElement('div',
+                                                { className: "flex flex-col" },
+                                                [
+                                                    React.createElement('span',
+                                                        { className: "text-sm font-medium text-gray-900" },
+                                                        "Redball Submission Date"
+                                                    ),
+                                                    React.createElement('span',
+                                                        { className: "text-sm text-gray-500" },
+                                                        "Date submitted to Redball"
+                                                    )
+                                                ]
+                                            ),
+                                            // Right side - Date input/display and edit button
+                                            React.createElement('div',
+                                                { className: "flex items-center gap-2" },
+                                                [
+                                                    isEditingRedball
+                                                        ? React.createElement('input',
+                                                            {
+                                                                type: "date",
+                                                                className: `border border-gray-300 rounded px-3 py-1.5 text-sm
+                                                                    ${!formData.isPPA ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'}
+                                                                    focus:ring-blue-500 focus:border-blue-500`,
+                                                                value: formatDateForInput(formData.redballSubmissionDate),
+                                                                disabled: !formData.isPPA,
+                                                                onChange: (e) => {
+                                                                    const date = e.target.value;
+                                                                    if (date) {
+                                                                        const [year, month, day] = date.split('-');
+                                                                        const formattedDate = `${month}/${day}/${year}`;
+                                                                        setFormData(prev => ({
+                                                                            ...prev,
+                                                                            redballSubmissionDate: formattedDate
+                                                                        }));
+                                                                        setHasChanges(true);
+                                                                    } else {
+                                                                        setFormData(prev => ({
+                                                                            ...prev,
+                                                                            redballSubmissionDate: ''
+                                                                        }));
+                                                                        setHasChanges(true);
+                                                                    }
+                                                                },
+                                                                onBlur: () => setIsEditingRedball(false)
+                                                            }
+                                                        )
+                                                        : React.createElement('div',
+                                                            { className: "flex items-center gap-2" },
+                                                            [
+                                                                React.createElement('span',
+                                                                    { className: "text-sm font-medium" },
+                                                                    formData.redballSubmissionDate 
+                                                                        ? formatDate(formData.redballSubmissionDate) 
+                                                                        : 'Not submitted'
+                                                                ),
+                                                                React.createElement('button',
+                                                                    {
+                                                                        className: "p-1 text-gray-400 hover:text-gray-600",
+                                                                        onClick: () => setIsEditingRedball(true),
+                                                                        disabled: !formData.isPPA
+                                                                    },
+                                                                    React.createElement('i', 
+                                                                        { className: "fas fa-edit" }
+                                                                    )
+                                                                )
+                                                            ]
+                                                        )
+                                                ]
+                                            )
+                                        ]
+                                    )
+                                ]
+                            )
+                        ]
+                    ),
+
+                    // Results Section
+                    React.createElement('div',
+                        { className: "grid grid-cols-3 gap-4 mb-6" },
+                        [
+                            // System Size Card
+                            React.createElement('div',
+                                { className: "bg-white p-4 rounded-lg shadow-sm border border-gray-100" },
+                                [
+                                    React.createElement('div',
+                                        { className: "text-sm text-gray-500 mb-1" },
+                                        "System Size"
+                                    ),
+                                    React.createElement('div',
+                                        { className: "text-2xl font-bold text-gray-800" },
+                                        `${project.systemSize || 0} kW`
+                                    )
+                                ]
+                            ),
+                            // Applicable Rate Card
+                            React.createElement('div',
+                                { className: "bg-white p-4 rounded-lg shadow-sm border border-gray-100" },
+                                [
+                                    React.createElement('div',
+                                        { className: "text-sm text-gray-500 mb-1" },
+                                        "Applicable Rate"
+                                    ),
+                                    React.createElement('div',
+                                        { className: "text-2xl font-bold text-gray-800" },
+                                        `$${project.applicableRate || '0.00'}/W`
+                                    )
+                                ]
+                            ),
+                            // Project Cost Card
+                            React.createElement('div',
+                                { className: "bg-white p-4 rounded-lg shadow-sm border border-gray-100" },
+                                [
+                                    React.createElement('div',
+                                        { className: "text-sm text-gray-500 mb-1" },
+                                        "Project Cost"
+                                    ),
+                                    React.createElement('div',
+                                        { className: "text-2xl font-bold text-gray-800" },
+                                        formatCurrency(project.projectCost)
+                                    )
+                                ]
+                            )
+                        ]
+                    ),
+
+                    // Milestone Payments Section
+                    React.createElement(MilestonesInvestorsTab, {
+                        project: project,
+                        fetchModalData: fetchModalData,
+                        isPPAEnabled: formData.isPPA
+                    })
+                ]
+            )
+        ]
+    );
+};
+
+export default InvestorsTab;

@@ -1,0 +1,243 @@
+import { logError } from './errorHandling.js';
+import { getCurrentUser } from './userInfo.js';
+
+/**
+ * Uploads multiple attachments to a note in Zoho Creator
+ * @param {Object} config Configuration object
+ * @param {File[]} config.files Array of files to upload
+ * @param {string} config.noteId The ID of the note to attach to
+ * @param {string} config.projectId The ID of the project to link the note to
+ * @param {Object} config.currentUser The current user object
+ * @param {string} [config.app_name="nexgen-portal"] The application name
+ * @returns {Promise<Array>} Resolves with array of upload responses
+ */
+export const uploadNoteAttachments = async ({
+    files,
+    noteId,
+    projectId,
+    currentUser,
+    app_name = "nexgen-portal"
+}) => {
+    try {
+        const results = [];
+        
+        if (!currentUser?.id) {
+            throw new Error('Current user information is required');
+        }
+        
+        // Process each file sequentially
+        for (const file of files) {
+            console.log(`Processing attachment: ${file.name}`);
+            
+            // Step 1: Create attachment record
+            const attachmentConfig = {
+                app_name,
+                form_name: "Add_Note_Attachment",
+                payload: {
+                    data: {
+                        Name: file.name,
+                        Note: noteId,
+                        Project: projectId,
+                        User: currentUser.id
+                    }
+                }
+            };
+
+            console.log('Creating attachment record:', attachmentConfig);
+            const attachmentResponse = await ZOHO.CREATOR.DATA.addRecords(attachmentConfig);
+            
+            if (!attachmentResponse || attachmentResponse.code !== 3000) {
+                throw new Error(`Failed to create attachment record: ${attachmentResponse?.message || 'Unknown error'}`);
+            }
+
+            const attachmentId = attachmentResponse.data.ID;
+            console.log('Attachment record created with ID:', attachmentId);
+
+            // Step 2: Upload the file using V2 API format
+            const uploadConfig = {
+                app_name,
+                report_name: "PM_Kanban_Note_Attachments",
+                id: attachmentId,
+                field_name: "File_field",
+                file: file
+            };
+
+            console.log('Uploading file with config:', uploadConfig);
+            const uploadResponse = await ZOHO.CREATOR.FILE.uploadFile(uploadConfig);
+            console.log('Upload response:', uploadResponse);
+            
+            if (!uploadResponse || uploadResponse.code !== 3000) {
+                throw new Error(`Failed to upload file ${file.name}: ${uploadResponse?.message || JSON.stringify(uploadResponse)}`);
+            }
+            
+            console.log('Upload successful for file:', file.name);
+
+            // Step 3: Trigger the transfer using V2 API format
+            const attachTriggerConfig = {
+                app_name,
+                report_name: "PM_Kanban_Note_Attachments",
+                id: attachmentId,
+                payload: {
+                    data: {
+                        Transfer_Trigger: "true"
+                    }
+                }
+            };
+
+            console.log('Triggering transfer with config:', attachTriggerConfig);
+            const attachTriggerResponse = await ZOHO.CREATOR.DATA.updateRecordById(attachTriggerConfig);
+            console.log('Trigger response:', attachTriggerResponse);
+            
+            results.push({
+                id: attachmentId,
+                name: file.name,
+                isImage: file.type.startsWith('image/'),
+                uploadResponse: uploadResponse.data
+            });
+        }
+
+        console.log('All attachments processed successfully:', results);
+        return results;
+
+    } catch (error) {
+        logError('Error in uploadNoteAttachments:', error);
+        console.error('Full upload error:', error);
+        throw error;
+    }
+};
+
+/**
+ * Creates a note with attachments in Zoho Creator
+ * @param {Object} config Configuration object
+ * @param {string} config.Note The content of the note
+ * @param {string} config.Project The project ID to link the note to
+ * @param {boolean} config.Notify_Sales Whether to notify sales
+ * @param {string[]} config.Tagged_Users Array of user IDs to tag
+ * @param {string} config.Author The author of the note
+ * @param {string} config.User_Lookup The user lookup for the note
+ * @param {string[]} config.Viewed_By Array of user IDs who have viewed the note
+ * @param {string} config.Department The department for the note
+ * @param {string} config.Context The context for the note
+ * @param {File[]} config.attachments Array of files to attach
+ * @param {Object} config.currentUser The current user object
+ * @param {string} [config.app_name="nexgen-portal"] The application name
+ * @returns {Promise} Resolves with the created note and attachment data
+ */
+export const createNoteWithAttachments = async ({
+    Note,
+    Project,
+    Notify_Sales,
+    Tagged_Users,
+    Author,
+    User_Lookup,
+    Viewed_By,
+    Department,
+    Context,
+    attachments = [],
+    currentUser,
+    app_name = "nexgen-portal"
+}) => {
+    try {
+        if (!currentUser?.id) {
+            throw new Error('Current user information is required');
+        }
+
+        // Step 1: Create the note record using V2 API format
+        const noteConfig = {
+            app_name,
+            form_name: "Add_Note",
+            payload: {
+                data: {
+                    Note,
+                    Project,
+                    Notify_Sales,
+                    Tagged_Users,
+                    Author,
+                    User_Lookup,
+                    Viewed_By,
+                    Department,
+                    Context
+                }
+            }
+        };
+
+        console.log('Creating note with config:', noteConfig);
+        const noteResponse = await ZOHO.CREATOR.DATA.addRecords(noteConfig);
+        
+        if (!noteResponse || noteResponse.code !== 3000) {
+            throw new Error(`Failed to create note: ${noteResponse?.message || 'Unknown error'}`);
+        }
+
+        const noteId = noteResponse.data.ID;
+        console.log('Note created successfully with ID:', noteId);
+
+        // Step 2: Upload attachments if any
+        if (attachments.length > 0) {
+            try {
+                const uploadResults = await uploadNoteAttachments({
+                    files: attachments,
+                    noteId,
+                    projectId: Project,
+                    currentUser,
+                    app_name
+                });
+
+                return {
+                    success: true,
+                    noteId,
+                    attachments: uploadResults
+                };
+            } catch (uploadError) {
+                console.error('Error uploading attachments:', uploadError);
+                return {
+                    success: true,
+                    noteId,
+                    attachmentError: uploadError.message
+                };
+            }
+        }
+
+        return {
+            success: true,
+            noteId
+        };
+
+    } catch (error) {
+        logError('Error in createNoteWithAttachments:', error);
+        throw error;
+    }
+};
+
+/**
+ * Validates files before upload
+ * @param {File[]} files Array of files to validate
+ * @param {Object} options Validation options
+ * @param {number} [options.maxSize=25] Maximum file size in MB
+ * @param {string[]} [options.allowedTypes=null] Allowed MIME types
+ * @returns {Object} Validation result with valid files and errors
+ */
+export const validateAttachments = (
+    files,
+    { 
+        maxSize = 25, // Increased max size to 25MB
+        allowedTypes = null // No type restriction
+    } = {}
+) => {
+    const validFiles = [];
+    const errors = [];
+    const maxSizeBytes = maxSize * 1024 * 1024; // Convert MB to bytes
+
+    Array.from(files).forEach(file => {
+        if (file.size > maxSizeBytes) {
+            errors.push(`${file.name} exceeds the ${maxSize}MB size limit`);
+        } else {
+            validFiles.push(file);
+        }
+    });
+
+    return {
+        validFiles,
+        errors,
+        hasErrors: errors.length > 0
+    };
+};

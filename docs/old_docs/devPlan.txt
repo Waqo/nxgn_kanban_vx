@@ -1,0 +1,420 @@
+# Kanban Widget Rebuild Plan (Vue 3 - No Build Step)
+
+**Goal:** Rebuild the existing Zoho Creator Kanban widget (React-based) using Vue 3 to improve maintainability, performance, and resolve existing issues. The rebuild must operate without a build step, relying on CDN-loaded libraries and direct `<script>` tag loading for application code.
+
+**Progress:**
+*   Completed comprehensive review of the old React codebase (`docs/old_code/`) to understand functionality, data structures, API interactions, and identify issues.
+*   Documented review findings, identified issues, and initial rebuild considerations chronologically below.
+*   Confirmed the decision to proceed with Vue 3 under the "no build step" constraint.
+*   Initiated planning phase for the Vue 3 rebuild.
+
+---
+
+### Vue 3 Rebuild Structure & Setup Strategy
+
+**Constraints:** Vue 3 via CDN, no build step, no local static assets (images/fonts), deployment via `zet pack`.
+
+**1. `app/widget.html` Structure:**
+*   **CDN Links:** Required for Vue 3 (global build), state management (Pinia/Vuex), Tailwind CSS, and potentially other UI libraries (e.g., Select component, Icons - FontAwesome already available).
+*   **Zoho SDK:** Include `<script src="https://js.zohostatic.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>`.
+*   **Mount Point:** Define `<div id="app"></div>`.
+*   **App Scripts:** Load custom JS via `<script>` tags (e.g., `app.js`, `services/zohoCreatorAPI.js`, component files if separated). Order matters for dependencies.
+*   **Initialization:** Use a `<script>` tag for `Vue.createApp({...}).mount('#app')`.
+
+**2. Component Definition Strategy (No `.vue` files):**
+*   Components defined as plain JS objects (Options API or Composition API).
+*   **Option A (Inlined):** Define components within `app.js` or `widget.html`. Simpler for small apps, harder to manage scale.
+*   **Option B (Separate Files):** Define in separate `.js` files (e.g., `components/KanbanBoard.js`), load via `<script>`, attach to a global object (e.g., `window.AppComponents = {}`), register globally (`app.component('KanbanBoard', window.AppComponents.KanbanBoard)`). Better organization, needs careful scoping. *Recommended approach for this project's complexity.*
+*   **Registration:** Use `app.component('ComponentName', ComponentObject)` globally on the Vue app instance.
+
+**3. Templating Strategy (No SFC compilation):**
+*   **Option A (Template Strings):** Define HTML within JS component object: `template: '<div>...'`. Can become unwieldy for complex components.
+*   **Option B (Inline Templates):** Define HTML within `<script type="text/x-template" id="component-id">...</script>` in `widget.html`. Reference via component definition: `template: '#component-id'`. Cleaner separation for larger templates. *Recommended approach.*
+
+**4. Styling:**
+*   Use Tailwind CSS via CDN link in `widget.html`.
+*   Port necessary custom styles from the old `styles/style.css` into a new `<style>` block in `widget.html` or potentially a separate `.css` file loaded via `<link>`.
+
+---
+
+### Initial Rebuild Plan (Outline)
+
+*   **Framework:** Vue.js 3 (using the global `Vue.createApp` API, no `.vue` files).
+*   **Styling:** Tailwind CSS (via CDN link in `widget.html`). Include necessary custom styles.
+*   **State Management:** Pinia recommended (check CDN availability) or Vuex (via CDN). Centralized store for shared state.
+*   **Data Interaction:** Centralized API service (`services/zohoCreatorAPI.js`) wrapping Zoho Creator JS API v2 calls. Update V1 calls (e.g., delete) to V2 where possible.
+*   **JS Data Structure Convention:** Use Zoho API Field Names (e.g., `New_Stage`, `kW_STC`) as keys in JavaScript objects where possible.
+
+---
+
+### Code Review Log (Old React Codebase)
+
+**Observations:**
+
+*   **Framework:** The `widgethtml.txt` file indicates the *current* implementation uses **React 17** (loaded via `esm.sh`), along with React DOM, Zustand (state management), Tanstack Query (data fetching/caching), Lucide Icons, and React Select. This conflicts with the plan to rebuild using Vue 3.
+*   **Dependencies:** Dependencies (React, Zustand, etc.) and application modules (`utils/*`, `components/*`, `app.js`) are loaded directly in the HTML using `<script type="importmap">` and `<script type="module">`.
+*   **Zoho SDK:** Includes the Zoho Creator Widget SDK v2 (`widgetsdk-min.js`).
+*   **Styling:** Links to a local `./styles/style.css` file. The `devPlan.txt` mentioned using Tailwind via CDN, which is not present here.
+*   **API (`zohoApijs.txt`):** Contains only a single async function `getDocTypes` using `ZOHO.CREATOR.DATA.getRecords` to fetch from a specific report ("All_Document_Types"). Uses hardcoded app/report names. Uses ES module `export`.
+
+**Identified Issues/Points of Concern:**
+
+*   **Framework Mismatch (Critical):** The current codebase uses React, while the rebuild plan specifies Vue 3. A decision is needed:
+    *   Proceed with Vue 3 rebuild (requires full rewrite).
+    *   Adapt the plan and rebuild/refactor using React.
+*   **Lack of Build Step:** Loading numerous modules directly can impact performance. The rebuild should use a bundler (Vite, Webpack).
+*   **Styling Discrepancy:** Need to determine if `style.css` contains custom CSS or if Tailwind (or another utility framework) is being used differently than expected. Verify against the plan.
+*   **Incomplete API Layer:** The `zohoApijs.txt` is minimal. Data fetching logic is likely spread elsewhere (presumably `dataFetchingjs.txt`). The plan for a centralized API service (`services/zohoCreatorAPI.js`) is not reflected in this old structure.
+*   **State Management:** Uses Zustand. The plan mentioned Vuex. If sticking with React, Zustand is a viable option. If moving to Vue, Vuex or Pinia would be used.
+
+**Next Steps:**
+
+*   Review `appjs.txt` and `dataFetchingjs.txt` to understand core logic and data handling.
+*   Review `styles/style.css` (if provided) to clarify styling approach.
+*   **Crucially, confirm the framework choice (Vue vs. React) for the rebuild.**
+
+---
+
+### Code Review (appjs.txt, dataFetchingjs.txt, stylescss.txt) - [Date Recorded]
+
+**Observations:**
+
+*   **Styling (`stylescss.txt`):**
+    *   Confirms use of **Tailwind CSS v2.2.19** loaded via `@import`.
+    *   Includes significant **custom CSS** classes and rules alongside Tailwind utilities.
+    *   Contains **Zoho Creator CSS overrides**.
+*   **Application Logic (`appjs.txt` - React):**
+    *   Main entry point using `ReactDOM.render` and a Root component providing context (`ToastProvider`).
+    *   Core logic in `AppContent` component using `React.useState` for state, `useEffect` for initialization and side effects, and `React.createElement` for rendering (no JSX).
+    *   Manages complex state: project data, lookups (stages, users, tags), UI state (loading, modals, filters, search), current user.
+    *   Handles user interactions via functions passed as props to child components (`KanbanBoard`, `ProjectDetailsModal`).
+    *   Complex initialization logic (`initializeApp`) fetching and processing various data types on load.
+    *   Relies on `dataFetching.js` for API calls and `ToastContext` for notifications.
+*   **Data Fetching (`dataFetchingjs.txt`):**
+    *   Contains numerous functions for interacting with Zoho Creator API v2 (`ZOHO.CREATOR.DATA`, `ZOHO.CREATOR.UTIL`). One function (`getInstallerSlots`) potentially uses the V1 API (`ZOHO.CREATOR.API`).
+    *   Handles fetching lists (`fetchKanbanProjects` with pagination) and individual records (`fetchProjectDetails` with specific view).
+    *   Fetches various lookup data types (`fetchInitialData`, `fetchTagsData`, `fetchStagesData`, etc.).
+    *   Includes extensive **data processing and mapping logic** to transform raw API responses (handling lookups, subforms, defaults, sorting, calculating values).
+    *   Identifies current user via `ZOHO.CREATOR.UTIL.getInitParams`.
+    *   Uses hardcoded app/report names.
+    *   Basic `try...catch` error handling.
+
+**Identified Issues/Points of Concern:**
+
+*   **Complexity:** Significant logic exists in both `appjs.txt` (state management, component orchestration, initialization) and `dataFetchingjs.txt` (API calls, data transformation).
+*   **React Dependencies:** Relies heavily on React patterns (hooks, context) and libraries (Tanstack Query, React Select, Lucide-React) that need Vue equivalents.
+*   **V1 API Usage:** Potential use of older V1 API in `getInstallerSlots` needs verification/update.
+
+**Decision:** Proceed with Vue 3 Rebuild (No Build Step)
+
+**New Challenges/Considerations for Vue Rebuild (No Build Step):**
+
+*   **Component Definition/Registration:** Need a strategy for defining components (Options/Composition API in `<script>`) and registering them globally (`app.component(...)`) on the Vue app instance created via CDN.
+*   **State Management (Vuex/Pinia via CDN):** Load state management library via CDN, configure globally, and connect to components. Manage local state with Vue's reactivity (`data`, `ref`, `reactive`).
+*   **Data Layer (`services/zohoCreatorAPI.js`):** Carefully port all API interactions and *crucially the data transformation logic* from `dataFetchingjs.txt`. Manage async state (loading, error, data) using Vue reactivity instead of Tanstack Query.
+*   **Templating:** Translate `React.createElement` calls to Vue templates (e.g., in `<script type="text/x-template">` tags) or Vue's `h()` render function.
+*   **Library Equivalents (CDN):** Find/verify CDN availability for Vue equivalents of React Select, Lucide icons. Use FontAwesome (already present) or build simple replacements if needed.
+*   **No ES Modules:** Replace `import`/`export` with a global pattern (e.g., attaching to `window` or using IIFEs) compatible with direct `<script>` loading.
+*   **Custom CSS:** Ensure all custom styles from `stylescss.txt` are correctly applied in the Vue structure.
+
+**Next Steps:**
+
+*   Review core component logic: `KanbanBoard.js`, `KanbanColumn.js`, `KanbanCard.js`, `ProjectDetailsModal.js`.
+*   Begin planning the structure of the Vue application files (HTML structure, component definitions, service structure).
+*   Investigate CDN availability for Vuex/Pinia and UI component libraries.
+
+---
+
+### Component Review (KanbanBoard, KanbanColumn, KanbanCard, ProjectDetailsModal) - [Date Recorded]
+
+**`KanbanCardjs.txt` (React):**
+
+*   **Purpose:** Renders individual project card.
+*   **Functionality:** Displays summary data (contact, address, size, type, sales rep, yield), numerous status badges (install date, interconnect, permit, work needed [tree/roof/panel upgrade], survey) using helper functions for logic/styling, highlights cards needing help, provides quick call/email icons, handles drag events (`onDragStart`, `onDragEnd`) and double-click (`onDoubleClick`) for modal opening.
+*   **Dependencies:** `lucide-react`, `utils/navigation.js`, `utils/recordUpdates.js`.
+*   **Vue Notes:** Logic for badges/formatting translates to computed properties/methods. Need icon equivalent. Native drag/drop sufficient.
+
+**`KanbanColumnjs.txt` (React):**
+
+*   **Purpose:** Renders a stage column.
+*   **Functionality:** Displays title, card count, total system size. Renders `KanbanCard` list. Handles card drop events (`onDrop`), drag-over styling (`isDropTarget` state), and column collapse/expand (`onToggleCollapse`).
+*   **Dependencies:** `KanbanCard.js`, `utils/errorHandling.js`.
+*   **Vue Notes:** Standard component structure. Use `v-for` for cards, computed props for counts/size, local state for drop target style, methods for event handling.
+
+**`KanbanBoardjs.txt` (React):**
+
+*   **Purpose:** Main Kanban view container and orchestrator.
+*   **Functionality:** Renders `Toolbar` and `KanbanColumn` list. Manages complex filter/sort/search state (`filterConfig`, `sortConfig`, `searchConfig`) via `useState` and applies them in `getFilteredCards`. Filters stages based on `currentView` prop. Manages drag-and-drop state (`draggedCard`, `sourceStage`) and handles drops (`handleDrop`) with optimistic UI updates + API calls (`updateProjectStage`). Conditionally renders `TranchesKanbanBoard`. Manages scroll position restoration and column collapse state based on filters.
+*   **Dependencies:** `KanbanColumn.js`, `KanbanCard.js`, `Toolbar.js`, `TranchesKanbanBoard.js`, `KanbanBoardSkeleton.js`, `ToastContext.js`, multiple `utils/*.js` files.
+*   **Vue Notes:** Complex state suggests Vuex/Pinia (via CDN). Filtering/sorting logic via computed properties. Drag/drop orchestration methods. Conditional rendering for skeleton/Tranches view.
+
+**`ProjectDetailsModaljs.txt` (React):**
+
+*   **Purpose:** Large modal for viewing/editing detailed project info.
+*   **Functionality:** Uses tabs (`activeTab` state) to show different sections. Renders numerous sub-components for tabs (`OverviewTab`, `DocumentsTab`, `ActivitiesTab`, etc.). Manages extensive local state for UI interactions (inputs, dropdowns, loading flags). Handles adding/removing tags, resolving issues, adding notes/replies (likely delegated to sub-components), changing stage/tranche via `ModalHeader`. Fetches initial doc types, relies on `fetchModalData` prop for data refreshes. Handles folder creation trigger.
+*   **Dependencies:** Numerous `utils/*.js`, `ToastContext.js`, many sub-components (some potentially global), modals (`IssueModal`, `TagModal`).
+*   **Vue Notes:** Very large component, consider breaking down. Tabbed interface needed. Central store (Vuex/Pinia) recommended for managing `projectData` and related state across tabs/actions. Each tab can be a child component. Need Vue modal equivalents.
+
+**Overall Component Interactions:**
+
+*   `app.js` (root) -> `KanbanBoard.js` (passes down projects, stages, state setters, handlers)
+*   `KanbanBoard.js` -> `Toolbar.js` (passes filter/sort state and handlers)
+*   `KanbanBoard.js` -> `KanbanColumn.js` (passes stage, filtered cards, handlers)
+*   `KanbanColumn.js` -> `KanbanCard.js` (passes card data, handlers)
+*   `app.js` -> `ProjectDetailsModal.js` (passes project data, lookups, handlers)
+*   `ProjectDetailsModal.js` -> various Tab Components & `ModalHeader`
+
+**Next Steps:**
+
+*   Review remaining components (`Toolbar.js`, `TranchesKanbanBoard.js`, `KanbanBoardSkeleton.js`, `ModalHeader.js`, Tab components like `OverviewTab`, `DocumentsTab`, etc.).
+*   Review utility files (`utils/*.js`) to understand helper functions for API calls, data processing, navigation, error handling, etc.
+*   Start outlining the Vue file structure and state management strategy (Vuex/Pinia setup via CDN).
+
+---
+
+### Inferred Old Code Structure (Based on Imports/Usage)
+
+```
+/ (root)
+  widget.html
+  app.js
+  styles/
+    style.css
+  components/
+    KanbanBoard.js
+    KanbanColumn.js
+    KanbanCard.js
+    ProjectDetailsModal.js
+    Toolbar.js
+    ModalHeader.js
+    OverviewTab.js
+    DocumentsTab.js
+    EventsSection.js
+    NotesSection.js
+    IssuesSection.js
+    SalesRepInfo.js
+    ContactTab.js
+    SurveyTab.js
+    SalesRepTab.js
+    SystemsTab.js
+    PermittingTab.js
+    TranchesKanbanBoard.js
+    KanbanBoardSkeleton.js
+    Counters.js
+    WorkRequirementBars.js
+    CommSection.js
+    ActivitiesTab.js
+    IssueModal.js
+    TagModal.js
+    Toast.js
+    PDFPreview.js
+    DocumentTypeDrawer.js
+    DocumentContent.js
+    DocumentChecklist.js
+    MultipleFileUploadForm.js
+    NoteItem.js
+    NoteAttachment.js
+    ContactItem.js
+    CommissionNotes.js
+    EditSalesRepModal.js
+    SystemApprovalModal.js
+    AddMaterialForm.js
+    MilestonesInvestorsTab.js
+    ErrorBoundary.js
+  utils/
+    zohoInit.js
+    errorHandling.js
+    dataFetching.js
+    queryParams.js
+    recordUpdates.js
+    stagecardUpdate.js
+    navigation.js
+    userInfo.js
+    zohoApi.js
+    fileUpload.js
+    customAPI.js
+    recordCreation.js
+    deleteRecord.js
+    attachmentUpload.js
+  contexts/
+    ToastContext.js
+```
+
+---
+
+### Utility & Component Review (Utilities, Overview Sections, Toast) - [Date Recorded]
+
+**Utilities (`utils/*.js`):**
+
+*   **`navigation.js`:** Simple wrapper for `ZOHO.CREATOR.UTIL.navigateParentURL` to open URLs/`mailto:`. (Vue: Port directly).
+*   **`userInfo.js`:** Fetches current user via `getInitParams` + report query. Gets other users via fragile query param parsing. (Vue: Use API fetch for user list; current user logic is key for service layer).
+*   **`fileUpload.js`:** Handles multi-step file upload (create record -> upload file -> update status). (Vue: Core logic for API service).
+*   **`customAPI.js`:** Invokes specific Custom APIs (WorkDrive folder creation/upload, email sending) using `invokeCustomApi` and hardcoded keys. (Vue: Core logic for API service; handle keys).
+*   **`recordCreation.js`:** Generic function using `ZOHO.CREATOR.DATA.addRecords`. (Vue: Core logic for API service).
+*   **`zohoApi.js`:** Fetches document types from report. (Vue: Part of API service lookups).
+
+**Overview Tab Components (`components/*.js`):**
+
+*   **`EventsSection.js`:** Displays project events (Survey, Install, etc.), allows status updates and scheduling via date pickers. Includes special survey booking URL navigation. (Vue: Requires event processing, status dropdowns, date pickers, API calls).
+*   **`NotesSection.js`:** Displays notes/replies (threaded, sorted, limited view), handles adding new notes/replies with user tagging and file attachments (drag/drop, preview). (Vue: Complex component. Needs input, attachments, user tagging, threading/limiting logic, API calls).
+*   **`IssuesSection.js`:** Displays *unresolved* issues with author/date/tags/status. Buttons to resolve or raise new issues (triggers parent/modal). (Vue: Simple display + filtering. Relies on parent handlers).
+*   **`SalesRepInfo.js`:** Displays sales rep name, org, phone (with call button), email (with mailto button). (Vue: Simple display component).
+
+**Context (`contexts/*.js`):**
+
+*   **`ToastContext.js`:** React Context implementation for global toast notifications. (Vue: Replace with alternative like CDN library, event bus, or store integration).
+
+**Next Steps:**
+
+*   Review remaining key components: `components/NoteItem.js`, `components/DocumentChecklist.js`, `components/CommSection.js`, potentially modals like `IssueModal.js`, `TagModal.js` if needed.
+*   Review remaining utility files if any were missed or newly discovered (e.g., `attachmentUpload.js`).
+*   Finalize the plan for Vue structure (components, file layout), state management approach (Pinia recommended if CDN available), and the specific methods/structure for the `services/zohoCreatorAPI.js`.
+
+---
+
+### Final Component & Utility Review (NoteItem, Doc Checklist, CommSection, Attachment Util) - [Date Recorded]
+
+**Components (`components/*.js`):**
+
+*   **`NoteItem.js`:** Renders individual note/reply. Shows avatar, author, content, department, tagged users, timestamp, attachments (via `NoteAttachment`), status badges (Team Only/Sales Notified). Provides Reply button (for parent notes) and shows reply count.
+    *   **Dependencies:** `NoteAttachment.js`, props from `NotesSection`.
+    *   **Vue Notes:** Core display logic. Needs avatar generation, date formatting, attachment rendering. Relies on parent/store for reply state.
+*   **`DocumentChecklist.js`:** Displays checklist of required document types. Filters `docTypes` based on `Include_In_Checklist`. Shows completion status based on existence of matching `Doc_Type` in project documents. Expandable/collapsible.
+    *   **Dependencies:** `project`, `docTypes` props.
+    *   **Vue Notes:** Simple component. Needs filtering/completion logic. Toggle state.
+*   **`CommSection.js`:** Shows preview of recent calls (Subject, Date, User) on Overview tab. Filters communications by type 'call'. Shows first 4, provides "View All" button to switch tabs.
+    *   **Dependencies:** `communications`, `setActiveTab` props.
+    *   **Vue Notes:** Simple preview component. Filtering/slicing logic easy. Relies on parent handler for navigation.
+
+**Utilities (`utils/*.js`):**
+
+*   **`attachmentUpload.js`:** Handles note attachments. `uploadNoteAttachments` uploads files sequentially (create record -> upload -> trigger update). `createNoteWithAttachments` creates note record then calls upload function. Includes file validation helper.
+    *   **Dependencies:** `errorHandling.js`, `userInfo.js`.
+    *   **Vue Notes:** Critical logic for notes feature. Encapsulate in API service. Validation useful.
+
+**Code Review Complete:**
+
+This concludes the detailed review of the provided old codebase files. We have analyzed the structure, components, utilities, API interactions, and identified key functionalities and complexities.
+
+**Next Steps (Transition to Rebuild Planning):**
+
+1.  **Solidify Vue Structure:** Define the main Vue application setup (`widget.html` CDN links, Vue app initialization), component file structure (even if inlined in HTML or separate `<script>` tags initially), and how components will be registered/used.
+2.  **State Management Strategy:** Choose between Pinia (preferred if CDN available) or Vuex (likely available via CDN). Outline the store modules/state/actions/getters needed based on reviewed complexity (projects, stages, user info, lookups, filters, modal state, etc.).
+3.  **API Service (`services/zohoCreatorAPI.js`):** Define the structure and methods for this central service. Consolidate all Zoho API interactions (fetching, creating, updating - including generic and specific functions like `updateRecord`, `createRecord`, `fetchKanbanProjects`, `fetchProjectDetails`, `uploadDocumentWithFile`, `createNoteWithAttachments`, custom API calls, etc.) found in the old `utils/*.js` files.
+4.  **Component Implementation Plan:** Start outlining the key Vue components identified (KanbanBoard, KanbanColumn, KanbanCard, ProjectDetailsModal, Toolbar, Tabs, etc.) and how they will interact with the store and API service.
+5.  **Library Selection (CDN):** Confirm CDN availability for Vue 3, Vuex/Pinia, and any necessary UI libraries (like a Select component replacement, icons - FontAwesome already available).
+
+---
+
+### Component Review (Tabs: Activity, Investors; Modals: Issue, Tag) - [Date Recorded]
+
+**Tabs (`components/*.js`):**
+
+*   **`ActivitiesTab.js`:** Displays list of project activities with description, author, platform icon, timestamp. Shows placeholder if none.
+    *   **Dependencies:** Relies on `project` prop.
+    *   **Vue Notes:** Simple list display (`v-for`). Needs date formatting, platform icon logic.
+*   **`CommunicationTab.js`:** *(Assumed)* Likely displays detailed list of calls, SMS, emails. May include filtering/sorting.
+    *   **Dependencies:** Relies on `project` prop.
+    *   **Vue Notes:** Needs list rendering, logic for different communication types, potential filtering.
+*   **`InvestorsTab.js`:** Manages PPA config (toggle, rate/year dropdowns, domestic content toggle), Redball submission date. Shows calculated System Size, Applicable Rate, Project Cost. Renders `MilestonesInvestorsTab` for investor payments.
+    *   **Dependencies:** `utils/recordUpdates.js`, `ToastContext.js`, `MilestonesInvestorsTab.js`.
+    *   **Vue Notes:** Needs PPA config UI, state management for form data, save logic (API call). Needs `MilestonesInvestorsTab` equivalent.
+
+**Modals (`components/*.js`):**
+
+*   **`IssueModal.js`:** Form to create new issues. Textarea for description, checkbox for 'Notify Sales', button/dropdown for tagging users (multi-select, filters current user/sales reps, 'Tag All' option). Submit calls parent handler (likely `createRecord`).
+    *   **Dependencies:** `utils/userInfo.js`.
+    *   **Vue Notes:** Standard modal. Needs inputs, user tagging dropdown logic. Submit calls API service.
+*   **`TagModal.js`:** Simple modal with dropdown to select an available tag. Submit calls parent handler (likely `updateRecord`).
+    *   **Dependencies:** Relies on props.
+    *   **Vue Notes:** Simple modal with select input.
+
+**Next Steps:**
+
+*   Review remaining key components: `MilestonesInvestorsTab.js`, `Counters.js`, `PDFPreview.js`, `WorkRequirementBars.js`, `TranchesKanbanBoard.js`, `KanbanBoardSkeleton.js`, `NoteAttachment.js`, `ContactItem.js`, `CommissionNotes.js`, `EditSalesRepModal.js`, `CommSection.js`, `SystemApprovalModal.js`, `AddMaterialForm.js`.
+*   Review `utils/attachmentUpload.js`.
+*   Finalize Vue planning (structure, state, API service, libraries).
+
+### Component Review (Milestones Tab, Counters, PDF, WorkBars, TrancheBoard) - [Date Recorded]
+
+*   **`MilestonesInvestorsTab.js`:** Displays/edits investor milestone payments (M1, M2, M3) within `InvestorsTab`. Manages local state for payment amounts/dates. Edit mode shows inputs/date pickers. Calculates projected payments. Saves via `updateRecord`. Calculates total payments & shows progress bar/summary. Disabled if PPA is not enabled.
+    *   **Dependencies:** `utils/recordUpdates.js`, `ToastContext.js`. Relies on props from `InvestorsTab`.
+    *   **Vue Notes:** Needs state for edit mode/data. Input/date pickers. Calculation logic (computed props). API save logic. Conditional disabling.
+*   **`Counters.js`:** Displays time-elapsed badges (Days Since Sold, Permit Submission, etc.) in `ModalHeader`. Calculates days, applies conditional coloring.
+    *   **Dependencies:** Relies on `project` prop.
+    *   **Vue Notes:** Calculation logic (computed props). Badge component easy. Conditional rendering.
+*   **`PDFPreview.js`:** Full-screen modal overlay to display PDF using `<iframe>`. Header shows filename, Close button. Footer has Download button.
+    *   **Dependencies:** Relies on props (`pdfData`, `fileName`, `onClose`, `onDownload`).
+    *   **Vue Notes:** Standard modal structure. `<iframe>` embed. Download logic needed if required.
+*   **`WorkRequirementBars.js`:** Displays colored bars (Roof/Tree/PU) indicating work needed based on props. Adjusts bar width based on count (1-3).
+    *   **Dependencies:** Relies on props.
+    *   **Vue Notes:** Simple display component. Filtering/width logic straightforward.
+*   **`TranchesKanbanBoard.js`:** Displays Kanban board grouped by Tranches. Regroups project cards based on `card.tranche.ID`. Renders `KanbanColumn` for each tranche. Handles drag-and-drop to update project's tranche via `updateProjectTranche`.
+    *   **Dependencies:** `KanbanColumn.js`, `ToastContext.js`, `utils/stagecardUpdate.js`.
+    *   **Vue Notes:** Requires logic to regroup projects by tranche (computed prop). Uses `KanbanColumn` equivalent. Drag/drop calls tranche update API method.
+
+**Next Steps:**
+
+*   Review remaining key components: `KanbanBoardSkeleton.js`, `NoteAttachment.js`, `ContactItem.js`, `CommissionNotes.js`, `EditSalesRepModal.js`, `CommSection.js`, `SystemApprovalModal.js`, `AddMaterialForm.js`.
+*   Review remaining utility files: `utils/attachmentUpload.js`, `utils/deleteRecord.js`.
+*   Finalize Vue planning (structure, state, API service, libraries).
+
+---
+
+### Component & Utility Review (Skeleton, Attachments, Items, Modals, Utils) - [Date Recorded]
+
+**Components (`components/*.js`):**
+
+*   **`KanbanBoardSkeleton.js`:** Displays placeholder columns and cards with pulsing gray shapes mimicking the board layout during loading.
+    *   **Dependencies:** None.
+    *   **Vue Notes:** Standard skeleton loader pattern using basic elements + Tailwind `animate-pulse`.
+*   **`NoteAttachment.js`:** Renders a single note attachment. Shows image thumbnail or file icon. Click triggers image preview modal or file download (`navigateToURL`). May integrate `PDFPreview`.
+    *   **Dependencies:** `utils/navigation.js`, `PDFPreview.js`.
+    *   **Vue Notes:** Needs conditional rendering (image/file), image preview modal, file download logic. Potential PDF preview integration.
+*   **`ContactItem.js`:** Renders a single contact card in `ContactTab`. Displays details. Action menu allows Edit (toggles inline form), Set as Main Owner (updates project record), Delete (uses `deleteRecord`). Saves edits via `updateRecord`.
+    *   **Dependencies:** `lucide-react`, `utils/recordUpdates.js`, `utils/deleteRecord.js`, `Toast.js`.
+    *   **Vue Notes:** Needs display/edit modes. Action menu. API calls for save/delete/set-main. Toast integration.
+*   **`CommissionNotes.js`:** Displays/adds notes with context 'Commissions' within `SalesRepTab`. Filters project notes. Provides textarea to add notes (saves via `createRecord`).
+    *   **Dependencies:** `utils/recordCreation.js`, `utils/queryParams.js` (unused?).
+    *   **Vue Notes:** Filters notes. Note input/add logic. API call for creation.
+*   **`EditSalesRepModal.js`:** Modal form to edit sales rep details (Name, Email, Phone, Commission Rates). Saves changes via `updateRecord`.
+    *   **Dependencies:** `utils/recordUpdates.js`, `ToastContext.js`.
+    *   **Vue Notes:** Standard modal form. Input bindings. API call for saving.
+
+**Utilities (`utils/*.js`):**
+
+*   **`attachmentUpload.js`:** Handles note attachments. `uploadNoteAttachments` uploads files sequentially (create record -> upload -> trigger update). `createNoteWithAttachments` creates note record then calls upload function. Includes file validation helper.
+    *   **Dependencies:** `errorHandling.js`, `userInfo.js`.
+    *   **Vue Notes:** Critical logic for notes feature. Encapsulate in API service. Validation useful.
+*   **`deleteRecord.js`:** Deletes single or multiple records using V1 API (`ZOHO.CREATOR.API.deleteRecord`).
+    *   **Dependencies:** `errorHandling.js`.
+    *   **Vue Notes:** Logic belongs in API service, but should be updated to use V2 API (`ZOHO.CREATOR.DATA.deleteRecords`) if possible.
+
+**Next Steps:**
+
+*   Review final components: `CommSection.js`, `SystemApprovalModal.js`, `AddMaterialForm.js`.
+*   Finalize Vue planning (structure, state, API service, libraries).
+
+### Component Review (Final Components: CommSection, SystemApprovalModal, AddMaterialForm) - [Date Recorded]
+
+*   **`CommSection.js`:** *(Confirmed Review)* Shows preview of recent calls (Subject, Date, User) on Overview tab. Filters communications by type 'call'. Shows first 4, provides "View All" button to switch tabs.
+    *   **Dependencies:** Relies on `communications`, `setActiveTab` props.
+    *   **Vue Notes:** Simple preview component. Filtering/slicing logic easy. Relies on parent handler for navigation.
+*   **`SystemApprovalModal.js`:** Modal to edit system details (kW, Output, Usage) and component quantities. Includes "Approve System" checkbox. Saves project fields and modified material quantities via `updateRecord`.
+    *   **Dependencies:** `utils/recordUpdates.js`.
+    *   **Vue Notes:** Modal form. Input bindings. API calls for saving project & materials. Needs modification tracking.
+*   **`AddMaterialForm.js`:** Modal form to add BOM items. Cascading dropdowns for Category -> Manufacturer -> Model (populated from `equipmentData`). Input for Quantity. Calculates Unit/Total Price. Saves via `createRecord` (form `Add_Bill_of_Material`).
+    *   **Dependencies:** `utils/recordCreation.js`.
+    *   **Vue Notes:** Modal form. Cascading dropdown logic. Price calculation. API call for creation.
+
+**Code Review Complete & Verified:**
+
+All identified components and utilities from the old codebase have now been reviewed. We have a comprehensive understanding of the required functionality.
+
+**Next Steps (Rebuild Planning):**
+
+1.  **Vue Structure & Setup:** Define `widget.html` (CDN links for Vue, Pinia/Vuex), Vue app initialization, component definition/registration strategy.
+2.  **State Management (Pinia/Vuex):** Outline store structure (modules, state, actions, getters) based on reviewed needs.
+3.  **API Service (`services/zohoCreatorAPI.js`):** Detail the methods needed, consolidating logic from old utils and updating V1 calls to V2 where possible.
+4.  **Component Implementation Plan:** Outline key Vue components and their interaction with the store/API service.
+5.  **Library Selection (CDN):** Finalize choices for state management, UI libraries (Select component, Icons), etc., confirming CDN availability.

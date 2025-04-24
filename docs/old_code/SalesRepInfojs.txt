@@ -1,0 +1,96 @@
+/* global React */
+import React from 'react';
+import { navigateToURL } from '../utils/navigation.js';
+import { updateUserCallStatus } from '../utils/recordUpdates.js';
+
+const formatPhoneNumber = (phoneNumber) => {
+    if (!phoneNumber) return { display: '', link: '' };
+    const cleaned = phoneNumber.replace(/\D/g, '');
+    if (cleaned.length === 10) {
+        const display = `(${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+        return { display, link: cleaned };
+    }
+    return { 
+        display: phoneNumber,
+        link: cleaned
+    };
+};
+
+const SalesRepInfo = ({ salesRep }) => {
+    const phone = formatPhoneNumber(salesRep?.phone);
+
+    return React.createElement('div',
+        { className: "bg-white rounded-lg shadow-sm p-4" },
+        [
+            // Header
+            React.createElement('h3',
+                { className: "text-sm font-medium text-gray-500 mb-3" },
+                "Sales Representative"
+            ),
+            // Sales Rep Details
+            React.createElement('div',
+                { className: "space-y-2" },
+                [
+                    // Name
+                    React.createElement('div',
+                        { className: "text-sm font-medium text-gray-900" },
+                        salesRep?.name || "Unassigned"
+                    ),
+                    // Organization
+                    React.createElement('div',
+                        { className: "text-sm text-gray-600" },
+                        [
+                            React.createElement('i', 
+                                { className: "fas fa-building mr-2" }
+                            ),
+                            salesRep?.organization || "No Organization"
+                        ]
+                    ),
+                    // Contact buttons row
+                    React.createElement('div',
+                        { className: "flex flex-col gap-2" },
+                        [
+                            // Phone button
+                            salesRep?.phone && React.createElement('button',
+                                {
+                                    className: "flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600",
+                                    onClick: async (e) => {
+                                        e.preventDefault();
+                                        try {
+                                            const cleanPhone = salesRep.phone.replace(/\D/g, '');
+                                            const cleanName = salesRep.name.trim();
+                                            await updateUserCallStatus(cleanPhone, cleanName);
+                                        } catch (error) {
+                                            console.error("Error initiating call:", error);
+                                        }
+                                    }
+                                },
+                                [
+                                    React.createElement('i', { className: "fas fa-phone" }),
+                                    React.createElement('span', {}, phone.display)
+                                ]
+                            ),
+                            // Email button
+                            salesRep?.email && React.createElement('button',
+                                {
+                                    className: "flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600",
+                                    onClick: (e) => {
+                                        e.preventDefault();
+                                        const mailtoUrl = `mailto:${salesRep.email}`;
+                                        navigateToURL(mailtoUrl);
+                                    }
+                                },
+                                [
+                                    React.createElement('i', { className: "fas fa-envelope" }),
+                                    React.createElement('span', {}, salesRep.email)
+                                ]
+                            )
+                        ]
+                    )
+                ]
+            )
+        ]
+    );
+};
+
+export default SalesRepInfo;

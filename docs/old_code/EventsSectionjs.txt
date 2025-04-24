@@ -1,0 +1,644 @@
+/* global React */
+
+import React from 'react';
+import { createRecord } from '../utils/recordCreation.js';
+import { getQueryParams } from '../utils/queryParams.js';
+import { getInstallerSlots } from '../utils/dataFetching.js';
+import { updateRecord } from '../utils/recordUpdates.js';
+import { navigateToURL } from '../utils/navigation.js';
+
+const EVENT_TYPES = [
+    {
+        type: "Site Survey",
+        field: "surveyBooking",
+        statusField: "surveyStatus",
+        apiField: "Survey_Date_Time",
+        apiStatusField: "Survey_Status",
+        possibleStatuses: ["Needs Scheduling", "Scheduled", "Completed"]
+    },
+    // Work related events
+    {
+        type: "Tree Work",
+        field: "treeWorkBooking",
+        statusField: "treeWorkStatus",
+        apiField: "Tree_Work_Date_Time",
+        apiStatusField: "Tree_Work_Status",
+        possibleStatuses: ["TBD", "Not Required", "Needs Scheduling", "Scheduled", "Completed"]
+    },
+    {
+        type: "Roof Work",
+        field: "roofWorkBooking",
+        statusField: "roofWorkStatus",
+        apiField: "Roof_Work_Date_Time",
+        apiStatusField: "Roof_Work_Status",
+        possibleStatuses: ["TBD", "Not Required", "Needs Scheduling", "Scheduled", "Completed"]
+    },
+    {
+        type: "Panel Upgrade",
+        field: "puWorkBooking",
+        statusField: "puWorkStatus",
+        apiField: "PU_Work_Date_Time",
+        apiStatusField: "PU_Work_Status",
+        possibleStatuses: ["TBD", "Not Required", "Needs Scheduling", "Scheduled", "Completed"]
+    },
+    // Installation
+    {
+        type: "Installation",
+        field: "installationBooking",
+        statusField: "installationStatus",
+        apiField: "Installation_Date_Time",
+        apiStatusField: "Installation_Status",
+        possibleStatuses: ["Needs Scheduling", "Scheduled", "Completed"]
+    },
+    // Final Inspection
+    {
+        type: "Final Inspection",
+        field: "finalInspectionBooking",
+        statusField: "finalInspectionStatus",
+        apiField: "Final_Inspection_Date_Time",
+        apiStatusField: "Final_Inspection_Status",
+        possibleStatuses: ["Needs Scheduling", "Scheduled", "Completed"]
+    }
+];
+
+const getEventIcon = (eventType) => {
+    const getIconConfig = (type) => {
+        switch (type) {
+            case 'Site Survey':
+                return { icon: 'fa-search', bgColor: 'bg-blue-100', textColor: 'text-blue-600' };
+            case 'Installation':
+                return { icon: 'fa-solar-panel', bgColor: 'bg-green-100', textColor: 'text-green-600' };
+            case 'Roof Work':
+                return { icon: 'fa-home', bgColor: 'bg-orange-100', textColor: 'text-orange-600' };
+            case 'Tree Work':
+                return { icon: 'fa-tree', bgColor: 'bg-emerald-100', textColor: 'text-emerald-600' };
+            case 'Final Inspection':
+                return { icon: 'fa-clipboard-check', bgColor: 'bg-purple-100', textColor: 'text-purple-600' };
+            case 'Panel Upgrade':
+                return { icon: 'fa-bolt', bgColor: 'bg-yellow-100', textColor: 'text-yellow-600' };
+            default:
+                return { icon: 'fa-calendar', bgColor: 'bg-gray-100', textColor: 'text-gray-600' };
+        }
+    };
+
+    const config = getIconConfig(eventType);
+    return React.createElement('i', { 
+        className: `fas ${config.icon} ${config.textColor}`
+    });
+};
+
+const AddEventModal = ({ isOpen, onClose, onSubmit, projectId }) => {
+    const [eventData, setEventData] = React.useState({
+        type: EVENT_TYPES[0].type,
+        startTime: '',
+        details: ''
+    });
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            await onSubmit(eventData);
+            onClose();
+        } catch (error) {
+            console.error("Error submitting event:", error);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return React.createElement('div',
+        {
+            className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        },
+        React.createElement('div',
+            {
+                className: "bg-white rounded-lg p-6 w-full max-w-md"
+            },
+            [
+                React.createElement('h3',
+                    { className: "text-lg font-medium mb-4" },
+                    "Add New Event"
+                ),
+                React.createElement('form',
+                    { onSubmit: handleSubmit },
+                    [
+                        // Event Type Dropdown
+                        React.createElement('div', { className: "mb-4" }, [
+                            React.createElement('label',
+                                { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                "Event Type"
+                            ),
+                            React.createElement('select',
+                                {
+                                    className: "w-full border rounded-md p-2",
+                                    value: eventData.type,
+                                    onChange: (e) => setEventData({ ...eventData, type: e.target.value })
+                                },
+                                EVENT_TYPES.map(type =>
+                                    React.createElement('option', { key: type.type, value: type.type }, type.type)
+                                )
+                            )
+                        ]),
+
+                        // Date and Time
+                        React.createElement('div', { className: "mb-4" }, [
+                            React.createElement('label',
+                                { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                "Date and Time"
+                            ),
+                            React.createElement('input',
+                                {
+                                    type: "datetime-local",
+                                    className: "w-full border rounded-md p-2",
+                                    value: eventData.startTime,
+                                    onChange: (e) => setEventData({ ...eventData, startTime: e.target.value })
+                                }
+                            )
+                        ]),
+
+                        // Details
+                        React.createElement('div', { className: "mb-4" }, [
+                            React.createElement('label',
+                                { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                "Details (Optional)"
+                            ),
+                            React.createElement('textarea',
+                                {
+                                    className: "w-full border rounded-md p-2",
+                                    value: eventData.details,
+                                    onChange: (e) => setEventData({ ...eventData, details: e.target.value })
+                                }
+                            )
+                        ]),
+
+                        // Buttons
+                        React.createElement('div',
+                            { className: "flex justify-end gap-2" },
+                            [
+                                React.createElement('button',
+                                    {
+                                        type: "button",
+                                        className: "px-4 py-2 text-sm text-gray-600 hover:text-gray-800",
+                                        onClick: onClose
+                                    },
+                                    "Cancel"
+                                ),
+                                React.createElement('button',
+                                    {
+                                        type: "submit",
+                                        className: "px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                    },
+                                    "Add Event"
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+    );
+};
+
+    // Helper functions first
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        return new Date(dateString).toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+    };
+
+    const formatDateForAPI = (dateString) => {
+        const date = new Date(dateString);
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        const year = date.getFullYear().toString().slice(-2);
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const seconds = date.getSeconds().toString().padStart(2, '0');
+        
+        return `${month}/${day}/${year} ${hours}:${minutes}:${seconds}`;
+    };
+
+// Process events function
+const processEvents = (projectData) => {
+    if (!projectData) return [];
+    
+    return EVENT_TYPES.map(eventType => {
+        const bookingField = eventType.field;
+        const statusField = eventType.statusField;
+        
+        // Get the status value and log it
+        let status = projectData?.[statusField];
+       
+        
+        // Only set to TBD if status is undefined, null, or empty string
+        if (status === undefined || status === null || status === '') {
+            status = 'TBD';
+        }
+        
+       
+            
+        return {
+            type: eventType.type,
+            date: projectData?.[bookingField] ? formatDate(projectData[bookingField]) : '',
+            status: status,
+            id: `${eventType.type}-${projectData?.[bookingField] || 'no-date'}`,
+            possibleStatuses: eventType.possibleStatuses,
+            isDisabled: false,
+            isBookingDisabled: false
+        };
+    });
+};
+
+const EventsSection = ({ project, onEventAdded }) => {
+    const [showDatePicker, setShowDatePicker] = React.useState(null);
+    const [loadingStates, setLoadingStates] = React.useState({});
+    const [datePickerLoading, setDatePickerLoading] = React.useState(false);
+    
+    // Process events directly from project data
+    const events = React.useMemo(() => {
+        if (!project) return [];
+        return processEvents(project);
+    }, [project]);
+
+    const handleStatusChange = async (eventType, newStatus) => {
+        try {
+            // Set loading state for specific event
+            setLoadingStates(prev => ({ ...prev, [eventType]: true }));
+            
+            const eventConfig = EVENT_TYPES.find(e => e.type === eventType);
+            if (!eventConfig) {
+                console.error('Event config not found for type:', eventType);
+                return;
+            }
+
+           
+            // Update directly in Zoho using API field names
+            const response = await updateRecord("PM_Kanban_Projects", project.id, {
+                data: {
+                    [eventConfig.apiStatusField]: newStatus
+                }
+            });
+
+            console.log('Status update response:', response);
+
+            // Refresh project data
+            if (onEventAdded) {
+                console.log('Refreshing project data...');
+                await onEventAdded();
+            }
+        } catch (error) {
+            console.error('Error updating status:', error);
+            throw error;
+        } finally {
+            setLoadingStates(prev => ({ ...prev, [eventType]: false }));
+        }
+    };
+
+    const handleSchedule = async (eventType, selectedDateTime) => {
+        try {
+            setDatePickerLoading(true);
+            const eventConfig = EVENT_TYPES.find(e => e.type === eventType);
+            if (!eventConfig) return;
+
+            // Format the date for API
+            const formattedDate = formatDateForAPI(selectedDateTime);
+            
+           
+            // Update directly in Zoho using API field names and formatted date
+            await updateRecord("PM_Kanban_Projects", project.id, {
+                data: {
+                    [eventConfig.apiField]: formattedDate,
+                    [eventConfig.apiStatusField]: "Scheduled"
+                }
+            });
+
+            // Refresh project data
+            if (onEventAdded) await onEventAdded();
+            setShowDatePicker(null);
+        } catch (error) {
+            console.error('Error scheduling:', error);
+        } finally {
+            setDatePickerLoading(false);
+        }
+    };
+
+    const handleClearDate = async (eventType) => {
+        try {
+            setDatePickerLoading(true);
+            const eventConfig = EVENT_TYPES.find(e => e.type === eventType);
+            if (!eventConfig) return;
+
+            // Update record with empty date and reset status
+            await updateRecord("PM_Kanban_Projects", project.id, {
+                data: {
+                    [eventConfig.apiField]: "",
+                    [eventConfig.apiStatusField]: "Needs Scheduling"
+                }
+            });
+
+            // Refresh project data
+            if (onEventAdded) await onEventAdded();
+        } catch (error) {
+            console.error('Error clearing date:', error);
+        } finally {
+            setDatePickerLoading(false);
+        }
+    };
+
+    const handleBookSurveyClick = (project) => {
+        // First decode any encoded values to get raw strings
+        const urlParameters = "First Name=" + project.contactFirstName + 
+            "&Last Name=" + project.contactLastName + 
+            "&Email=" + project.contactEmail + 
+            "&Phone Number=" + project.contactPhone + 
+            "&Site Address Line 1=" + project.addressLine1 + 
+            "&City=" + project.city + 
+            "&State=" + project.state + 
+            "&Zip Code=" + project.zip + 
+            "&Project ID=" + project.id + 
+            "&OS ID=" + project.os_id + 
+            "&Sales Rep Name=" + project.salesRep.name + 
+            "&Booked By=Sales Rep";
+
+        const surveyUrl = "https://book.aduusolar.com/#/solarsurvey?" + urlParameters;
+        navigateToURL(surveyUrl, "new");
+    };
+
+    const renderDateTimePicker = (event) => {
+        if (showDatePicker !== event.type) return null;
+
+        return React.createElement('form',
+            { 
+                className: "mt-2 flex items-center gap-2",
+                onSubmit: (e) => {
+                    e.preventDefault();
+                    const dateInput = e.target.querySelector('input[type="datetime-local"]');
+                    handleSchedule(event.type, dateInput.value);
+                }
+            },
+            [
+                React.createElement('input',
+                    {
+                        type: "datetime-local",
+                        className: "text-xs border rounded px-2 py-1",
+                        defaultValue: event.date || '',
+                        required: true,
+                        disabled: datePickerLoading
+                    }
+                ),
+                datePickerLoading ? 
+                    React.createElement('div', 
+                        { className: "animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent" }
+                    ) :
+                    [
+                        React.createElement('button',
+                            {
+                                type: 'submit',
+                                className: "text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700",
+                                disabled: datePickerLoading
+                            },
+                            "Save"
+                        ),
+                        React.createElement('button',
+                            {
+                                type: 'button',
+                                className: "text-xs text-gray-500 hover:text-gray-700",
+                                onClick: () => setShowDatePicker(null),
+                                disabled: datePickerLoading
+                            },
+                            "Cancel"
+                        )
+                    ]
+            ]
+        );
+    };
+
+    const renderDateOrBooking = (event) => {
+        if (showDatePicker === event.type) return null;
+
+        if (event.date) {
+            return React.createElement('div',
+                { className: "mt-2 flex items-center text-xs text-gray-500 group" },
+                [
+                    React.createElement('svg',
+                        {
+                            className: "flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400",
+                            xmlns: "http://www.w3.org/2000/svg",
+                            viewBox: "0 0 20 20",
+                            fill: "currentColor"
+                        },
+                        React.createElement('path',
+                            {
+                                fillRule: "evenodd",
+                                d: "M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z",
+                                clipRule: "evenodd"
+                            }
+                        )
+                    ),
+                    event.date,
+                    event.status !== 'Not Required' && React.createElement('div',
+                        { className: "ml-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1" },
+                        [
+                            // Edit button
+                            React.createElement('button',
+                                {
+                                    className: "text-gray-400 hover:text-gray-600",
+                                    onClick: () => setShowDatePicker(event.type)
+                                },
+                                React.createElement('svg',
+                                    {
+                                        className: "h-3.5 w-3.5",
+                                        xmlns: "http://www.w3.org/2000/svg",
+                                        viewBox: "0 0 20 20",
+                                        fill: "currentColor"
+                                    },
+                                    React.createElement('path',
+                                        {
+                                            d: "M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"
+                                        }
+                                    )
+                                )
+                            ),
+                            // Clear button
+                            React.createElement('button',
+                                {
+                                    className: "text-gray-400 hover:text-red-600",
+                                    onClick: () => handleClearDate(event.type)
+                                },
+                                React.createElement('svg',
+                                    {
+                                        className: "h-3.5 w-3.5",
+                                        xmlns: "http://www.w3.org/2000/svg",
+                                        viewBox: "0 0 20 20",
+                                        fill: "currentColor"
+                                    },
+                                    React.createElement('path',
+                                        {
+                                            fillRule: "evenodd",
+                                            d: "M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z",
+                                            clipRule: "evenodd"
+                                        }
+                                    )
+                                )
+                            )
+                        ]
+                    )
+                ]
+            );
+        } else if (!event.isBookingDisabled) {
+            // Special handling for Site Survey
+            if (event.type === 'Site Survey') {
+                return React.createElement('button',
+                    {
+                        className: "mt-2 flex items-center text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full px-2 py-1",
+                        onClick: () => handleBookSurveyClick(project)
+                    },
+                    [
+                        React.createElement('svg',
+                            {
+                                className: "h-3.5 w-3.5 mr-1",
+                                xmlns: "http://www.w3.org/2000/svg",
+                                viewBox: "0 0 20 20",
+                                fill: "currentColor"
+                            },
+                            React.createElement('path',
+                                {
+                                    fillRule: "evenodd",
+                                    d: "M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z",
+                                    clipRule: "evenodd"
+                                }
+                            )
+                        ),
+                        "Book Survey"
+                    ]
+                );
+            }
+            
+            // Default booking button for other event types
+            return React.createElement('button',
+                {
+                    className: "mt-2 flex items-center text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full px-2 py-1",
+                    onClick: () => setShowDatePicker(event.type)
+                },
+                [
+                    React.createElement('svg',
+                        {
+                            className: "h-3.5 w-3.5 mr-1",
+                            xmlns: "http://www.w3.org/2000/svg",
+                            viewBox: "0 0 20 20",
+                            fill: "currentColor"
+                        },
+                        React.createElement('path',
+                            {
+                                fillRule: "evenodd",
+                                d: "M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z",
+                                clipRule: "evenodd"
+                            }
+                        )
+                    ),
+                    "Book"
+                ]
+            );
+        }
+        return null;
+    };
+
+    if (!project) {
+        return React.createElement('div',
+            { className: "bg-white rounded-lg shadow-sm p-4" },
+            React.createElement('p',
+                { className: "text-sm text-gray-500 text-center" },
+                "Loading project events..."
+            )
+        );
+    }
+
+    return React.createElement(
+        'div',
+        { className: "bg-white rounded-lg shadow-sm p-4" },
+        [
+            React.createElement('div', 
+                { className: "flex justify-between items-center mb-4 pb-2 border-b border-gray-200" },
+                [
+                    React.createElement('h3', 
+                        { className: "text-sm font-medium text-gray-900" }, 
+                        "Project Events"
+                    )
+                ]
+            ),
+            React.createElement('div', 
+                { className: "space-y-4" },
+                events.map((event, index) => 
+                    React.createElement('div', 
+                        { 
+                            key: event.id,
+                            className: `flex p-3 rounded-lg ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} transition-all hover:shadow-sm`
+                        },
+                        [
+                            React.createElement('div', 
+                                { className: `rounded-full w-10 h-10 flex items-center justify-center ${getEventIcon(event.type).bgColor}` },
+                                getEventIcon(event.type)
+                            ),
+                            React.createElement('div', 
+                                { className: "ml-4 flex-1" },
+                                [
+                                    React.createElement('div', 
+                                        { className: "flex items-center justify-between" },
+                                        [
+                                            React.createElement('h4', 
+                                                { className: "text-sm font-medium text-gray-900" }, 
+                                                event.type
+                                            ),
+                                            React.createElement('div',
+                                                { className: "flex items-center gap-2" },
+                                                [
+                                                    React.createElement('select',
+                                                        {
+                                                            value: event.status,
+                                                            onChange: (e) => handleStatusChange(event.type, e.target.value),
+                                                            disabled: event.isDisabled || loadingStates[event.type],
+                                                            className: `text-xs px-2 py-0.5 rounded-full ${
+                                                                event.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                                                                event.status === 'Scheduled' ? 'bg-blue-100 text-blue-800' :
+                                                                event.status === 'Not Required' ? 'bg-gray-100 text-gray-600' :
+                                                                'bg-yellow-100 text-yellow-800'
+                                                            } border-0 focus:ring-0 ${
+                                                                (event.isDisabled || loadingStates[event.type]) ? 'opacity-75 cursor-not-allowed' : 'cursor-pointer'
+                                                            }`
+                                                        },
+                                                        event.possibleStatuses.map(status =>
+                                                            React.createElement('option',
+                                                                { 
+                                                                    key: status, 
+                                                                    value: status 
+                                                                },
+                                                                status
+                                                            )
+                                                        )
+                                                    ),
+                                                    loadingStates[event.type] && React.createElement('div', 
+                                                        { className: "animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent" }
+                                                    )
+                                                ]
+                                            )
+                                        ]
+                                    ),
+                                    renderDateTimePicker(event),
+                                    renderDateOrBooking(event)
+                                ]
+                            )
+                        ]
+                    )
+                )
+            )
+        ]
+    );
+};
+
+export default EventsSection;

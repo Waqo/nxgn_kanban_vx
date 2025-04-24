@@ -1,0 +1,65 @@
+export const getCurrentUser = async () => {
+    try {
+        // await ZOHO.CREATOR.init(); // Not needed in V2
+        const initParams = ZOHO.CREATOR.UTIL.getInitParams();
+
+        
+        const loginEmail = initParams.loginUser?.trim();
+        
+        const userResponse = await ZOHO.CREATOR.DATA.getRecords({
+            app_name: "nexgen-portal",
+            report_name: "PM_Kanban_Users",
+            criteria: `(Email == "${loginEmail}")`,
+            fields: "ID, Name, Username, Email, Active_Detail_Window"
+        });
+        
+        if (userResponse.code === 3000) {
+            const userData = userResponse.data[0];
+            return {
+                id: userData.ID,
+                name: userData.Name,
+                username: userData.Username,
+                email: userData.Email,
+                activeDetailWindow: userData.Active_Detail_Window,
+            }
+        }
+        
+        // Return basic info if no match found
+     
+    } catch (error) {
+        console.error("Error getting current user info:", error);
+        throw error;
+    }
+};
+
+export const getAllUsersExceptCurrent = async () => {
+    try {
+        const currentUser = await getCurrentUser();
+        const queryParams = ZOHO.CREATOR.UTIL.getQueryParams();
+        
+        if (!queryParams.users) return [];
+        
+        const parsedUsers = JSON.parse(queryParams.users);
+        return parsedUsers
+            .map(userStr => {
+                const [id, name, username, email, activeDetailWindow] = userStr.split(', ');
+                return { id, name, username, email, activeDetailWindow };
+            })
+            .filter(user => user.email !== currentUser.email);
+            
+    } catch (error) {
+        console.error("Error getting users list:", error);
+        throw error;
+    }
+};
+
+// Helper function to check if user is logged in
+export const isUserLoggedIn = async () => {
+    try {
+        const userInfo = await getCurrentUser();
+        return Boolean(userInfo.email);
+    } catch (error) {
+        console.error("Error checking user login status:", error);
+        return false;
+    }
+};

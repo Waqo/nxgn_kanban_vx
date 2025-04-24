@@ -1,0 +1,584 @@
+import React, { useState, useEffect } from 'react';
+import { Users, Briefcase, Building2, Mail, Phone, Smartphone, Search, Plus, UserCircle2, MoreVertical } from 'lucide-react';
+import ContactItem from './ContactItem.js';
+import { createRecord } from '../utils/recordCreation.js';
+
+const ContactTab = ({ contacts, project, onRefresh }) => {
+    // Add console log when component mounts
+    useEffect(() => {
+        console.log('ContactTab mounted with project:', project);
+    }, [project]);
+
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedType, setSelectedType] = useState('All');
+    const [isAddingContact, setIsAddingContact] = useState(false);
+    const [newContact, setNewContact] = useState({
+        Name: {
+            first_name: '',
+            last_name: ''
+        },
+        Primary_Contact_Type1: '',
+        Email: '',
+        Phone_Number: '',
+        Mobile_Phone_Number: '',
+        Business_POC: false,
+        Job_Title: '',
+        Business_Name: '',
+        Project: project.id,  // Use project.id directly
+        Billing_Address: {
+            address_line_1: '',
+            address_line_2: '',
+            district_city: '',
+            state_province: '',
+            postal_code: '',
+            country: 'USA'
+        }
+    });
+
+    // Add state to control billing address visibility
+    const [showBillingAddress, setShowBillingAddress] = useState(false);
+
+    // Replace the dynamic contactTypes with static options
+    const contactTypes = ['All', 'Owner 1', 'Owner 2', 'Other Project Contact'];
+    
+    // Update the filtered contacts logic to use project.contacts
+    const filteredContacts = project.contacts?.filter(contact => {
+        const matchesSearch = (
+            contact.First_Name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            contact.Last_Name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            contact.Email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            contact.Business_Name?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        
+        const matchesType = selectedType === 'All' || contact.Contact_Type === selectedType;
+        
+        return matchesSearch && matchesType;
+    }) || [];
+
+    const handleAddContact = async () => {
+        const projectIdString = project.id.toString();
+        
+        // Format phone numbers as +1XXXXXXXXXX
+        const formatPhoneNumber = (phone) => {
+            if (!phone) return "";
+            // Remove all non-numeric characters
+            const cleaned = phone.replace(/\D/g, '');
+            // Add +1 prefix if it's a 10-digit number
+            if (cleaned.length === 10) {
+                return `+1${cleaned}`;
+            }
+            return phone;
+        };
+        
+        const contactData = {
+            Name: {
+                prefix: "",
+                first_name: newContact.Name.first_name,
+                last_name: newContact.Name.last_name,
+                suffix: ""
+            },
+            Primary_Contact_Type1: newContact.Primary_Contact_Type1,
+            Email: newContact.Email,
+            Phone_Number: formatPhoneNumber(newContact.Phone_Number),
+            Mobile_Phone_Number: formatPhoneNumber(newContact.Mobile_Phone_Number),
+            Business_POC: newContact.Business_POC,
+            Job_Title: newContact.Job_Title,
+            Business_Name: newContact.Business_Name,
+            Project: [projectIdString],
+        };
+
+        // Only include billing address if at least one field is filled
+        const hasAddressFields = Object.values(newContact.Billing_Address)
+            .some(value => value && value !== 'USA');
+        
+        if (hasAddressFields) {
+            contactData.Billing_Address = newContact.Billing_Address;
+        }
+        
+        // Don't send empty phone numbers
+        if (!newContact.Phone_Number) {
+            delete contactData.Phone_Number;
+        }
+        if (!newContact.Mobile_Phone_Number) {
+            delete contactData.Mobile_Phone_Number;
+        }
+        
+        console.log('Contact data being sent to API:', JSON.stringify(contactData, null, 2));
+        
+        try {
+            const response = await createRecord('Add_Contact', contactData);
+            console.log('API Response:', response);
+            
+            if (response.code === 3000) {
+                console.log('Contact created successfully with ID:', response.data.ID);
+                setIsAddingContact(false);
+                setNewContact({
+                    Name: { first_name: '', last_name: '' },
+                    Primary_Contact_Type1: '',
+                    Email: '',
+                    Phone_Number: '',
+                    Mobile_Phone_Number: '',
+                    Business_POC: false,
+                    Job_Title: '',
+                    Business_Name: '',
+                    Project: [projectIdString],
+                    Billing_Address: {
+                        address_line_1: '',
+                        address_line_2: '',
+                        district_city: '',
+                        state_province: '',
+                        postal_code: '',
+                        country: 'USA'
+                    }
+                });
+                onRefresh();
+            }
+        } catch (error) {
+            console.error('Error details:', error);
+        }
+    };
+
+    return React.createElement('div',
+        { className: "space-y-6 p-8 max-w-6xl mx-auto" },
+        [
+            // Header Section with Add Contact button
+            React.createElement('div',
+                { className: "flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4" },
+                [
+                    // Title and description
+                    React.createElement('div',
+                        { className: "flex items-center gap-4" },
+                        [
+                            React.createElement('div',
+                                { className: "w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center" },
+                                React.createElement(Users, { className: "w-6 h-6 text-blue-500" })
+                            ),
+                            React.createElement('div',
+                                null,
+                                [
+                                    React.createElement('h3',
+                                        { className: "text-2xl font-semibold text-gray-900" },
+                                        "Project Contacts"
+                                    ),
+                                    React.createElement('p',
+                                        { className: "text-sm text-gray-500" },
+                                        "Manage your project team and stakeholders"
+                                    )
+                                ]
+                            )
+                        ]
+                    ),
+                    // Add Contact button
+                    React.createElement('button',
+                        {
+                            className: "px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2",
+                            onClick: () => setIsAddingContact(!isAddingContact)
+                        },
+                        [
+                            React.createElement(Plus, { className: "w-4 h-4" }),
+                            isAddingContact ? "Cancel" : "Add Contact"
+                        ]
+                    )
+                ]
+            ),
+
+            // Expandable Form Section - Moved above search
+            isAddingContact && React.createElement('div',
+                { className: "bg-white rounded-lg shadow p-6 space-y-6 mb-4" },
+                [
+                    // Name fields row
+                    React.createElement('div',
+                        { className: "grid grid-cols-1 sm:grid-cols-2 gap-4" },
+                        [
+                            // First Name
+                            React.createElement('div', null, [
+                                React.createElement('label',
+                                    { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                    "First Name"
+                                ),
+                                React.createElement('input',
+                                    {
+                                        type: "text",
+                                        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                        value: newContact.Name.first_name,
+                                        onChange: (e) => setNewContact(prev => ({
+                                            ...prev,
+                                            Name: { ...prev.Name, first_name: e.target.value }
+                                        }))
+                                    }
+                                )
+                            ]),
+                            // Last Name
+                            React.createElement('div', null, [
+                                React.createElement('label',
+                                    { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                    "Last Name"
+                                ),
+                                React.createElement('input',
+                                    {
+                                        type: "text",
+                                        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                        value: newContact.Name.last_name,
+                                        onChange: (e) => setNewContact(prev => ({
+                                            ...prev,
+                                            Name: { ...prev.Name, last_name: e.target.value }
+                                        }))
+                                    }
+                                )
+                            ])
+                        ]
+                    ),
+
+                    // Contact Type
+                    React.createElement('div', null, [
+                        React.createElement('label',
+                            { className: "block text-sm font-medium text-gray-700 mb-1" },
+                            "Contact Type"
+                        ),
+                        React.createElement('select',
+                            {
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                value: newContact.Primary_Contact_Type1,
+                                onChange: (e) => setNewContact(prev => ({
+                                    ...prev,
+                                    Primary_Contact_Type1: e.target.value
+                                }))
+                            },
+                            [
+                                React.createElement('option', { value: "" }, "Select a type..."),
+                                React.createElement('option', { value: "Owner 1" }, "Owner 1"),
+                                React.createElement('option', { value: "Owner 2" }, "Owner 2"),
+                                React.createElement('option', { value: "Other Project Contact" }, "Other Project Contact")
+                            ]
+                        )
+                    ]),
+
+                    // Email
+                    React.createElement('div', null, [
+                        React.createElement('label',
+                            { className: "block text-sm font-medium text-gray-700 mb-1" },
+                            "Email"
+                        ),
+                        React.createElement('input',
+                            {
+                                type: "email",
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                value: newContact.Email,
+                                onChange: (e) => setNewContact(prev => ({
+                                    ...prev,
+                                    Email: e.target.value
+                                }))
+                            }
+                        )
+                    ]),
+
+                    // Phone
+                    React.createElement('div', null, [
+                        React.createElement('label',
+                            { className: "block text-sm font-medium text-gray-700 mb-1" },
+                            "Phone"
+                        ),
+                        React.createElement('input',
+                            {
+                                type: "tel",
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                value: newContact.Phone_Number,
+                                onChange: (e) => setNewContact(prev => ({
+                                    ...prev,
+                                    Phone_Number: e.target.value
+                                }))
+                            }
+                        )
+                    ]),
+
+                    // Mobile
+                    React.createElement('div', null, [
+                        React.createElement('label',
+                            { className: "block text-sm font-medium text-gray-700 mb-1" },
+                            "Mobile"
+                        ),
+                        React.createElement('input',
+                            {
+                                type: "tel",
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                value: newContact.Mobile_Phone_Number,
+                                onChange: (e) => setNewContact(prev => ({
+                                    ...prev,
+                                    Mobile_Phone_Number: e.target.value
+                                }))
+                            }
+                        )
+                    ]),
+
+                    // Business POC Checkbox
+                    React.createElement('div', null, [
+                        React.createElement('label',
+                            { className: "flex items-center gap-2 text-sm font-medium text-gray-700" },
+                            [
+                                React.createElement('input',
+                                    {
+                                        type: "checkbox",
+                                        className: "rounded border-gray-300 text-blue-600 focus:ring-blue-500",
+                                        checked: newContact.Business_POC,
+                                        onChange: (e) => setNewContact(prev => ({
+                                            ...prev,
+                                            Business_POC: e.target.checked
+                                        }))
+                                    }
+                                ),
+                                "Business Contact"
+                            ]
+                        )
+                    ]),
+
+                    // Conditionally render Job Title and Business Name
+                    newContact.Business_POC && React.createElement('div', null, [
+                        // Job Title
+                        React.createElement('div', 
+                            { className: "mb-4" },
+                            [
+                                React.createElement('label',
+                                    { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                    "Job Title"
+                                ),
+                                React.createElement('input',
+                                    {
+                                        type: "text",
+                                        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                        value: newContact.Job_Title,
+                                        onChange: (e) => setNewContact(prev => ({
+                                            ...prev,
+                                            Job_Title: e.target.value
+                                        }))
+                                    }
+                                )
+                            ]
+                        ),
+                        // Business Name
+                        React.createElement('div', null, [
+                            React.createElement('label',
+                                { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                "Business Name"
+                            ),
+                            React.createElement('input',
+                                {
+                                    type: "text",
+                                    className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                    value: newContact.Business_Name,
+                                    onChange: (e) => setNewContact(prev => ({
+                                        ...prev,
+                                        Business_Name: e.target.value
+                                    }))
+                                }
+                            )
+                        ])
+                    ])
+                ],
+                // Add Billing Address section before Submit Button
+                React.createElement('div', null, [
+                    React.createElement('label',
+                        { className: "flex items-center gap-2 text-sm font-medium text-gray-700 mb-4" },
+                        [
+                            React.createElement('input',
+                                {
+                                    type: "checkbox",
+                                    className: "rounded border-gray-300 text-blue-600 focus:ring-blue-500",
+                                    checked: showBillingAddress,
+                                    onChange: (e) => setShowBillingAddress(e.target.checked)
+                                }
+                            ),
+                            "Add Billing Address"
+                        ]
+                    ),
+
+                    // Conditional Billing Address Fields
+                    showBillingAddress && React.createElement('div', 
+                        { className: "space-y-4 mt-4" },
+                        [
+                            // Address Line 1
+                            React.createElement('div', null, [
+                                React.createElement('label',
+                                    { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                    "Address Line 1"
+                                ),
+                                React.createElement('input',
+                                    {
+                                        type: "text",
+                                        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                        value: newContact.Billing_Address.address_line_1,
+                                        onChange: (e) => setNewContact(prev => ({
+                                            ...prev,
+                                            Billing_Address: {
+                                                ...prev.Billing_Address,
+                                                address_line_1: e.target.value
+                                            }
+                                        }))
+                                    }
+                                )
+                            ]),
+
+                            // Address Line 2
+                            React.createElement('div', null, [
+                                React.createElement('label',
+                                    { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                    "Address Line 2 (Optional)"
+                                ),
+                                React.createElement('input',
+                                    {
+                                        type: "text",
+                                        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                        value: newContact.Billing_Address.address_line_2,
+                                        onChange: (e) => setNewContact(prev => ({
+                                            ...prev,
+                                            Billing_Address: {
+                                                ...prev.Billing_Address,
+                                                address_line_2: e.target.value
+                                            }
+                                        }))
+                                    }
+                                )
+                            ]),
+
+                            // City and State row
+                            React.createElement('div', 
+                                { className: "grid grid-cols-1 sm:grid-cols-2 gap-4" },
+                                [
+                                    // City
+                                    React.createElement('div', null, [
+                                        React.createElement('label',
+                                            { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                            "City"
+                                        ),
+                                        React.createElement('input',
+                                            {
+                                                type: "text",
+                                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                                value: newContact.Billing_Address.district_city,
+                                                onChange: (e) => setNewContact(prev => ({
+                                                    ...prev,
+                                                    Billing_Address: {
+                                                        ...prev.Billing_Address,
+                                                        district_city: e.target.value
+                                                    }
+                                                }))
+                                            }
+                                        )
+                                    ]),
+
+                                    // State
+                                    React.createElement('div', null, [
+                                        React.createElement('label',
+                                            { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                            "State"
+                                        ),
+                                        React.createElement('input',
+                                            {
+                                                type: "text",
+                                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                                value: newContact.Billing_Address.state_province,
+                                                onChange: (e) => setNewContact(prev => ({
+                                                    ...prev,
+                                                    Billing_Address: {
+                                                        ...prev.Billing_Address,
+                                                        state_province: e.target.value
+                                                    }
+                                                }))
+                                            }
+                                        )
+                                    ])
+                                ]
+                            ),
+
+                            // Postal Code
+                            React.createElement('div', null, [
+                                React.createElement('label',
+                                    { className: "block text-sm font-medium text-gray-700 mb-1" },
+                                    "Postal Code"
+                                ),
+                                React.createElement('input',
+                                    {
+                                        type: "text",
+                                        className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                                        value: newContact.Billing_Address.postal_code,
+                                        onChange: (e) => setNewContact(prev => ({
+                                            ...prev,
+                                            Billing_Address: {
+                                                ...prev.Billing_Address,
+                                                postal_code: e.target.value
+                                            }
+                                        }))
+                                    }
+                                )
+                            ])
+                        ]
+                    )
+                ]),
+
+                // Submit Button
+                React.createElement('div',
+                    { className: "flex justify-end mt-6" },
+                    React.createElement('button',
+                        {
+                            className: "px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2",
+                            onClick: handleAddContact
+                        },
+                        [
+                            React.createElement(Plus, { className: "w-4 h-4" }),
+                            "Add Contact"
+                        ]
+                    )
+                )
+            ),
+
+            // Search and Filter Section
+            React.createElement('div',
+                { className: "flex flex-col sm:flex-row gap-4" },
+                [
+                    // Search Input
+                    React.createElement('div',
+                        { className: "flex-1" },
+                        React.createElement('input',
+                            {
+                                type: "text",
+                                placeholder: "Search contacts...",
+                                className: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500",
+                                value: searchTerm,
+                                onChange: (e) => setSearchTerm(e.target.value)
+                            }
+                        )
+                    ),
+                    // Contact Type Filter
+                    React.createElement('select',
+                        {
+                            className: "px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500",
+                            value: selectedType,
+                            onChange: (e) => setSelectedType(e.target.value)
+                        },
+                        contactTypes.map(type =>
+                            React.createElement('option',
+                                { key: type, value: type },
+                                type
+                            )
+                        )
+                    )
+                ]
+            ),
+
+            // Contacts List
+            React.createElement('div',
+                { className: "grid grid-cols-1 md:grid-cols-2 gap-4 mt-6" },
+                filteredContacts.map(contact =>
+                    React.createElement(ContactItem, {
+                        key: contact.ID,
+                        contact: contact,
+                        project: project,  // Pass the entire project object
+                        contactTypes: contactTypes.filter(type => type !== 'All'),
+                        onRefresh: onRefresh
+                    })
+                )
+            )
+        ]
+    );
+};
+
+export default ContactTab;

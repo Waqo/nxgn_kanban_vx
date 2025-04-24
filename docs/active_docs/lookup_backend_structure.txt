@@ -1,0 +1,468 @@
+## Raw Data Example: Stages (getRecords)
+
+This example shows the typical structure of the data returned when fetching the list of stages from the `PM_Kanban_Stages` report.
+
+```json
+{
+  "code": 3000,
+  "data": [
+    {
+      "Stage_Name": "Install Scheduled",
+      "Description": "",
+      "Stage_View": "Install",
+      "Active_Status": "true",
+      "Stage_Order": "31",
+      "ID": "4663646000004195003"
+    },
+    {
+      "Stage_Name": "Pending Updated PW for SRECS Reg",
+      "Description": "",
+      "Stage_View": "Install",
+      "Active_Status": "true",
+      "Stage_Order": "48",
+      "ID": "4663646000004096003"
+    },
+    {
+      "Stage_Name": "C&L Ready for Install",
+      "Description": "",
+      "Stage_View": "Both",
+      "Active_Status": "true",
+      "Stage_Order": "29",
+      "ID": "4663646000003851474"
+    },
+    // ... (Include the rest of the stage objects from your file here) ...
+    {
+      "Stage_Name": "Pre-Sale",
+      "Description": "Contracts that are not sold.",
+      "Stage_View": "Sales",
+      "Active_Status": "true",
+      "Stage_Order": "1",
+      "ID": "4663646000002634108"
+    }
+  ]
+}
+```
+
+## Raw Data Example: Tags (getRecords)
+
+This example shows the typical structure of the data returned when fetching the list of tags from the `PM_Kanban_Tags` report. Note the `Project` field is a related list showing projects associated with the tag.
+
+```json
+{
+  "code": 3000,
+  "data": [
+    {
+      "Tag_Name": "Needs Voided Check",
+      "Project": [
+        {
+          "Site_Address.state_province": "MD",
+          "Site_Address.district_city": "Oxon Hill",
+          "Site_Address.address_line_1": "4654 Winterberry Ln",
+          "ID": "4663646000001312094",
+          "Site_Address.address_line_2": "",
+          "zc_display_value": " 4654 Winterberry Ln   Oxon Hill MD"
+        },
+        // ... (omitting other projects for brevity) ...
+        {
+          "Site_Address.state_province": "DC",
+          "Site_Address.district_city": "Washington",
+          "Site_Address.address_line_1": "1438 Montague St NW",
+          "ID": "4663646000003848206",
+          "Site_Address.address_line_2": "",
+          "zc_display_value": " 1438 Montague St NW   Washington DC"
+        }
+      ],
+      "Category": "Action Required",
+      "Tag_Color": "#FF0000",
+      "Active_Status": "true",
+      "ID": "4663646000004737003",
+      "Tag_Description": ""
+    },
+    {
+      "Tag_Name": "SUBMITTED TO REDBALL",
+      "Project": [],
+      "Category": "Informational",
+      "Tag_Color": "#007BFF",
+      "Active_Status": "false",
+      "ID": "4663646000003712003",
+      "Tag_Description": ""
+    },
+    // ... (Include the rest of the tag objects from your file here) ...
+    {
+      "Tag_Name": "Yield Less Than 1050",
+      "Project": [
+         // ... project list ...
+      ],
+      "Category": "Action Required",
+      "Tag_Color": "#FF0000",
+      "Active_Status": "true",
+      "ID": "4663646000003459024",
+      "Tag_Description": ""
+    }
+  ]
+}
+```
+
+## Raw Data Example: Users (getRecords)
+
+This example shows the typical structure of the data returned when fetching the list of users from the `PM_Kanban_Users` report. Note the `Sales_Rep_Lookup` field which links a User record to a Sales Rep record (if applicable).
+
+```json
+{
+  "code": 3000,
+  "data": [
+    {
+      "Email": "engineering@gogreensolutions.co",
+      "Active_Detail_Window": "",
+      "Profile_Picture": "",
+      "Calling_Number": "",
+      "Phone_Number": "",
+      "Calling_Name": "",
+      "In_Call": "false",
+      "Name": {
+        "prefix": "",
+        "last_name": "M",
+        "suffix": "",
+        "first_name": "Deep",
+        "zc_display_value": "Deep M"
+      },
+      "Role": "Admin",
+      "Zoho_Account": "",
+      "Customer_Lookup": {},
+      "Portal_Account": "",
+      "Subcontractor": {},
+      "Sales_Rep_Lookup": {},
+      "ID": "4663646000004613011"
+    },
+    {
+      "Email": "gtrintegration@dcnexgen.com",
+      "Active_Detail_Window": "4663646000001317143",
+      "Profile_Picture": "",
+      "Calling_Number": "",
+      "Phone_Number": "",
+      "Calling_Name": "",
+      "In_Call": "false",
+      "Name": {
+        "prefix": "",
+        "last_name": "Integration",
+        "suffix": "",
+        "first_name": "GTR ",
+        "zc_display_value": "GTR  Integration"
+      },
+      "Role": "Project Manager",
+      "Zoho_Account": "",
+      "Customer_Lookup": {},
+      "Portal_Account": "",
+      "Subcontractor": {},
+      "Sales_Rep_Lookup": {},
+      "ID": "4663646000004413005"
+    },
+    // ... (Include the rest of the user objects from your file here) ...
+    {
+      "Email": "admin@dcnexgen.com",
+      "Active_Detail_Window": "4663646000001317143",
+      "Profile_Picture": "/api/v2.1/nexgenroofingandsolar/nexgen-portal/report/PM_Kanban_Users/4663646000001940051/Profile_Picture/download?filepath=1739839790344_Untitled_design__7_.png",
+      "Calling_Number": "",
+      "Phone_Number": "+15713636506",
+      "Calling_Name": "",
+      "In_Call": "false",
+      "Name": {
+        "prefix": "",
+        "last_name": "Ensermu",
+        "suffix": "",
+        "first_name": "Waqgari",
+        "zc_display_value": "Waqgari Ensermu"
+      },
+      "Role": "Admin",
+      "Zoho_Account": "nexgenroofingandsolar",
+      "Customer_Lookup": {},
+      "Portal_Account": "",
+      "Subcontractor": {},
+      "Sales_Rep_Lookup": {},
+      "ID": "4663646000001940051"
+    }
+  ]
+}
+```
+
+## Raw Data Example: Sales Reps (getRecords)
+
+This example shows the typical structure of the data returned when fetching the list of sales reps from the `PM_Kanban_Sales_Reps` report.
+
+```json
+{
+  "code": 3000,
+  "data": [
+    {
+      "Email": "engineering@gogreensolutions.co",
+      "Active_Detail_Window": "",
+      "Profile_Picture": "",
+      "Calling_Number": "",
+      "Phone_Number": "",
+      "Calling_Name": "",
+      "In_Call": "false",
+      "Name": {
+        "prefix": "",
+        "last_name": "M",
+        "suffix": "",
+        "first_name": "Deep",
+        "zc_display_value": "Deep M"
+      },
+      "Role": "Admin",
+      "Zoho_Account": "",
+      "Customer_Lookup": {},
+      "Portal_Account": "",
+      "Subcontractor": {},
+      "Sales_Rep_Lookup": {},
+      "ID": "4663646000004613011"
+    },
+    {
+      "Email": "gtrintegration@dcnexgen.com",
+      "Active_Detail_Window": "4663646000001317143",
+      "Profile_Picture": "",
+      "Calling_Number": "",
+      "Phone_Number": "",
+      "Calling_Name": "",
+      "In_Call": "false",
+      "Name": {
+        "prefix": "",
+        "last_name": "Integration",
+        "suffix": "",
+        "first_name": "GTR ",
+        "zc_display_value": "GTR  Integration"
+      },
+      "Role": "Project Manager",
+      "Zoho_Account": "",
+      "Customer_Lookup": {},
+      "Portal_Account": "",
+      "Subcontractor": {},
+      "Sales_Rep_Lookup": {},
+      "ID": "4663646000004413005"
+    },
+    // ... (Include the rest of the Sales Rep / User objects from your file here) ...
+    {
+      "Email": "carl@zenparcels.com",
+      "Active_Detail_Window": "",
+      "Profile_Picture": "",
+      "Calling_Number": "",
+      "Phone_Number": "+13019962196",
+      "Calling_Name": "",
+      "In_Call": "false",
+      "Name": {
+        "prefix": "",
+        "last_name": "Stanton",
+        "suffix": "",
+        "first_name": "Carl",
+        "zc_display_value": "Carl Stanton"
+      },
+      "Role": "Sales Rep",
+      "Zoho_Account": "",
+      "Customer_Lookup": {},
+      "Portal_Account": "",
+      "Subcontractor": {},
+      "Sales_Rep_Lookup": {
+        "Name.last_name": "Stanton",
+        "Name.prefix": "",
+        "ID": "4663646000002417300",
+        "Name.suffix": "",
+        "zc_display_value": "   Carl Stanton  ",
+        "Name.first_name": "Carl"
+      },
+      "ID": "4663646000003538170"
+    }
+  ]
+}
+```
+
+## Raw Data Example: Sales Organizations (getRecords)
+
+This example shows the typical structure of the data returned when fetching the list of sales organizations from the `All_Sales_Organizations` report. Note the `Projects` and `Members` fields are related lists.
+
+```json
+{
+  "code": 3000,
+  "data": [
+    {
+      "Org_Name": "NexGenNE",
+      "Auto_Update": "false",
+      "Sales_Manager": {
+        "Name.last_name": "Lombardo",
+        "Name.prefix": "",
+        "ID": "4663646000002417168",
+        "Name.suffix": "",
+        "zc_display_value": "   Tom Lombardo  ",
+        "Name.first_name": "Tom"
+      },
+      "Projects": [
+        {
+          "Site_Address.state_province": "DC",
+          "Site_Address.district_city": "Washington",
+          "Site_Address.address_line_1": "3708 Harrison St NW",
+          "ID": "4663646000001311010",
+          "Site_Address.address_line_2": "",
+          "zc_display_value": " 3708 Harrison St NW   Washington DC"
+        },
+        // ... (omitting other projects for brevity) ...
+        {
+          "Site_Address.state_province": "DC",
+          "Site_Address.district_city": "Washington",
+          "Site_Address.address_line_1": "1309 Hamilton St NW",
+          "ID": "4663646000004684038",
+          "Site_Address.address_line_2": "",
+          "zc_display_value": " 1309 Hamilton St NW   Washington DC"
+        }
+      ],
+      "ID": "4663646000003753011",
+      "OpenSolar_ID": "",
+      "Members": [
+        {
+          "Name.last_name": "Ahtsham",
+          "ID": "4663646000002417140",
+          "Name.first_name": "Ahmed",
+          "zc_display_value": " Ahmed Ahtsham"
+        },
+         // ... (omitting other members for brevity) ...
+         {
+          "Name.last_name": "Krahling",
+          "ID": "4663646000002618059",
+          "Name.first_name": "Aaron",
+          "zc_display_value": " Aaron Krahling"
+        }
+      ]
+    },
+    // ... (Include the rest of the Sales Org objects from your file here) ...
+    {
+      "Org_Name": "Garcia and Co",
+      "Auto_Update": "false",
+      "Sales_Manager": {},
+      "Projects": [],
+      "ID": "4663646000001421003",
+      "OpenSolar_ID": "",
+      "Members": []
+    }
+  ]
+}
+```
+
+## Raw Data Example: Tranches (getRecords)
+
+This example shows the typical structure of the data returned when fetching the list of tranches from the `PM_Tranches_Report` report. Note the `Projects` field is a related list showing projects associated with the tranche.
+
+```json
+{
+  "code": 3000,
+  "data": [
+    {
+      "Tranche_Date": "04/20/25",
+      "Tranche_Number": "26",
+      "Projects": [
+        {
+          "Site_Address.state_province": "MD",
+          "Site_Address.district_city": "Silver Spring",
+          "Site_Address.address_line_1": "8430 Georgia Ave",
+          "ID": "4663646000001932055",
+          "Site_Address.address_line_2": "",
+          "zc_display_value": " 8430 Georgia Ave   Silver Spring MD"
+        },
+        // ... (omitting other projects for brevity) ...
+        {
+          "Site_Address.state_province": "MD",
+          "Site_Address.district_city": "Capitol Heights",
+          "Site_Address.address_line_1": "105 69th St",
+          "ID": "4663646000003574029",
+          "Site_Address.address_line_2": "",
+          "zc_display_value": " 105 69th St   Capitol Heights MD"
+        }
+      ],
+      "ID": "4663646000004681003"
+    },
+    // ... (Include the rest of the tranche objects from your file here) ...
+    {
+      "Tranche_Date": "08/22/24",
+      "Tranche_Number": "1",
+      "Projects": [
+         // ... project list ...
+      ],
+      "ID": "4663646000003643043"
+    }
+  ]
+}
+```
+
+## Raw Data Example: Init Params (getInitParams)
+
+This example shows the typical structure of the data returned by `ZOHO.CREATOR.UTIL.getInitParams()`. It provides basic information about the current application context and the logged-in user.
+
+```json
+{
+  "scope": "nexgenroofingandsolar",
+  "envUrlFragment": "",
+  "appLinkName": "nexgen-portal",
+  "loginUser": "admin@dcnexgen.com"
+}
+```
+
+## Raw Data Example: Equipment (getRecords)
+
+This example shows the typical structure of the data returned when fetching the list of equipment items from the `PM_Kanban_Equipment` report.
+
+```json
+{
+  "code": 3000,
+  "data": [
+    {
+      "Equipment_Type": "Battery",
+      "Model": "aPower",
+      "Manufacturer": "FranklinWH",
+      "ID": "4663646000003459056",
+      "Cost": "0.00"
+    },
+    {
+      "Equipment_Type": "Battery",
+      "Model": "FRHNO-48143-G2",
+      "Manufacturer": "BigBattery, Inc.",
+      "ID": "4663646000003459052",
+      "Cost": "0.00"
+    },
+    // ... (Include the rest of the equipment objects from your file here) ...
+    {
+      "Equipment_Type": "Other Component",
+      "Model": "BW225WDP",
+      "Manufacturer": "Asea Brown Boveri (ABB Ltd.)",
+      "ID": "4663646000001212006",
+      "Cost": "0.00"
+    }
+  ]
+}
+```
+
+## Raw Data Example: Document Types (getRecords)
+
+This example shows the typical structure of the data returned when fetching the list of document types from the `All_Document_Types` report (used for classifying uploaded documents).
+
+```json
+{
+  "code": 3000,
+  "data": [
+    {
+      "ID": "4663646000004435365",
+      "Name": "Structural Letter",
+      "Include_In_Checklist": "false"
+    },
+    {
+      "ID": "4663646000004432003",
+      "Name": "Utility Bill",
+      "Include_In_Checklist": "true"
+    },
+    // ... (Include the rest of the document type objects from your file here) ...
+    {
+      "ID": "4663646000004407699",
+      "Name": "Proof of Ownership",
+      "Include_In_Checklist": "true"
+    }
+  ]
+}
+```
+
+
+

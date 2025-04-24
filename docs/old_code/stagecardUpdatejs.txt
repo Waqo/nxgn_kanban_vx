@@ -1,0 +1,87 @@
+export const updateProjectStage = async (projectId, stageId) => {
+    try {
+        console.log('Starting updateProjectStage with:', { projectId, stageId });
+
+
+
+        // Update the record directly with the stage ID
+        const updateConfig = {
+            app_name: "nexgen-portal",
+            report_name: "PM_Kanban_Projects",
+            id: projectId,
+            payload: {
+                data: {
+                    New_Stage: stageId
+                }
+            }
+        };
+        console.log('Updating record with config:', updateConfig);
+
+        const response = await ZOHO.CREATOR.DATA.updateRecordById(updateConfig);
+        console.log('Update response:', response);
+        
+        if (response.code !== 3000) {
+            console.error('Update failed with code:', response.code);
+            throw new Error("Failed to update stage");
+        }
+        return response;
+    } catch (error) {
+        console.error("Error updating stage:", error);
+        if (error.responseText) {
+            try {
+                const errorDetails = JSON.parse(error.responseText);
+                console.error('Detailed error:', errorDetails);
+            } catch (e) {
+                console.error('Raw error response:', error.responseText);
+            }
+        }
+        throw error;
+    }
+};
+
+export const updateProjectTranche = async (projectId, trancheId) => {
+    try {
+        console.log('Starting updateProjectTranche with:', { projectId, trancheId });
+
+        // Ensure clean data
+        const cleanData = {
+            data: {
+                Tranche: trancheId 
+            }
+        };
+
+        const config = {
+            app_name: "nexgen-portal",
+            report_name: "PM_Kanban_Projects",
+            id: projectId,
+            payload: {
+                data: {
+                    Tranche: trancheId
+                }
+            }
+        };
+        console.log('Update tranche config:', config);
+
+        const response = await ZOHO.CREATOR.DATA.updateRecordById(config);
+        console.log('Tranche update response:', response);
+        
+        if (response.code !== 3000) {
+            console.error('Tranche update failed with code:', response.code);
+            throw new Error('Failed to update project tranche');
+        }
+
+        return response;
+    } catch (error) {
+        console.error('Error updating project tranche:', error);
+        // Log additional error details if available
+        if (error.responseText) {
+            try {
+                const errorDetails = JSON.parse(error.responseText);
+                console.error('Detailed tranche error:', errorDetails);
+            } catch (e) {
+                console.error('Raw tranche error response:', error.responseText);
+            }
+        }
+        throw error;
+    }
+};

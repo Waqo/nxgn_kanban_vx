@@ -1,0 +1,1063 @@
+# Schema Definitions
+
+## Entity: Project (Source: Add_Project Form / PM_Kanban_Projects Report)
+
+This is the main entity representing a solar project.
+
+```javascript
+{
+  // --- Record ID ---
+  // Field: ID
+  //   - API Name: ID
+  //   - Zoho Type: Autonumber / Record ID (System Generated)
+  //   - Processed Name: id
+  //   - Availability: both
+  //   - Raw Example: "4663646000001508002"
+  //   - Notes: Unique identifier for the project record.
+  ID: String,
+
+  // --- Core Project Info ---
+  // Field: Owner_Name
+  //   - API Name: Owner_Name
+  //   - Zoho Type: Picklist (Lookup to Add_Contact)
+  //   - Processed Name: contactName, contactID, contactFirstName, contactLastName, contactEmail, contactPhone
+  //   - Availability: both (structure varies slightly)
+  //   - Raw Example (getRecordById): {"Name.last_name": "Roberts (Demo)", "ID": "4663646000001508005", "zc_display_value": " Michelle Roberts (Demo)", "Name.first_name": "Michelle"}
+  //   - Raw Example (getRecords): {"Name.last_name": "Roberts (Demo)", "ID": "4663646000001508005", "zc_display_value": " Michelle Roberts (Demo)", "Name.first_name": "Michelle"} 
+  //   - Raw Example (getRecordById also returns Owner_Name.Phone_Number, Owner_Name.Email which are fetched implicitly)
+  //   - Notes: Lookup to the primary contact(s). Processed into multiple fields in Vuex state.
+  Owner_Name: Object, 
+  "Owner_Name.Email": String, // Availability: both
+  "Owner_Name.Phone_Number": String, // Availability: both
+
+  // Field: Site_Address
+  //   - API Name: Site_Address
+  //   - Zoho Type: Address
+  //   - Processed Name: address, addressLine1, city, state, zip, country, latitude, longitude
+  //   - Availability: both
+  //   - Raw Example: {"country": "United States", "district_city": "Atherton", "latitude": "37.453773", "address_line_1": "230 Valparaiso Ave (Demo)", "state_province": "CA", "address_line_2": "", "postal_code": "94027", "zc_display_value": "230 Valparaiso Ave (Demo), Atherton, CA, 94027, United States", "longitude": "-122.2058272"}
+  //   - Notes: Processed into multiple fields in Vuex state. Lat/Lon might be hidden on form but captured.
+  Site_Address: Object,
+
+  // Field: New_Stage
+  //   - API Name: New_Stage
+  //   - Zoho Type: Picklist (Lookup to Add_Stage)
+  //   - Processed Name: stageField (Object: { ID, title, display_value })
+  //   - Availability: both
+  //   - Raw Example: {"Stage_Name": "Pre-Sale", "ID": "4663646000002634108", "zc_display_value": "Pre-Sale"}
+  //   - Notes: The primary stage lookup used in the Kanban view.
+  New_Stage: Object,
+
+  // Field: Stage
+  //   - API Name: Stage
+  //   - Zoho Type: Picklist
+  //   - Processed Name: N/A (Likely superseded by New_Stage)
+  //   - Availability: getRecords (Observed), getRecordById (Observed)
+  //   - Raw Example: "Pre-Sale"
+  //   - Notes: Simple picklist, seems less used than the New_Stage lookup.
+  Stage: String,
+
+  // Field: Previous_Stage_ID
+  //   - API Name: Previous_Stage_ID
+  //   - Zoho Type: Text
+  //   - Processed Name: N/A
+  //   - Availability: form_only (Not observed in examples)
+  //   - Notes: Likely used internally for workflow automation.
+  Previous_Stage_ID: String,
+
+  // Field: Stage_Last_Updated
+  //   - API Name: Stage_Last_Updated
+  //   - Zoho Type: Date
+  //   - Processed Name: N/A
+  //   - Availability: form_only (Not observed in examples)
+  Stage_Last_Updated: String,
+  
+  // Field: OpenSolar_Project_ID
+  //   - API Name: OpenSolar_Project_ID
+  //   - Zoho Type: Number
+  //   - Processed Name: os_id 
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: "4221999"
+  OpenSolar_Project_ID: String, // Stored as String in response despite Number type
+
+  // Field: OpenSolar_Stage
+  //   - API Name: OpenSolar_Stage
+  //   - Zoho Type: Picklist
+  //   - Processed Name: osStage
+  //   - Availability: both
+  //   - Raw Example: "Proposal Design"
+  OpenSolar_Stage: String,
+  
+  // Field: Aduu_Solar_Portal_ID1
+  //   - API Name: Aduu_Solar_Portal_ID1
+  //   - Zoho Type: Text
+  //   - Processed Name: aduuPortalID
+  //   - Availability: both
+  //   - Raw Example: "" or "DAA306E8"
+  Aduu_Solar_Portal_ID1: String,
+  
+  // Field: Is_Demo
+  //   - API Name: Is_Demo
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: Is_Demo
+  //   - Availability: getRecords (Observed), getRecordById (Observed)
+  //   - Raw Example: "true" / "false"
+  //   - Notes: Processed as boolean in Vuex.
+  Is_Demo: String,
+
+  // Field: Need_Help
+  //   - API Name: Need_Help
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: Need_Help
+  //   - Availability: getRecords (Observed), getRecordById (Observed)
+  //   - Raw Example: "true" / "false"
+  //   - Notes: Processed as boolean in Vuex.
+  Need_Help: String,
+
+  // Field: Commercial
+  //   - API Name: Commercial
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: Commercial
+  //   - Availability: getRecords (Observed), getRecordById (Observed)
+  //   - Raw Example: "true" / "false"
+  //   - Notes: Processed as boolean in Vuex.
+  Commercial: String,
+
+  // Field: Tags
+  //   - API Name: Tags
+  //   - Zoho Type: List (Lookup to Add_Tags)
+  //   - Processed Name: Tags (raw), processedTags (mapped with color/etc.)
+  //   - Availability: both (content varies)
+  //   - Raw Example (getRecords): [] or [{"Tag_Name": "No Contact Information", "ID": "4663646000002641153", "zc_display_value": "No Contact Information"}]
+  //   - Raw Example (getRecordById): [] or [{"ID": "4663646000002623003", "Tag_Name": "On MD Feeder Map", "zc_display_value": "On MD Feeder Map"}] (Note: getRecordById example seems to lack Tag_Name in raw data but shows it in zc_display_value)
+  //   - Notes: Array of lookup objects. Processed in Vuex using the tagsMap lookup.
+  Tags: Array, 
+  
+  // --- Sales Rep Info ---
+  // Field: Sales_Rep
+  //   - API Name: Sales_Rep
+  //   - Zoho Type: Picklist (Lookup to Add_Sales_Rep)
+  //   - Processed Name: salesRep (Object: { id, name, email, phone, organization, ...rates }), salesRepName (String)
+  //   - Availability: both (structure varies slightly)
+  //   - Raw Example (getRecordById): {"Name.last_name": "Test", "Name.prefix": "", "ID": "4663646000002417172", "Name.suffix": "", "zc_display_value": "   Johnny Test  ", "Name.first_name": "Johnny"}
+  //   - Raw Example (getRecords): {"Name.last_name": "Test", "Name.prefix": "", "ID": "4663646000002417172", "Name.suffix": "", "zc_display_value": "   Johnny Test  ", "Name.first_name": "Johnny"}
+  //   - Raw Example (getRecordById also returns Sales_Rep.Email, Sales_Rep.Phone implicitly)
+  //   - Notes: Lookup to the sales representative. Processed into an object in Vuex state.
+  Sales_Rep: Object,
+  "Sales_Rep.Email": String, // Availability: both
+  "Sales_Rep.Phone": String, // Availability: both
+
+  // Field: Sales_Org
+  //   - API Name: Sales_Org
+  //   - Zoho Type: Picklist (Lookup to Add_Sales_Org)
+  //   - Processed Name: salesRepOrg (String), Sales_Org (Object)
+  //   - Availability: getRecords (Observed), getRecordById (Observed)
+  //   - Raw Example: {"Org_Name": "Demo Org", "ID": "4663646000001438003", "zc_display_value": "Demo Org"}
+  //   - Notes: Lookup to the sales organization.
+  Sales_Org: Object,
+  
+  // --- System Info ---
+  // Field: kW_STC
+  //   - API Name: kW_STC
+  //   - Zoho Type: Decimal
+  //   - Processed Name: systemSize, kW_STC
+  //   - Availability: getRecords (Observed), getRecordById (Observed)
+  //   - Raw Example: "8.84"
+  //   - Notes: Processed as Number (systemSize) in Vuex.
+  kW_STC: String,
+
+  // Field: Annual_Usage
+  //   - API Name: Annual_Usage
+  //   - Zoho Type: Decimal
+  //   - Processed Name: annualUsage
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: "27560.00"
+  Annual_Usage: String, // Processed as Number
+
+  // Field: Annual_Output_kWh
+  //   - API Name: Annual_Output_kWh
+  //   - Zoho Type: Number
+  //   - Processed Name: annualOutput
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: "" (can be number)
+  Annual_Output_kWh: String, // Processed as Number
+
+  // Field: Offset
+  //   - API Name: Offset
+  //   - Zoho Type: Formula
+  //   - Processed Name: offset (String)
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: "" (depends on formula result)
+  Offset: String, // Formatted as percentage string in processor? Check schema.
+
+  // Field: Yield
+  //   - API Name: Yield
+  //   - Zoho Type: Formula
+  //   - Processed Name: Yield (Number)
+  //   - Availability: getRecords (Observed), getRecordById (Observed)
+  //   - Raw Example: "" or "1137.0625662778366"
+  //   - Notes: Processed as Number in Vuex.
+  Yield: String, 
+
+  // Field: Yield_Less
+  //   - API Name: Yield_Less
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: yieldLessThan1050
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: "false"
+  //   - Notes: Processed as boolean.
+  Yield_Less: String,
+
+  // --- Payment Info ---
+  // Field: Is_Cash_Finance
+  //   - API Name: Is_Cash_Finance
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: isCashDeal, Is_Cash_Finance
+  //   - Availability: getRecords (Observed), getRecordById (Observed)
+  //   - Raw Example: "true" / "false"
+  //   - Notes: Processed as boolean (isCashDeal) in Vuex.
+  Is_Cash_Finance: String,
+
+  // Field: Payment_Option
+  //   - API Name: Payment_Option
+  //   - Zoho Type: Text
+  //   - Processed Name: paymentOption
+  //   - Availability: getRecords (Observed), getRecordById (Observed)
+  //   - Raw Example: "Sungage - 20 years 5.99%" or ""
+  Payment_Option: String,
+  
+  // Field: Is_PPA
+  //   - API Name: Is_PPA
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: isPPA (String)
+  //   - Availability: getRecords (Observed), getRecordById (Observed)
+  //   - Raw Example: "false" / "true"
+  Is_PPA: String,
+  
+  // Field: PPA_Rate
+  //   - API Name: PPA_Rate
+  //   - Zoho Type: Picklist
+  //   - Processed Name: ppaRate (Number)
+  //   - Availability: getRecords (Observed), getRecordById (Observed)
+  //   - Raw Example: "" or "0.00"
+  //   - Notes: Processed as Number.
+  PPA_Rate: String,
+  
+  // --- Dates ---
+  // Field: Date_Sold
+  //   - API Name: Date_Sold
+  //   - Zoho Type: Date
+  //   - Processed Name: dateSold
+  //   - Availability: both
+  //   - Raw Example: "" or "09/18/24"
+  Date_Sold: String,
+
+  // Field: Install_Date
+  //   - API Name: Install_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: installDate
+  //   - Availability: both
+  //   - Raw Example: "" 
+  Install_Date: String,
+
+  // Field: Approximate_Installation_Date
+  //   - API Name: Approximate_Installation_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: approxInstallDate
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: ""
+  Approximate_Installation_Date: String,
+
+  // Field: NTP_Date
+  //   - API Name: NTP_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: N/A (Available in detail view)
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: ""
+  NTP_Date: String,
+
+  // Field: Permit_Approval_Date
+  //   - API Name: Permit_Approval_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: N/A (Available in detail view)
+  //   - Availability: form_only (Not observed in examples, likely in Permitting subform/grid)
+  Permit_Approval_Date: String,
+
+  // Field: Interconnection_Approval_Date
+  //   - API Name: Interconnection_Approval_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: N/A (Available in detail view)
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: ""
+  Interconnection_Approval_Date: String,
+
+  // Field: PTO_Submission_Date
+  //   - API Name: PTO_Submission_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: N/A (Available in detail view)
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: ""
+  PTO_Submission_Date: String,
+
+  // Field: PTO_Approval_Date
+  //   - API Name: PTO_Approval_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: N/A (Available in detail view)
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: ""
+  PTO_Approval_Date: String,
+  
+  // Field: System_Turned_On_Date
+  //   - API Name: System_Turned_On_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: N/A (Available in detail view)
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: ""
+  System_Turned_On_Date: String,
+
+  // Field: M1_Paid_Date, M1_Release_Date, M2_Paid_Date, M2_Release_Date, M3_Paid_Date
+  //   - API Names: M1_Paid_Date, M1_Release_Date, M2_Paid_Date, M2_Release_Date, M3_Paid_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: M1_Paid_Date, M1_Release_Date, M2_Paid_Date, M2_Release_Date, M3_Paid_Date
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: ""
+  M1_Paid_Date: String,
+  M1_Release_Date: String, // Not in getRecordById example
+  M2_Paid_Date: String, // Not in getRecordById example
+  M2_Release_Date: String, // Availability: getRecordById (Observed)
+  M3_Paid_Date: String, // Availability: getRecordById (Observed)
+
+  // Field: Comm_Advance_Paid_Date
+  //   - API Name: Comm_Advance_Paid_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: Comm_Advance_Paid_Date
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: ""
+  Comm_Advance_Paid_Date: String,
+
+  // Field: Submitted_to_Redball
+  //   - API Name: Submitted_to_Redball
+  //   - Zoho Type: Date
+  //   - Processed Name: redballSubmissionDate
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: ""
+  Submitted_to_Redball: String,
+  
+  // Field: Investor_M1_Date, Investor_M2_Date, Investor_M3_Date
+  //   - API Names: Investor_M1_Date, Investor_M2_Date, Investor_M3_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: investorM1Date, investorM2Date, investorM3Date
+  //   - Availability: getRecordById (Observed)
+  //   - Raw Example: ""
+  Investor_M1_Date: String,
+  Investor_M2_Date: String, 
+  Investor_M3_Date: String,
+
+  // --- Event Bookings & Statuses (Datetimes & Picklists) ---
+  Survey_Date_Time: String, // Processed: surveyBooking, Availability: getRecordById (Observed)
+  Survey_Status: String, // Processed: surveyStatus, Availability: getRecordById (Observed)
+  Roof_Work_Date_Time: String, // Processed: roofWorkBooking, Availability: getRecordById (Observed)
+  Roof_Work_Status: String, // Processed: roofWorkStatus, Availability: getRecords(Observed), getRecordById (Observed)
+  Tree_Work_Date_Time: String, // Processed: treeWorkBooking, Availability: getRecordById (Observed)
+  Tree_Work_Status: String, // Processed: treeWorkStatus, Availability: getRecords(Observed), getRecordById (Observed)
+  PU_Work_Date_Time: String, // Processed: puWorkBooking, Availability: getRecordById (Observed)
+  PU_Work_Status: String, // Processed: panelUpgradeStatus, Availability: getRecords(Observed), getRecordById (Observed)
+  Installation_Date_Time: String, // Processed: installationBooking, Availability: getRecords(Observed), getRecordById (Observed)
+  Installation_Status: String, // Processed: installationStatus, Availability: getRecordById (Observed)
+  Final_Inspection_Date_Time: String, // Processed: finalInspectionBooking, Availability: getRecordById (Observed)
+  Final_Inspection_Status: String, // Processed: finalInspectionStatus, Availability: getRecordById (Observed)
+  
+  // --- Investor Fields ---
+  Project_Cost: String, // Processed: projectCost (Number), Availability: getRecords(Observed), getRecordById (Observed)
+  Calculated_Project_Cost: String, // Processed: calcProjectCost (Number), Availability: getRecords(Observed), getRecordById (Observed)
+  PTO_Funded: String, // Processed: ptoFunded (Boolean), Availability: getRecordById (Observed)
+  Investor_M1_Payment: String, // Processed: investorM1Payment (Number), Availability: getRecords(Observed), getRecordById (Observed)
+  Investor_M2_Payment: String, // Processed: investorM2Payment (Number), Availability: getRecords(Observed), getRecordById (Observed)
+  Investor_M3_Payment: String, // Processed: investorM3Payment (Number), Availability: getRecords(Observed), getRecordById (Observed)
+  Applicable_Rate: String, // Processed: applicableRate (Number), Availability: getRecords(Observed), getRecordById (Observed)
+  Domestic_Content: String, // Processed: isDomesticContent (Boolean), Availability: getRecords(Observed), getRecordById (Observed)
+  Rate_Year: String, // Processed: rateYear (Number), Availability: getRecordById (Observed)
+  Funded_By_Redball: String, // Processed: fundedByRedball (Boolean), Availability: getRecords(Observed), getRecordById (Observed)
+
+  // --- Commission Fields ---
+  Active_Commission_Rate: String, // Processed: activeCommissionRate (Number), Availability: getRecords(Observed), getRecordById (Observed)
+  M1_Amount: String, // Processed: M1_Amount (Number), Availability: getRecords(Observed), getRecordById (Observed)
+  M1_Status: String, // Processed: M1_Status (String), Availability: getRecordById (Observed)
+  M2_Amount: String, // Processed: M2_Amount (Number), Availability: getRecords(Observed), getRecordById (Observed)
+  M2_Status: String, // Processed: M2_Status (String), Availability: getRecordById (Observed)
+  M3_Amount: String, // Processed: M3_Amount (Number), Availability: getRecords(Observed), getRecordById (Observed)
+  M3_Status: String, // Processed: M3_Status (String), Availability: getRecordById (Observed)
+  Total_Commission_Advance: String, // Processed: Total_Commission_Advance (Number), Availability: getRecords(Observed), getRecordById (Observed)
+  Commission_Advance_Status: String, // Processed: Commission_Advance_Status (String), Availability: getRecords(Observed), getRecordById (Observed)
+
+  // --- Property & Site Info ---
+  Property_Database_Ownership_Info: String, // Processed: propertyInfo, Availability: getRecordById (Observed)
+  Roof_Type: String, // Processed: roofType, Availability: getRecords(Observed), getRecordById (Observed)
+  // Roof_Material1: Picklist // Processed: N/A, Availability: form_only
+  
+  // --- WorkDrive / Folder Info ---
+  Project_Folder_ID: String, // Processed: project_folder, Availability: getRecordById (Observed)
+  Project_Investor_Folder_Id: String, // Processed: investor_folder, Availability: getRecordById (Observed)
+  Project_Folder_Link: Object, // URL Type, Availability: getRecordById (Observed)
+  Project_Investor_Folder_Link: Object, // URL Type, Availability: getRecordById (Observed)
+
+  // --- Checklist Fields (Mostly Form Only) ---
+  // Signed_Contract: String, // Checkbox
+  // Utility_Bill: String, // Checkbox
+  // Proof_of_Ownership: String, // Checkbox
+  // Proposal: String, // Checkbox
+  // Interconnection_Form: String, // Checkbox
+  // Plan_Set_with_Stamp: String, // Checkbox
+  // Structural_Letter: String, // Checkbox
+  // Electrical_Letter: String, // Checkbox
+  // Shade_Report: String, // Checkbox
+  // Site_Survey_Report: String, // Checkbox
+  // Permission_To_Operate: String, // Checkbox
+  // Building_Permit: String, // Checkbox
+  // Electrical_Permit: String, // Checkbox
+  // Final_Inspection: String, // Checkbox
+  // Feeder_Image: String, // Checkbox
+  // Copy_of_Residential_Project_List: String, // Checkbox
+  // As_Built_Production_Report: String, // Checkbox
+  // RGM_Information: String, // Checkbox
+  // Transfer_of_SRECS: String, // Checkbox
+  // Other_SFA_Files: String, // Checkbox
+  // Owner_Property_ID: String, // Checkbox
+  // Relationship_Letter: String, // Checkbox
+  // ATI: String, // Checkbox
+  // Yield_Report: String, // Checkbox
+  // Yield_Report_with_Tree_Trimming: String, // Checkbox
+  // Yield_Report_without_Tree_Trimming: String, // Checkbox
+  // Tree_Trimming_Invoice: String, // Checkbox
+  // MPU_Invoice: String, // Checkbox
+  // Roofing_Invoice: String, // Checkbox
+  // PTO_Submitted: String, // Checkbox
+  // System_Turned_On: String, // Checkbox
+  // PEPCO_ATO: String, // Checkbox
+  // Redball_ATO: String, // Checkbox
+  // PEPCO_As_Built: String, // Checkbox
+  // Redball_As_Built: String, // Checkbox
+  // TES_Inspection_Report: String, // Checkbox
+  // Final_Signed_Contract: String, // Checkbox
+  // Utility_Account_Number_Received: String, // Checkbox
+  // Relationship_Letter_Missing: String, // Checkbox
+  // Plan_Set_Matches_Contract: String, // Checkbox
+  // Permit_Updated: String, // Checkbox
+  // Installation_Pictures_Received: String, // Checkbox
+  // Inspection_Complete: String, // Checkbox
+  // EE_Stamp: String, // Checkbox
+  // Structural_Stamp: String, // Checkbox
+  // Is_Equipment_Purchased: String, // Checkbox
+  // Customer_Confirmation_Call_for_Install: String, // Checkbox
+  // Inspection_Scheduled: String, // Checkbox
+  // UtilityAPI_Authorized: String, // Checkbox
+
+  // --- System Fields ---
+  Added_Time: String, // Processed: addedTime, Availability: both
+  Added_User: String, // Processed: N/A, Availability: both
+  Modified_Time: String, // Processed: Modified_Time, Availability: getRecords(Observed), getRecordById(Observed)
+  Modified_User: String, // Processed: N/A, Availability: getRecords(Observed), getRecordById(Observed)
+  Created_On: String, // Processed: N/A, Availability: getRecordById(Observed) (Likely same as Added_Time)
+  
+  // --- Related Lists (Grids/SubForms) ---
+  // These are typically fetched or expanded in the getRecordById call.
+  // Their internal structure depends on their respective forms (e.g., Add_Note, Add_Document).
+  Activities: Array, // Availability: both (structure varies)
+  Communications: Array, // Availability: getRecordById (Observed)
+  Documents: Array, // Availability: both (structure varies)
+  Bill_of_Materials: Array, // Processed: materials, Availability: getRecordById (Observed)
+  Notes: Array, // Availability: both (structure varies)
+  Permitting: Array, // Availability: both (structure varies)
+  Survey_Results: Array, // Availability: both (structure varies)
+  Issues: Array, // Availability: both (structure varies)
+  Contacts1: Array, // Processed: contacts (separate fetch likely), Availability: getRecordById (Observed)
+  System_Summary: Array, // Availability: getRecords(Observed), getRecordById (Observed)
+  Note_Attachments: Array, // Availability: getRecords(Observed), getRecordById (Observed)
+
+  // --- Other Fields (Potentially unused or only in Form Script/Detail View) ---
+  // Utility_Account_Number: String, 
+  // Salesperson_Commission_Decision: String, 
+  // County_AHJ: String, 
+  // Offset_Percentage: String, 
+  // DC_Wattage: String, 
+  // Owner_ID_Link: Object, 
+  // System_Size_on_Shade_Report_kW: String, 
+  // OpenSolar_Proposal_Link: Object, 
+  // Annual_Output_kWh: String, 
+  // Rate_Year: String, 
+  // Final_Signed_Contract_File: String, 
+  // Finance_Company: String, 
+  // Lead_Source: String, 
+  // Street_View_Image: String, 
+  // Tree_Trimming: String, 
+  // Tranche_ID: String, 
+  // Meter_Number: String, 
+  // Renter_Co_Owner_Authorized_Signer: Array, 
+  // Roof_Upgrade: String, 
+  // Business_Name: String, 
+  // Roof_Material: String, 
+  // GTR_ID: String, 
+  // Secondary_Roof_Type: String, 
+  // Panel_Upgrade1: String, 
+  // Current_Panel_Size: String, 
+  // Tree_Location: String, 
+  // Utility_Bill_Link: Object, 
+  // Proof_of_Ownership_Link: Object, 
+  // MD_Feeder: Object, 
+  // Site_Survey_Date: String, 
+  // Owner_ID_File: String, 
+  // Utility_Bill_Upload: String, 
+  // Ownership_Check: String, 
+  // Project_ID_Generator: String, 
+  // Trello_Card_ID: String, 
+  // Trello_List_ID: String, 
+  // Trello_Board_ID: String, 
+  // Trello_Import_Stage_1: String, 
+  // Trello_Import_Stage_2: String, 
+  // Trello_Import_Stage_3: String, 
+  // Trello_Logs: String, 
+  // Newly_Uploaded: String, 
+  // Bad_Address: String, 
+  // WorkDrive_Folder_Created: String, 
+  // Workdrive_Folder_Name_Updated: String, 
+  // Folder_Processing_Date: String, 
+  // Doc_Processing_Date: String, 
+  // AUTO_Salesperson_Updated: String, 
+  // CrmID: String, 
+  // OpenSolar_Updated: String, 
+  // Update_Logs: String, 
+  // Folder_Download_Link: Object, 
+  // Folder_Thumbnail_Link: Object, 
+  // Investor_Folder_Download_Link: Object, 
+  // Investor_Folder_Thumbnail_Link: Object, 
+  // Investor_Folder_Embed_Link: Object, 
+  // Utility_Bill_Folder_Link: Object, 
+  // Utility_Bill_Folder_ID: String, 
+  // PropInfo_Matching_Address: String, 
+  // PropInfo_Owner_Address: String, 
+  // PropInfo_Owner_Address_2: String, 
+  // PropInfo_Owner_City_Zip: String, 
+  // PropInfo_Owner_Name: String, 
+  // PropInfo_Owner_Name_2: String, 
+  // PropInfo_Care_Taker: String, 
+  // PropInfo_MD_Owner_Occupied_Indicator: String, 
+  // PropInfo_MD_SDAT_URL: String, 
+  // ... plus all the notification date fields ...
+}
+```
+
+## Raw Data Example: getRecords (Kanban Board - Quick View)
+
+This example shows the structure of the data typically returned by `ZOHO.CREATOR.DATA.getRecords` when fetching the initial list of projects for the Kanban board. It usually corresponds to the `quick_view` field set, meaning not all fields available in the form are included. Note the format of lookup fields (like `Owner_Name`, `Sales_Org`, `New_Stage`) and how related list fields (`Permitting`, `Survey_Results`, `Documents`, `Notes`, `Issues`, `Activities`) are returned as arrays (often empty or with minimal data in quick view).
+
+```json
+{
+  "code": 3000,
+  "data": [
+    {
+      "Investor_M3_Payment": "",
+      "kW_STC": "8.84",
+      "Is_Cash_Finance": "true",
+      "Sales_Org": {
+        "Org_Name": "Demo Org",
+        "ID": "4663646000001438003",
+        "zc_display_value": "Demo Org"
+      },
+      "Owner_Name.Phone_Number": "+1 510 383 9594",
+      "Sales_Rep.Phone": "+12025660001",
+      "Active_Commission_Rate": "",
+      "Install_Date": "",
+      "Roof_Type": "",
+      "Stage": "Pre-Sale",
+      "Funded_By_Redball": "false",
+      "Calculated_Project_Cost": "",
+      "ID": "4663646000001508002",
+      "Property_Database_Ownership_Info": "",
+      "Tags": [],
+      "Comm_Advance_Paid_Date": "",
+      "Investor_M1_Payment": "",
+      "Aduu_Solar_Portal_ID1": "",
+      "PU_Work_Status": "",
+      "Installation_Date_Time": "",
+      "PPA_Rate": "",
+      "Tree_Work_Status": "",
+      "NTP_Date": "",
+      "M1_Amount": "",
+      "Owner_Name": {
+        "Name.last_name": "Roberts (Demo)",
+        "ID": "4663646000001508005",
+        "zc_display_value": " Michelle Roberts (Demo)",
+        "Name.first_name": "Michelle"
+      },
+      "Permitting": [],
+      "Applicable_Rate": "",
+      "Is_Approved": "false",
+      "Permission_To_Operate": "false",
+      "Documents": [],
+      "PTO_Approval_Date": "",
+      "Sales_Rep.Email": "enswaq@gmail.com",
+      "Commission_Advance_Status": "",
+      "M2_Status": "",
+      "Investor_M2_Payment": "",
+      "Survey_Results": [],
+      "New_Stage": {
+        "Stage_Name": "Pre-Sale",
+        "ID": "4663646000002634108",
+        "zc_display_value": "Pre-Sale"
+      },
+      "Issues": [
+        {
+          "Is_Resolved": "true",
+          "Issue": "test",
+          "Author": "Tom Lombardo",
+          "ID": "4663646000003182003",
+          "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:50:21,4663646000003182003",
+          "Added_Time": "01/10/25 10:50:21"
+        },
+        {
+          "Is_Resolved": "true",
+          "Issue": "test",
+          "Author": "Tom Lombardo",
+          "ID": "4663646000003182007",
+          "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:50:21,4663646000003182007",
+          "Added_Time": "01/10/25 10:50:21"
+        },
+        {
+          "Is_Resolved": "true",
+          "Issue": "test",
+          "Author": "Tom Lombardo",
+          "ID": "4663646000003182011",
+          "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:50:36,4663646000003182011",
+          "Added_Time": "01/10/25 10:50:36"
+        },
+        {
+          "Is_Resolved": "true",
+          "Issue": "test",
+          "Author": "Waqgari Ensermu",
+          "ID": "4663646000003174123",
+          "zc_display_value": "test,Waqgari Ensermu,true,01/10/25 10:52:16,4663646000003174123",
+          "Added_Time": "01/10/25 10:52:16"
+        },
+        {
+          "Is_Resolved": "true",
+          "Issue": "test",
+          "Author": "Tom Lombardo",
+          "ID": "4663646000003182019",
+          "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:52:27,4663646000003182019",
+          "Added_Time": "01/10/25 10:52:27"
+        }
+      ],
+      "Project_Cost": "",
+      "OpenSolar_Stage": "Proposal Design",
+      "Date_Sold": "",
+      "Investor_M2_Date": "",
+      "Need_Help": "false",
+      "M3_Amount": "",
+      "Sales_Rep": {
+        "Name.last_name": "Test",
+        "Name.prefix": "",
+        "ID": "4663646000002417172",
+        "Name.suffix": "",
+        "zc_display_value": "   Johnny Test  ",
+        "Name.first_name": "Johnny"
+      },
+      "Owner_Name.Email": "michelle@opensolar-demo.com",
+      "Added_User": "Public",
+      "Payment_Option": "Sungage - 20 years 5.99%",
+      "Total_Commission_Advance": "",
+      "Investor_M3_Date": "",
+      "Notes": [
+        {
+          "Replied_To": {},
+          "Note": "test",
+          "Tagged_Users": [
+            {
+              "Name.last_name": "Ensermu",
+              "Name.prefix": "",
+              "ID": "4663646000001940051",
+              "Name.suffix": "",
+              "Name.first_name": "Waqgari",
+              "zc_display_value": "   Waqgari Ensermu  "
+            }
+          ],
+          "Author": "Tom Lombardo",
+          "ID": "4663646000003182015",
+          "Notify_Sales": "true",
+          "zc_display_value": "test,Tom Lombardo,01/10/25 10:50:51,true,,   Waqgari Ensermu  ,4663646000003182015",
+          "Added_Time": "01/10/25 10:50:51"
+        }
+      ],
+      "Is_PPA": "false",
+      "Domestic_Content": "false",
+      "Added_Time": "09/16/24 08:32:43",
+      "Final_Inspection_Date": "",
+      "Activities": [
+        {
+          "Activity": "Your customer has viewed their contract in Docusign",
+          "ID": "4663646000001570015",
+          "Is_Who": "Unknown User",
+          "Where": "OpenSolar",
+          "Created_Date": "09/19/24 15:31:28",
+          "zc_display_value": "Your customer has viewed their contract in Docusign,Unknown User,09/19/24 15:31:28,OpenSolar"
+        }
+      ],
+      "Modified_User": "nexgenroofingandsolar",
+      "Approximate_Installation_Date": "",
+      "Modified_Time": "04/09/25 11:59:55",
+      "System_Summary": [],
+      "Is_Demo": "true",
+      "Roof_Work_Status": "",
+      "Tranche": {},
+      "Note_Attachments": [],
+      "M2_Amount": "",
+      "Commercial": "false",
+      "Site_Address": {
+        "country": "United States",
+        "district_city": "Atherton",
+        "latitude": "37.453773",
+        "address_line_1": "230 Valparaiso Ave (Demo)",
+        "state_province": "CA",
+        "address_line_2": "",
+        "postal_code": "94027",
+        "zc_display_value": "230 Valparaiso Ave (Demo), Atherton, CA, 94027, United States",
+        "longitude": "-122.2058272"
+      },
+      "PTO_Submission_Date": "",
+      "Investor_M1_Date": "",
+      "Yield": "",
+      "M1_Status": "",
+      "M3_Status": ""
+    }
+    // ... potentially more records
+  ],
+  "record_cursor": "9b453ddc63432cc30fa88716b38f015fe1640b0ac4772cea4b9ebaa81c38b0b659874abe16dd68a4ee1158b4643c9eac"
+}
+```
+
+## Raw Data Example: getRecordById (Project Details - Detail View)
+
+This example shows the structure of the data typically returned by `ZOHO.CREATOR.DATA.getRecordById` with `field_config: "detail_view"`. This usually includes most, if not all, fields defined in the form, including related lists with more complete data than the `quick_view` used for the board.
+
+```json
+{
+  "code": 3000,
+  "data": {
+    "Yield_Report_with_Tree_Trimming": "false",
+    "Utility_Account_Number": "",
+    "Second_Site_Survey_Booking_Reminder_Email_Sent": "",
+    "PU_Work_Date_Time": "",
+    "Owner_Name.Phone_Number": "+1 510 383 9594",
+    "Sales_Rep.Phone": "+12025660001",
+    "Survey_Report_Email_Sent": "",
+    "Active_Commission_Rate": "",
+    "Interconnection_Approval_Date": "",
+    "Proof_of_Ownership_File": "",
+    "Stage": "Pre-Sale",
+    "Survey_Status": "",
+    "Tags": [],
+    "Investor_M1_Payment": "",
+    "Salesperson_Commission_Decision": "",
+    "County_AHJ": "",
+    "Offset": "",
+    "Project_Folder_Link": {
+      "value": "Open Project Folder",
+      "url": "https://workdrive.zoho.com/folder/mr3f83a60e1af6a3d4405b2633b0d142aea24"
+    },
+    "Customer_Confirmation_Call_for_Install": "false",
+    "Is_Approved": "false",
+    "NEM_or_CREF": "TBD",
+    "Commission_Advance_Status": "",
+    "System_Turned_On": "false",
+    "M2_Status": "",
+    "Offset_Percentage": "",
+    "UtilityAPI_Authorized": "false",
+    "DC_Wattage": "",
+    "Not_Viable_Email_Sent": "",
+    "OpenSolar_Stage": "Proposal Design",
+    "Date_Sold": "",
+    "Tree_Trimming_Invoice": "false",
+    "Owner_ID_Link": {},
+    "Installation_Status": "",
+    "M3_Amount": "",
+    "System_Size_on_Shade_Report_kW": "",
+    "Plan_Set_with_Stamp": "false",
+    "OpenSolar_Link": {
+      "title": "",
+      "value": "https://app.opensolar.com/#/projects/4221999",
+      "url": "https://app.opensolar.com/#/projects/4221999"
+    },
+    "Relationship_Letter_Link": {},
+    "Ready_for_Inves": "No",
+    "Owner_Property_ID": "false",
+    "OpenSolar_Proposal_Link": {},
+    "Utility_Bill_Request_Stage_Based_Email": "",
+    "Annual_Output_kWh": "",
+    "Roof_Work_Date_Time": "",
+    "Redball_As_Built": "false",
+    "Rate_Year": "",
+    "Final_Signed_Contract_File": "",
+    "Finance_Company": "",
+    "ATI": "false",
+    "Is_Installed": "false",
+    "Lead_Source": "",
+    "Yield": "",
+    "Investor_M3_Payment": "",
+    "Street_View_Image": "https://maps.googleapis.com/maps/api/streetview?size=700x700&location=37.4449416,-122.1972638&pitch=0&fov=90&key=AIzaSyCJ1r8niN2r93HOkZdOyriPaWb0Igq-TdM",
+    "Tree_Trimming": "",
+    "Closed_Sale_with_Booking_Link_Email_Sent": "02/17/25",
+    "Tranche_ID": "",
+    "Submitted_to_Redball": "",
+    "Relationship_Letter_Required": "false",
+    "Meter_Number": "",
+    "Renter_Co_Owner_Authorized_Signer": [],
+    "Roof_Upgrade": "",
+    "Installation_Date_Time": "",
+    "Created_On": "09/16/24 08:32:42",
+    "PPA_Rate": "",
+    "Installation_Complete_Email_Sent": "",
+    "Tree_Work_Status": "",
+    "M3_Paid_Date": "",
+    "Relationship_Letter": "false",
+    "M1_Amount": "",
+    "Assigned_Auditor_has_Verified_ID_Matches": "",
+    "Business_Name": "",
+    "Roofing_Invoice": "false",
+    "Applicable_Rate": "",
+    "Permission_To_Operate": "false",
+    "Project_Cost": "",
+    "Need_Help": "false",
+    "Shade_Report": "false",
+    "Electrical_Permit": "false",
+    "Identification_Matches": "",
+    "Installation_Email_Sent": "",
+    "PTO_Email_Sent": "",
+    "Sales_Rep": {
+      "Name.last_name": "Test",
+      "Name.prefix": "",
+      "ID": "4663646000002417172",
+      "Name.suffix": "",
+      "zc_display_value": "   Johnny Test  ",
+      "Name.first_name": "Johnny"
+    },
+    "Notes": [
+      {
+        "Replied_To": {},
+        "Note": "test",
+        "Tagged_Users": [
+          {
+            "Name.last_name": "Ensermu",
+            "Name.prefix": "",
+            "ID": "4663646000001940051",
+            "Name.suffix": "",
+            "Name.first_name": "Waqgari",
+            "zc_display_value": "   Waqgari Ensermu  "
+          }
+        ],
+        "Author": "Tom Lombardo",
+        "ID": "4663646000003182015",
+        "Notify_Sales": "true",
+        "zc_display_value": "test,Tom Lombardo,01/10/25 10:50:51,true,,   Waqgari Ensermu  ,4663646000003182015",
+        "Added_Time": "01/10/25 10:50:51"
+      }
+    ],
+    "Is_PPA": "false",
+    "M2_Release_Date": "",
+    "Added_Time": "09/16/24 08:32:43",
+    "Lease_per_kW": "",
+    "Activities": [
+      {
+        "Activity": "Your customer has viewed their contract in Docusign",
+        "ID": "4663646000001570015",
+        "Is_Who": "Unknown User",
+        "Where": "OpenSolar",
+        "Created_Date": "09/19/24 15:31:28",
+        "zc_display_value": "Your customer has viewed their contract in Docusign,Unknown User,09/19/24 15:31:28,OpenSolar"
+      }
+    ],
+    "Design_Eng_Paid_Date": "",
+    "Approximate_Installation_Date": "",
+    "OpenSolar_Project_ID": "4221999",
+    "Is_Demo": "true",
+    "Site_Survey_Booking_Reminder_Email_Sent": "",
+    "Finance_Status": "",
+    "Annual_Usage": "27560.00",
+    "Tranche": {},
+    "Contacts1": [
+      {
+        "Primary_Contact_Type1": "Owner 1",
+        "Name.last_name": "Roberts (Demo)",
+        "ID": "4663646000001508005",
+        "Name.first_name": "Michelle",
+        "zc_display_value": " Michelle Roberts (Demo) - Owner 1"
+      }
+    ],
+    "Plan_Set_Matches_Contract": "false",
+    "System_Size_at_Signing": "",
+    "Site_Address": {
+      "country": "United States",
+      "district_city": "Atherton",
+      "latitude": "37.453773",
+      "address_line_1": "230 Valparaiso Ave (Demo)",
+      "state_province": "CA",
+      "address_line_2": "",
+      "postal_code": "94027",
+      "zc_display_value": "230 Valparaiso Ave (Demo), Atherton, CA, 94027, United States",
+      "longitude": "-122.2058272"
+    },
+    "PTO_Submission_Date": "",
+    "TES_Inspection_Report": "false",
+    "Permit_Updated": "false",
+    "M3_Status": "",
+    "Record_ID": "4663646000001508002",
+    "kW_STC": "8.84",
+    "PEPCO_ATO": "false",
+    "System_Turned_On_Date": "",
+    "Final_Inspection_Status": "",
+    "Finance_Info_Request_Email": "",
+    "Install_Date": "",
+    "Utility_Account_Number_Received": "true",
+    "Yield_Report": "false",
+    "Calculated_Project_Cost": "",
+    "Cancelled_Project_Email_Sent": "",
+    "ID": "4663646000001508002",
+    "Ownership_Check": "",
+    "Aduu_Solar_Portal_ID1": "",
+    "PU_Work_Status": "",
+    "Relationship_Letter_Missing": "false",
+    "Utility_Bill": "false",
+    "PTO_Submitted": "false",
+    "Owner_Name": {
+      "Name.last_name": "Roberts (Demo)",
+      "ID": "4663646000001508005",
+      "zc_display_value": " Michelle Roberts (Demo)",
+      "Name.first_name": "Michelle"
+    },
+    "Site_Survey_Report": "false",
+    "Investor_M2_Payment": "",
+    "Project_ID": "881",
+    "Project_Investor_Folder_Id": "",
+    "Roof_Material": "",
+    "Signed_Contract": "false",
+    "PEPCO_As_Built": "false",
+    "PTO_Funded": "false",
+    "Payment_Option": "Sungage - 20 years 5.99%",
+    "Total_Commission_Advance": "",
+    "Tree_Work_Date_Time": "",
+    "Final_Inspection_Date": "",
+    "Redball_ATO": "false",
+    "Owning_Company_LLC": [],
+    "Project_Investor_Folder_Link": {
+      "value": "Open Project Folder",
+      "url": "https://workdrive.zoho.com/folder/mr3f8929ca3d39f9b45d49d68347f241c7d0b"
+    },
+    "Info_for_Contract_Email_Sent": "",
+    "M2_Amount": "",
+    "Second_Permit_Interconnection_Email_Sent": "",
+    "Investor_M1_Date": "",
+    "M2_Paid_Date": "",
+    "M1_Status": "",
+    "Survey_Date_Time": "",
+    "Project_Folder_ID": "",
+    "Utility_Bill_Link": {},
+    "Proof_of_Ownership_Link": {},
+    "MD_Feeder": {},
+    "Inspection_Complete": "false",
+    "Site_Survey_Date": "",
+    "Third_Permit_Interconnection_Email_Sent": "",
+    "Funded_By_Redball": "false",
+    "Property_Database_Ownership_Info": "",
+    "Comm_Advance_Paid_Date": "",
+    "Purchase_Order_Link": {},
+    "M1_Release_Date": "",
+    "Proof_of_Ownership": "false",
+    "Permitting": [],
+    "Yield_Report_without_Tree_Trimming": "false",
+    "Sales_Rep.Email": "enswaq@gmail.com",
+    "Installation_Pictures_Received": "false",
+    "Offset_Percentage_Calculator": "0",
+    "Proposal": "false",
+    "Utility_Bill_Upload": "",
+    "Owner_ID_File": "",
+    "Survey_Results": [],
+    "New_Stage": {
+      "Stage_Name": "Pre-Sale",
+      "ID": "4663646000002634108",
+      "zc_display_value": "Pre-Sale"
+    },
+    "Issues": [
+      {
+        "Is_Resolved": "true",
+        "Issue": "test",
+        "Author": "Tom Lombardo",
+        "ID": "4663646000003182003",
+        "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:50:21,4663646000003182003",
+        "Added_Time": "01/10/25 10:50:21"
+      },
+      {
+        "Is_Resolved": "true",
+        "Issue": "test",
+        "Author": "Tom Lombardo",
+        "ID": "4663646000003182007",
+        "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:50:21,4663646000003182007",
+        "Added_Time": "01/10/25 10:50:21"
+      },
+      {
+        "Is_Resolved": "true",
+        "Issue": "test",
+        "Author": "Tom Lombardo",
+        "ID": "4663646000003182011",
+        "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:50:36,4663646000003182011",
+        "Added_Time": "01/10/25 10:50:36"
+      },
+      {
+        "Is_Resolved": "true",
+        "Issue": "test",
+        "Author": "Waqgari Ensermu",
+        "ID": "4663646000003174123",
+        "zc_display_value": "test,Waqgari Ensermu,true,01/10/25 10:52:16,4663646000003174123",
+        "Added_Time": "01/10/25 10:52:16"
+      },
+      {
+        "Is_Resolved": "true",
+        "Issue": "test",
+        "Author": "Tom Lombardo",
+        "ID": "4663646000003182019",
+        "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:52:27,4663646000003182019",
+        "Added_Time": "01/10/25 10:52:27"
+      }
+    ],
+    "Sales_Rep.Sales_Org": {
+      "Org_Name": "Demo Org",
+      "ID": "4663646000001438003",
+      "zc_display_value": "Demo Org"
+    },
+    "Investor_M2_Date": "",
+    "Final_Inspection_Date_Time": "",
+    "Building_Permit": "false",
+    "AUDIT_Final_Engineering_Review": "false",
+    "Closed_Sale_Email_Sent": "02/17/25",
+    "Permit_Interconnection_Email_Sent": "",
+    "Feeder_Image": "false",
+    "Signed_Contract_Link": {},
+    "Interconnect_Submission_Date": "",
+    "Owner_Name.Email": "michelle@opensolar-demo.com",
+    "Investor_M3_Date": "",
+    "M1_Paid_Date": "",
+    "Domestic_Content": "false",
+    "Yield_Less": "false",
+    "Inspection_Scheduled": "false",
+    "System_Summary": [],
+    "On_MD_Feeder_Map": "false",
+    "EE_Stamp": "false",
+    "Roof_Work_Status": "",
+    "Note_Attachments": [],
+    "SSL": "",
+    "Final_Signed_Contract": "false",
+    "Commercial": "false",
+    "Structural_Stamp": "false",
+    "Is_Equipment_Purchased": "false",
+    "MPU_Invoice": "false",
+    "Aduu_Billed_Date": ""
+  }
+}
+```

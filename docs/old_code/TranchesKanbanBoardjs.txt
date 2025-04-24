@@ -1,0 +1,162 @@
+import React, { useState } from "react";
+import KanbanColumn from "./KanbanColumn.js";
+import { useToast } from "../contexts/ToastContext.js";
+import { updateProjectTranche } from "../utils/stagecardUpdate.js";
+
+const TranchesKanbanBoard = ({
+  projects,
+  tranchesData,
+  collapsedColumns,
+  setCollapsedColumns,
+  getFilteredCards,
+  onDrop,
+  onDragStart,
+  onDragEnd,
+  onCardClick,
+  isRefreshing,
+  onDragOver,
+  containerRef,
+  setProjects,
+}) => {
+  const { showToast } = useToast();
+  const [draggedCard, setDraggedCard] = useState(null);
+  const [sourceTranche, setSourceTranche] = useState(null);
+
+  const handleDragStart = (card, trancheId) => {
+    setDraggedCard(card);
+    setSourceTranche(trancheId);
+    if (onDragStart) onDragStart(card, trancheId);
+  };
+
+  const handleDrop = async (targetTrancheId) => {
+    if (!draggedCard || !sourceTranche) return;
+
+    // Skip if dropped in same tranche
+    if (sourceTranche === targetTrancheId) {
+      setDraggedCard(null);
+      setSourceTranche(null);
+      return;
+    }
+
+    // Show loading toast
+    showToast("Updating project tranche...", "loading");
+
+    // Optimistically update UI
+    const updatedProjects = projects.map((project) => ({
+      ...project,
+      cards: project.cards.map((card) =>
+        card.id === draggedCard.id
+          ? { ...card, tranche: { ID: targetTrancheId } }
+          : card
+      ),
+    }));
+
+    // Update UI immediately
+    setProjects(updatedProjects);
+
+    try {
+      // Attempt API update
+      await updateProjectTranche(draggedCard.id, targetTrancheId);
+      showToast("Project tranche updated successfully", "success");
+    } catch (error) {
+      console.error("Failed to update tranche:", error);
+      // Revert on failure
+      setProjects(projects);
+      showToast("Failed to update tranche. Changes reverted.", "error");
+    } finally {
+      setDraggedCard(null);
+      setSourceTranche(null);
+      if (onDragEnd) onDragEnd();
+    }
+  };
+
+  const getTranchesColumns = () => {
+    if (!tranchesData.length) return [];
+
+    // Get all cards from all columns
+    const allCards = projects.flatMap((column) => column.cards || []);
+    console.log("Total cards:", allCards.length);
+
+    return tranchesData.map((tranche) => {
+      // Filter cards for this tranche
+      const trancheCards = allCards.filter((card) => {
+        // Check both possible tranche ID locations
+        const cardTrancheId = card.tranche?.ID || card.tranche?.id;
+        return cardTrancheId === tranche.id;
+      });
+
+      console.log(`Tranche ${tranche.number}: ${trancheCards.length} cards`);
+
+      return {
+        id: tranche.id,
+        title: `Tranche ${tranche.number}`,
+        subtitle: tranche.date,
+        cards: trancheCards,
+      };
+    });
+  };
+
+  return React.createElement(
+    "div",
+    {
+      className: "h-full flex gap-4 p-4 overflow-x-auto overflow-y-hidden",
+      onDragOver: onDragOver,
+      ref: containerRef,
+    },
+    [
+      // Improved Refresh Overlay
+      isRefreshing &&
+        React.createElement(
+          "div",
+          {
+            className:
+              "absolute inset-0 bg-white/60 z-50 flex items-center justify-center cursor-not-allowed",
+          },
+          [
+            React.createElement(
+              "div",
+              {
+                className:
+                  "flex items-center gap-3 bg-white/90 px-4 py-2 rounded-lg shadow-lg",
+              },
+              [
+                React.createElement("div", {
+                  className:
+                    "animate-spin h-5 w-5 border-3 border-[#1F52DC] rounded-full border-t-transparent",
+                }),
+                React.createElement(
+                  "span",
+                  {
+                    className: "text-gray-600 font-medium",
+                  },
+                  "Refreshing..."
+                ),
+              ]
+            ),
+          ]
+        ),
+      // Tranche columns
+      getTranchesColumns().map((column) =>
+        React.createElement(KanbanColumn, {
+          key: column.id,
+          stage: column.id,
+          title: column.title,
+          subtitle: column.subtitle,
+          cards: getFilteredCards(column.cards || [], column.id),
+          isCollapsed: collapsedColumns[column.id],
+          onDrop: () => handleDrop(column.id),
+          onDragStart: (card) => handleDragStart(card, column.id),
+          onDragEnd,
+          onToggleCollapse: () =>
+            setCollapsedColumns((prev) => ({
+              ...prev,
+              [column.id]: !prev[column.id],
+            })),
+          onCardClick,
+        })
+      ),
+    ]
+  );
+};
+
+export default TranchesKanbanBoard;

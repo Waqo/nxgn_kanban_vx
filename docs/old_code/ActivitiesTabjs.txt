@@ -1,0 +1,146 @@
+/* global React */
+import React from 'react';
+
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+        month: '2-digit', 
+        day: '2-digit', 
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+};
+
+const ActivitiesTab = ({ project }) => {
+    const activities = project.activities || [];
+
+    return React.createElement('div',
+        { className: "p-6 max-w-5xl mx-auto" },
+        [
+            // Header Section
+            React.createElement('div',
+                { className: "mb-8 flex justify-between items-center" },
+                [
+                    React.createElement('div',
+                        { className: "flex items-center gap-3" },
+                        [
+                            React.createElement('i',
+                                { className: "fas fa-history text-blue-500 text-xl" }
+                            ),
+                            React.createElement('h3',
+                                { className: "text-xl font-semibold text-gray-900" },
+                                "Activities"
+                            )
+                        ]
+                    ),
+                    React.createElement('span',
+                        { className: "px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-sm font-medium" },
+                        `${activities.length} Activities`
+                    )
+                ]
+            ),
+
+            // Activities List
+            React.createElement('div',
+                { className: "space-y-4" },
+                activities.length > 0 
+                    ? activities.map(activity => 
+                        React.createElement('div',
+                            {
+                                key: activity.ID,
+                                className: "bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-blue-300 transition-colors"
+                            },
+                            [
+                                // Activity content
+                                React.createElement('div',
+                                    { className: "flex items-start gap-4" },
+                                    [
+                                        // Platform Icon
+                                        React.createElement('div',
+                                            { className: "p-2 bg-blue-50 rounded-lg" },
+                                            React.createElement('i',
+                                                { 
+                                                    className: `fas ${
+                                                        activity.Platform === 'OpenSolar' ? 'fa-solar-panel' :
+                                                        activity.Platform === 'WorkDrive' ? 'fa-folder' :
+                                                        activity.Platform === 'Creator' ? 'fa-database' :
+                                                        'fa-circle'
+                                                    } text-blue-500`
+                                                }
+                                            )
+                                        ),
+                                        // Activity Details
+                                        React.createElement('div',
+                                            { className: "flex-1" },
+                                            [
+                                                React.createElement('p',
+                                                    { className: "text-gray-900" },
+                                                    activity.Activity
+                                                ),
+                                                React.createElement('div',
+                                                    { className: "flex items-center gap-4 mt-2 text-sm text-gray-500" },
+                                                    [
+                                                        // Author
+                                                        React.createElement('div',
+                                                            { className: "flex items-center gap-1" },
+                                                            [
+                                                                React.createElement('i',
+                                                                    { className: "fas fa-user text-xs" }
+                                                                ),
+                                                                activity.Author
+                                                            ]
+                                                        ),
+                                                        // Platform
+                                                        React.createElement('div',
+                                                            { className: "flex items-center gap-1" },
+                                                            [
+                                                                React.createElement('i',
+                                                                    { className: "fas fa-cube text-xs" }
+                                                                ),
+                                                                activity.Platform
+                                                            ]
+                                                        ),
+                                                        // Timestamp
+                                                        React.createElement('div',
+                                                            { className: "flex items-center gap-1" },
+                                                            [
+                                                                React.createElement('i',
+                                                                    { className: "fas fa-clock text-xs" }
+                                                                ),
+                                                                formatDate(activity.Added_Time)
+                                                            ]
+                                                        )
+                                                    ]
+                                                )
+                                            ]
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    )
+                    : React.createElement('div',
+                        { className: "text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200" },
+                        [
+                            React.createElement('i',
+                                { className: "fas fa-history text-gray-400 text-4xl mb-3" }
+                            ),
+                            React.createElement('p',
+                                { className: "text-gray-500 font-medium" },
+                                "No activities recorded"
+                            ),
+                            React.createElement('p',
+                                { className: "text-sm text-gray-400 mt-1" },
+                                "Activities will appear here as they occur"
+                            )
+                        ]
+                    )
+            )
+        ]
+    );
+};
+
+export default ActivitiesTab;

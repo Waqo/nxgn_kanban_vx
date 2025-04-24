@@ -1,0 +1,648 @@
+import React, { useState } from 'react';
+import { Briefcase, Building2, Mail, Phone, Smartphone, MoreVertical, Check, X, Edit2, User, Trash2 } from 'lucide-react';
+import { updateRecord } from '../utils/recordUpdates.js';
+import { deleteRecord } from '../utils/deleteRecord.js';
+import Toast from './Toast.js';
+
+const ContactItem = ({ contact, project, onRefresh, contactTypes = [
+    'Owner 1',
+    'Owner 2',
+    'Other Project Contact'
+] }) => {
+    const [showOptions, setShowOptions] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedContact, setEditedContact] = useState(contact);
+    const [showBillingAddress, setShowBillingAddress] = useState(
+        !!(contact.Billing_Address_1 || contact.Billing_Address_2 || contact.Billing_City || 
+           contact.Billing_State || contact.Billing_Zip)
+    );
+    const optionsRef = React.useRef(null);
+    const [toast, setToast] = React.useState({
+        message: '',
+        type: 'info',
+        isVisible: false
+    });
+
+    React.useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showOptions && optionsRef.current && !optionsRef.current.contains(event.target)) {
+                setShowOptions(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showOptions]);
+
+    const handleSave = async () => {
+        try {
+            const contactData = {
+                data: {
+                    Name: {
+                        first_name: editedContact.First_Name,
+                        last_name: editedContact.Last_Name
+                    },
+                    Primary_Contact_Type1: editedContact.Contact_Type,
+                    Email: editedContact.Email,
+                    Phone_Number: editedContact.Phone,
+                    Mobile_Phone_Number: editedContact.Mobile,
+                    Business_POC: editedContact.Is_Business_Contact,
+                    Job_Title: editedContact.Job_Title,
+                    Business_Name: editedContact.Business_Name,
+                    Billing_Address: {
+                        address_line_1: editedContact.Billing_Address_1,
+                        address_line_2: editedContact.Billing_Address_2,
+                        district_city: editedContact.Billing_City,
+                        state_province: editedContact.Billing_State,
+                        postal_code: editedContact.Billing_Zip,
+                        country: editedContact.Billing_Country || 'USA'
+                    }
+                }
+            };
+
+            await updateRecord('PM_Kanban_Contacts', contact.ID, contactData);
+            setIsEditing(false);
+            if (onRefresh) await onRefresh();
+        } catch (error) {
+            console.error('Error updating contact:', error);
+            alert('Failed to update contact. Please try again.');
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!window.confirm('Are you sure you want to delete this contact?')) {
+            return;
+        }
+
+        try {
+            await deleteRecord('PM_Kanban_Contacts', contact.ID);
+            setShowOptions(false);
+            
+            if (onRefresh) {
+                await onRefresh();
+            }
+
+            setToast({
+                message: `Successfully deleted contact: ${contact.First_Name} ${contact.Last_Name}`,
+                type: 'success',
+                isVisible: true
+            });
+        } catch (error) {
+            console.error('Error deleting contact:', error);
+            setToast({
+                message: 'Failed to delete contact. Please try again.',
+                type: 'error',
+                isVisible: true
+            });
+        }
+    };
+
+    // Options Menu Content
+    const optionsMenu = React.createElement('div',
+        {
+            ref: optionsRef,
+            className: "absolute right-0 top-full mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10",
+            onClick: (e) => e.stopPropagation()
+        },
+        React.createElement('div',
+            { className: "py-1" },
+            [
+                React.createElement('button',
+                    {
+                        className: "w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2",
+                        onClick: () => {
+                            setIsEditing(true);
+                            setShowOptions(false);
+                        }
+                    },
+                    [
+                        React.createElement(Edit2, { className: "w-4 h-4" }),
+                        "Edit"
+                    ]
+                ),
+                React.createElement('button',
+                    {
+                        className: "w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2",
+                        onClick: async () => {
+                            try {
+                                console.log('Set as Main Owner clicked. Data:', {
+                                    projectId: project.id,
+                                    contactId: contact.ID,
+                                    contact: contact
+                                });
+
+                                await updateRecord(
+                                    'PM_Kanban_Projects', 
+                                    project.id,
+                                    {
+                                        data: { 
+                                            Owner_Name: contact.ID 
+                                        }
+                                    }
+                                );
+
+
+                                console.log('Update successful');
+                                setShowOptions(false);
+                                if (onRefresh) {
+                                    console.log('Calling refresh');
+                                    await onRefresh();
+                                    console.log('Refresh complete');
+                                }
+                            } catch (error) {
+                                console.error('Error setting main owner:', {
+                                    error,
+                                    projectId: project.id,
+                                    contactId: contact.ID,
+                                    errorMessage: error.message,
+                                    stack: error.stack
+                                });
+                                alert('Failed to set as main owner. Please try again.');
+                            }
+                        }
+                    },
+                    [
+                        React.createElement(User, { className: "w-4 h-4" }),
+                        "Set as Main Owner"
+                    ]
+                ),
+                React.createElement('button',
+                    {
+                        className: "w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2",
+                        onClick: handleDelete
+                    },
+                    [
+                        React.createElement(Trash2, { className: "w-4 h-4" }),
+                        "Delete"
+                    ]
+                )
+            ]
+        )
+    );
+
+    // Edit Form
+    const editForm = React.createElement('div',
+        { className: "mt-4 space-y-4" },
+        [
+            // Name Fields
+            React.createElement('div', { className: "grid grid-cols-2 gap-4" }, [
+                // First Name
+                React.createElement('div', null, [
+                    React.createElement('label', 
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "First Name"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "text",
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md",
+                            value: editedContact.First_Name,
+                            onChange: (e) => setEditedContact(prev => ({
+                                ...prev,
+                                First_Name: e.target.value
+                            }))
+                        }
+                    )
+                ]),
+                // Last Name
+                React.createElement('div', null, [
+                    React.createElement('label', 
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "Last Name"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "text",
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md",
+                            value: editedContact.Last_Name,
+                            onChange: (e) => setEditedContact(prev => ({
+                                ...prev,
+                                Last_Name: e.target.value
+                            }))
+                        }
+                    )
+                ])
+            ]),
+
+            // Contact Type
+            React.createElement('div', null, [
+                React.createElement('label',
+                    { className: "block text-sm font-medium text-gray-700 mb-1" },
+                    "Contact Type"
+                ),
+                React.createElement('select',
+                    {
+                        className: "w-full px-3 py-2 border border-gray-300 rounded-md bg-white",
+                        value: editedContact.Contact_Type,
+                        onChange: (e) => setEditedContact(prev => ({
+                            ...prev,
+                            Contact_Type: e.target.value
+                        }))
+                    },
+                    [
+                        React.createElement('option', { value: '' }, 'Select a type...'),
+                        React.createElement('option', { value: 'Owner 1' }, 'Owner 1'),
+                        React.createElement('option', { value: 'Owner 2' }, 'Owner 2'),
+                        React.createElement('option', { value: 'Other Project Contact' }, 'Other Project Contact')
+                    ]
+                )
+            ]),
+
+            // Contact Information
+            React.createElement('div', { className: "grid grid-cols-2 gap-4" }, [
+                // Email
+                React.createElement('div', null, [
+                    React.createElement('label',
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "Email"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "email",
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md",
+                            value: editedContact.Email,
+                            onChange: (e) => setEditedContact(prev => ({
+                                ...prev,
+                                Email: e.target.value
+                            }))
+                        }
+                    )
+                ]),
+                // Phone
+                React.createElement('div', null, [
+                    React.createElement('label',
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "Phone"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "tel",
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md",
+                            value: editedContact.Phone,
+                            onChange: (e) => setEditedContact(prev => ({
+                                ...prev,
+                                Phone: e.target.value
+                            }))
+                        }
+                    )
+                ])
+            ]),
+
+            // Mobile Phone
+            React.createElement('div', null, [
+                React.createElement('label',
+                    { className: "block text-sm font-medium text-gray-700 mb-1" },
+                    "Mobile Phone"
+                ),
+                React.createElement('input',
+                    {
+                        type: "tel",
+                        className: "w-full px-3 py-2 border border-gray-300 rounded-md",
+                        value: editedContact.Mobile,
+                        onChange: (e) => setEditedContact(prev => ({
+                            ...prev,
+                            Mobile: e.target.value
+                        }))
+                    }
+                )
+            ]),
+
+            // Business Information
+            React.createElement('div', { className: "grid grid-cols-2 gap-4" }, [
+                // Job Title
+                React.createElement('div', null, [
+                    React.createElement('label',
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "Job Title"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "text",
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md",
+                            value: editedContact.Job_Title,
+                            onChange: (e) => setEditedContact(prev => ({
+                                ...prev,
+                                Job_Title: e.target.value
+                            }))
+                        }
+                    )
+                ]),
+                // Business Name
+                React.createElement('div', null, [
+                    React.createElement('label',
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "Business Name"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "text",
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md",
+                            value: editedContact.Business_Name,
+                            onChange: (e) => setEditedContact(prev => ({
+                                ...prev,
+                                Business_Name: e.target.value
+                            }))
+                        }
+                    )
+                ])
+            ]),
+
+            // Business POC Checkbox
+            React.createElement('div', null, [
+                React.createElement('label',
+                    { className: "flex items-center gap-2" },
+                    [
+                        React.createElement('input',
+                            {
+                                type: "checkbox",
+                                className: "rounded border-gray-300 text-blue-600 focus:ring-blue-500",
+                                checked: editedContact.Is_Business_Contact,
+                                onChange: (e) => setEditedContact(prev => ({
+                                    ...prev,
+                                    Is_Business_Contact: e.target.checked
+                                }))
+                            }
+                        ),
+                        React.createElement('span',
+                            { className: "text-sm font-medium text-gray-700" },
+                            "Business Contact"
+                        )
+                    ]
+                )
+            ]),
+
+            // Billing Address Section
+            React.createElement('div', { className: "space-y-4" }, [
+                // Address Line 1
+                React.createElement('div', null, [
+                    React.createElement('label',
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "Address Line 1"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "text",
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md",
+                            value: editedContact.Billing_Address_1,
+                            onChange: (e) => setEditedContact(prev => ({
+                                ...prev,
+                                Billing_Address_1: e.target.value
+                            }))
+                        }
+                    )
+                ]),
+                // Address Line 2
+                React.createElement('div', null, [
+                    React.createElement('label',
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "Address Line 2"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "text",
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md",
+                            value: editedContact.Billing_Address_2,
+                            onChange: (e) => setEditedContact(prev => ({
+                                ...prev,
+                                Billing_Address_2: e.target.value
+                            }))
+                        }
+                    )
+                ]),
+                // City, State, Zip in a grid
+                React.createElement('div', { className: "grid grid-cols-3 gap-4" }, [
+                    // City
+                    React.createElement('div', null, [
+                        React.createElement('label',
+                            { className: "block text-sm font-medium text-gray-700 mb-1" },
+                            "City"
+                        ),
+                        React.createElement('input',
+                            {
+                                type: "text",
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md",
+                                value: editedContact.Billing_City,
+                                onChange: (e) => setEditedContact(prev => ({
+                                    ...prev,
+                                    Billing_City: e.target.value
+                                }))
+                            }
+                        )
+                    ]),
+                    // State
+                    React.createElement('div', null, [
+                        React.createElement('label',
+                            { className: "block text-sm font-medium text-gray-700 mb-1" },
+                            "State"
+                        ),
+                        React.createElement('input',
+                            {
+                                type: "text",
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md",
+                                value: editedContact.Billing_State,
+                                onChange: (e) => setEditedContact(prev => ({
+                                    ...prev,
+                                    Billing_State: e.target.value
+                                }))
+                            }
+                        )
+                    ]),
+                    // Zip
+                    React.createElement('div', null, [
+                        React.createElement('label',
+                            { className: "block text-sm font-medium text-gray-700 mb-1" },
+                            "ZIP Code"
+                        ),
+                        React.createElement('input',
+                            {
+                                type: "text",
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md",
+                                value: editedContact.Billing_Zip,
+                                onChange: (e) => setEditedContact(prev => ({
+                                    ...prev,
+                                    Billing_Zip: e.target.value
+                                }))
+                            }
+                        )
+                    ])
+                ])
+            ]),
+
+            // Add Save/Cancel buttons
+            React.createElement('div',
+                { className: "flex justify-end gap-2 mt-4" },
+                [
+                    React.createElement('button',
+                        {
+                            className: "px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50",
+                            onClick: () => setIsEditing(false)
+                        },
+                        "Cancel"
+                    ),
+                    React.createElement('button',
+                        {
+                            className: "px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700",
+                            onClick: handleSave
+                        },
+                        "Save"
+                    )
+                ]
+            )
+        ]
+    );
+
+    return React.createElement(React.Fragment, null, [
+        React.createElement('div',
+            { className: "bg-white rounded-lg shadow-sm border border-gray-200 p-6" },
+            [
+                // Header with name, contact type, and options
+                React.createElement('div',
+                    { className: "flex justify-between items-start mb-4" },
+                    [
+                        // Left side: Contact info with icon
+                        React.createElement('div',
+                            { className: "flex items-center gap-3" },
+                            [
+                                // User Icon
+                                React.createElement('div',
+                                    { className: "bg-blue-50 p-2 rounded-full" },
+                                    React.createElement(User, { className: "w-5 h-5 text-blue-600" })
+                                ),
+                                // Name and Contact Type
+                                React.createElement('div', null, [
+                                    React.createElement('div',
+                                        { className: "text-lg font-medium text-gray-900" },
+                                        `${contact.First_Name} ${contact.Last_Name}`
+                                    ),
+                                    React.createElement('div',
+                                        { className: "text-sm text-gray-500" },
+                                        contact.Contact_Type || ''
+                                    )
+                                ])
+                            ]
+                        ),
+                        // Options Button (with relative positioning)
+                        React.createElement('div',
+                            { className: "relative" },
+                            [
+                                React.createElement('button',
+                                    {
+                                        className: "p-2 hover:bg-gray-50 rounded-full transition-colors",
+                                        onClick: (e) => {
+                                            e.stopPropagation();
+                                            setShowOptions(!showOptions);
+                                        }
+                                    },
+                                    React.createElement(MoreVertical, { className: "w-5 h-5 text-gray-400" })
+                                ),
+                                showOptions && optionsMenu
+                            ]
+                        )
+                    ]
+                ),
+                // Show edit form if isEditing is true
+                isEditing && editForm,
+                // Contact Details
+                React.createElement('div',
+                    { className: "space-y-3 text-sm" },
+                    [
+                        // Job Title
+                        contact.Job_Title && React.createElement('div',
+                            { className: "flex items-center gap-2 text-gray-600" },
+                            [
+                                React.createElement(Briefcase, { className: "w-4 h-4 text-gray-400" }),
+                                React.createElement('span', null, contact.Job_Title)
+                            ]
+                        ),
+                        // Business Name
+                        contact.Business_Name && React.createElement('div',
+                            { className: "flex items-center gap-2 text-gray-600" },
+                            [
+                                React.createElement(Building2, { className: "w-4 h-4 text-gray-400" }),
+                                React.createElement('span', null, contact.Business_Name)
+                            ]
+                        ),
+                        // Email
+                        contact.Email && React.createElement('div',
+                            { className: "flex items-center gap-2 text-gray-600" },
+                            [
+                                React.createElement(Mail, { className: "w-4 h-4 text-gray-400" }),
+                                React.createElement('a',
+                                    {
+                                        href: `mailto:${contact.Email}`,
+                                        className: "text-blue-600 hover:text-blue-700 hover:underline"
+                                    },
+                                    contact.Email
+                                )
+                            ]
+                        ),
+                        // Phone
+                        contact.Phone && React.createElement('div',
+                            { className: "flex items-center gap-2 text-gray-600" },
+                            [
+                                React.createElement(Phone, { className: "w-4 h-4 text-gray-400" }),
+                                React.createElement('a',
+                                    {
+                                        href: `tel:${contact.Phone}`,
+                                        className: "text-blue-600 hover:text-blue-700 hover:underline"
+                                    },
+                                    contact.Phone
+                                )
+                            ]
+                        ),
+                        // Mobile
+                        contact.Mobile && React.createElement('div',
+                            { className: "flex items-center gap-2 text-gray-600" },
+                            [
+                                React.createElement(Smartphone, { className: "w-4 h-4 text-gray-400" }),
+                                React.createElement('a',
+                                    {
+                                        href: `tel:${contact.Mobile}`,
+                                        className: "text-blue-600 hover:text-blue-700 hover:underline"
+                                    },
+                                    contact.Mobile
+                                )
+                            ]
+                        ),
+                        // Billing Address (only show if at least one field has a value)
+                        (contact.Billing_Address_1 || contact.Billing_Address_2 || contact.Billing_City || 
+                         contact.Billing_State || contact.Billing_Zip) && 
+                        React.createElement('div',
+                            { className: "mt-4 text-gray-600" },
+                            [
+                                React.createElement('div',
+                                    { className: "font-medium mb-1" },
+                                    "Billing Address:"
+                                ),
+                                React.createElement('div',
+                                    { className: "space-y-1" },
+                                    [
+                                        contact.Billing_Address_1 && 
+                                        React.createElement('div', null, contact.Billing_Address_1),
+                                        contact.Billing_Address_2 && 
+                                        React.createElement('div', null, contact.Billing_Address_2),
+                                        React.createElement('div', null, 
+                                            [
+                                                contact.Billing_City,
+                                                contact.Billing_State && `, ${contact.Billing_State}`,
+                                                contact.Billing_Zip && ` ${contact.Billing_Zip}`
+                                            ].filter(Boolean).join('')
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        ),
+        React.createElement(Toast, {
+            message: toast.message,
+            type: toast.type,
+            isVisible: toast.isVisible,
+            onClose: () => setToast(prev => ({ ...prev, isVisible: false }))
+        })
+    ]);
+};
+
+export default ContactItem;

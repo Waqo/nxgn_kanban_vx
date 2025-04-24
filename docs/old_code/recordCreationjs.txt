@@ -1,0 +1,35 @@
+export const createRecord = async (
+    formName, 
+    recordData, 
+    showToast,
+    options = {
+        loadingMessage: 'Creating record...',
+        successMessage: 'Record created successfully',
+        errorMessage: 'Failed to create record:', // Will be followed by error.message
+    }
+) => {
+    try {
+        if (showToast) showToast(options.loadingMessage, 'loading');
+
+        const config = {
+            app_name: "nexgen-portal",
+            form_name: formName,
+            payload: {
+                data: recordData
+            }
+        };
+
+        const response = await ZOHO.CREATOR.DATA.addRecords(config);
+        
+        if (response && (response.code === 3000 || response.data)) {
+            if (showToast) showToast(options.successMessage, 'success');
+            return response;
+        } else {
+            throw new Error(`Failed to create ${formName} record: ${response?.message || 'Unknown error'}`);
+        }
+    } catch (error) {
+        if (showToast) showToast(`${options.errorMessage} ${error.message}`, 'error');
+        console.error(`Error creating ${formName} record:`, error);
+        throw error;
+    }
+};

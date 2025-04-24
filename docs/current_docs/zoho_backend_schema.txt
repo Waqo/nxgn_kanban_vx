@@ -1,0 +1,517 @@
+## Raw Data Example: getRecords (Kanban Board - Quick View)
+
+This example shows the structure of the data typically returned by `ZOHO.CREATOR.DATA.getRecords` when fetching the initial list of projects for the Kanban board. It usually corresponds to the `quick_view` field set, meaning not all fields available in the form are included. Note the format of lookup fields (like `Owner_Name`, `Sales_Org`, `New_Stage`) and how related list fields (`Permitting`, `Survey_Results`, `Documents`, `Notes`, `Issues`, `Activities`) are returned as arrays (often empty or with minimal data in quick view).
+
+```json
+{
+  "code": 3000,
+  "data": [
+    {
+      "Investor_M3_Payment": "",
+      "kW_STC": "8.84",
+      "Is_Cash_Finance": "true",
+      "Sales_Org": {
+        "Org_Name": "Demo Org",
+        "ID": "4663646000001438003",
+        "zc_display_value": "Demo Org"
+      },
+      "Owner_Name.Phone_Number": "+1 510 383 9594",
+      "Sales_Rep.Phone": "+12025660001",
+      "Active_Commission_Rate": "",
+      "Install_Date": "",
+      "Roof_Type": "",
+      "Stage": "Pre-Sale",
+      "Funded_By_Redball": "false",
+      "Calculated_Project_Cost": "",
+      "ID": "4663646000001508002",
+      "Property_Database_Ownership_Info": "",
+      "Tags": [],
+      "Comm_Advance_Paid_Date": "",
+      "Investor_M1_Payment": "",
+      "Aduu_Solar_Portal_ID1": "",
+      "PU_Work_Status": "",
+      "Installation_Date_Time": "",
+      "PPA_Rate": "",
+      "Tree_Work_Status": "",
+      "NTP_Date": "",
+      "M1_Amount": "",
+      "Owner_Name": {
+        "Name.last_name": "Roberts (Demo)",
+        "ID": "4663646000001508005",
+        "zc_display_value": " Michelle Roberts (Demo)",
+        "Name.first_name": "Michelle"
+      },
+      "Permitting": [],
+      "Applicable_Rate": "",
+      "Is_Approved": "false",
+      "Permission_To_Operate": "false",
+      "Documents": [],
+      "PTO_Approval_Date": "",
+      "Sales_Rep.Email": "enswaq@gmail.com",
+      "Commission_Advance_Status": "",
+      "M2_Status": "",
+      "Investor_M2_Payment": "",
+      "Survey_Results": [],
+      "New_Stage": {
+        "Stage_Name": "Pre-Sale",
+        "ID": "4663646000002634108",
+        "zc_display_value": "Pre-Sale"
+      },
+      "Issues": [
+        {
+          "Is_Resolved": "true",
+          "Issue": "test",
+          "Author": "Tom Lombardo",
+          "ID": "4663646000003182003",
+          "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:50:21,4663646000003182003",
+          "Added_Time": "01/10/25 10:50:21"
+        },
+        {
+          "Is_Resolved": "true",
+          "Issue": "test",
+          "Author": "Tom Lombardo",
+          "ID": "4663646000003182007",
+          "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:50:21,4663646000003182007",
+          "Added_Time": "01/10/25 10:50:21"
+        },
+        {
+          "Is_Resolved": "true",
+          "Issue": "test",
+          "Author": "Tom Lombardo",
+          "ID": "4663646000003182011",
+          "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:50:36,4663646000003182011",
+          "Added_Time": "01/10/25 10:50:36"
+        },
+        {
+          "Is_Resolved": "true",
+          "Issue": "test",
+          "Author": "Waqgari Ensermu",
+          "ID": "4663646000003174123",
+          "zc_display_value": "test,Waqgari Ensermu,true,01/10/25 10:52:16,4663646000003174123",
+          "Added_Time": "01/10/25 10:52:16"
+        },
+        {
+          "Is_Resolved": "true",
+          "Issue": "test",
+          "Author": "Tom Lombardo",
+          "ID": "4663646000003182019",
+          "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:52:27,4663646000003182019",
+          "Added_Time": "01/10/25 10:52:27"
+        }
+      ],
+      "Project_Cost": "",
+      "OpenSolar_Stage": "Proposal Design",
+      "Date_Sold": "",
+      "Investor_M2_Date": "",
+      "Need_Help": "false",
+      "M3_Amount": "",
+      "Sales_Rep": {
+        "Name.last_name": "Test",
+        "Name.prefix": "",
+        "ID": "4663646000002417172",
+        "Name.suffix": "",
+        "zc_display_value": "   Johnny Test  ",
+        "Name.first_name": "Johnny"
+      },
+      "Owner_Name.Email": "michelle@opensolar-demo.com",
+      "Added_User": "Public",
+      "Payment_Option": "Sungage - 20 years 5.99%",
+      "Total_Commission_Advance": "",
+      "Investor_M3_Date": "",
+      "Notes": [
+        {
+          "Replied_To": {},
+          "Note": "test",
+          "Tagged_Users": [
+            {
+              "Name.last_name": "Ensermu",
+              "Name.prefix": "",
+              "ID": "4663646000001940051",
+              "Name.suffix": "",
+              "Name.first_name": "Waqgari",
+              "zc_display_value": "   Waqgari Ensermu  "
+            }
+          ],
+          "Author": "Tom Lombardo",
+          "ID": "4663646000003182015",
+          "Notify_Sales": "true",
+          "zc_display_value": "test,Tom Lombardo,01/10/25 10:50:51,true,,   Waqgari Ensermu  ,4663646000003182015",
+          "Added_Time": "01/10/25 10:50:51"
+        }
+      ],
+      "Is_PPA": "false",
+      "Domestic_Content": "false",
+      "Added_Time": "09/16/24 08:32:43",
+      "Final_Inspection_Date": "",
+      "Activities": [
+        {
+          "Activity": "Your customer has viewed their contract in Docusign",
+          "ID": "4663646000001570015",
+          "Is_Who": "Unknown User",
+          "Where": "OpenSolar",
+          "Created_Date": "09/19/24 15:31:28",
+          "zc_display_value": "Your customer has viewed their contract in Docusign,Unknown User,09/19/24 15:31:28,OpenSolar"
+        }
+      ],
+      "Modified_User": "nexgenroofingandsolar",
+      "Approximate_Installation_Date": "",
+      "Modified_Time": "04/09/25 11:59:55",
+      "System_Summary": [],
+      "Is_Demo": "true",
+      "Roof_Work_Status": "",
+      "Tranche": {},
+      "Note_Attachments": [],
+      "M2_Amount": "",
+      "Commercial": "false",
+      "Site_Address": {
+        "country": "United States",
+        "district_city": "Atherton",
+        "latitude": "37.453773",
+        "address_line_1": "230 Valparaiso Ave (Demo)",
+        "state_province": "CA",
+        "address_line_2": "",
+        "postal_code": "94027",
+        "zc_display_value": "230 Valparaiso Ave (Demo), Atherton, CA, 94027, United States",
+        "longitude": "-122.2058272"
+      },
+      "PTO_Submission_Date": "",
+      "Investor_M1_Date": "",
+      "Yield": "",
+      "M1_Status": "",
+      "M3_Status": ""
+    }
+    // ... potentially more records
+  ],
+  "record_cursor": "9b453ddc63432cc30fa88716b38f015fe1640b0ac4772cea4b9ebaa81c38b0b659874abe16dd68a4ee1158b4643c9eac"
+}
+```
+
+## Raw Data Example: getRecordById (Project Details - Detail View)
+
+This example shows the structure of the data typically returned by `ZOHO.CREATOR.DATA.getRecordById` with `field_config: "detail_view"`. This usually includes most, if not all, fields defined in the form, including related lists with more complete data than the `quick_view` used for the board.
+
+```json
+{
+  "code": 3000,
+  "data": {
+    "Yield_Report_with_Tree_Trimming": "false",
+    "Utility_Account_Number": "",
+    "Second_Site_Survey_Booking_Reminder_Email_Sent": "",
+    "PU_Work_Date_Time": "",
+    "Owner_Name.Phone_Number": "+1 510 383 9594",
+    "Sales_Rep.Phone": "+12025660001",
+    "Survey_Report_Email_Sent": "",
+    "Active_Commission_Rate": "",
+    "Interconnection_Approval_Date": "",
+    "Proof_of_Ownership_File": "",
+    "Stage": "Pre-Sale",
+    "Survey_Status": "",
+    "Tags": [],
+    "Investor_M1_Payment": "",
+    "Salesperson_Commission_Decision": "",
+    "County_AHJ": "",
+    "Offset": "",
+    "Project_Folder_Link": {
+      "value": "Open Project Folder",
+      "url": "https://workdrive.zoho.com/folder/mr3f83a60e1af6a3d4405b2633b0d142aea24"
+    },
+    "Customer_Confirmation_Call_for_Install": "false",
+    "Is_Approved": "false",
+    "NEM_or_CREF": "TBD",
+    "Commission_Advance_Status": "",
+    "System_Turned_On": "false",
+    "M2_Status": "",
+    "Offset_Percentage": "",
+    "UtilityAPI_Authorized": "false",
+    "DC_Wattage": "",
+    "Not_Viable_Email_Sent": "",
+    "OpenSolar_Stage": "Proposal Design",
+    "Date_Sold": "",
+    "Tree_Trimming_Invoice": "false",
+    "Owner_ID_Link": {},
+    "Installation_Status": "",
+    "M3_Amount": "",
+    "System_Size_on_Shade_Report_kW": "",
+    "Plan_Set_with_Stamp": "false",
+    "OpenSolar_Link": {
+      "title": "",
+      "value": "https://app.opensolar.com/#/projects/4221999",
+      "url": "https://app.opensolar.com/#/projects/4221999"
+    },
+    "Relationship_Letter_Link": {},
+    "Ready_for_Inves": "No",
+    "Owner_Property_ID": "false",
+    "OpenSolar_Proposal_Link": {},
+    "Utility_Bill_Request_Stage_Based_Email": "",
+    "Annual_Output_kWh": "",
+    "Roof_Work_Date_Time": "",
+    "Redball_As_Built": "false",
+    "Rate_Year": "",
+    "Final_Signed_Contract_File": "",
+    "Finance_Company": "",
+    "ATI": "false",
+    "Is_Installed": "false",
+    "Lead_Source": "",
+    "Yield": "",
+    "Investor_M3_Payment": "",
+    "Street_View_Image": "https://maps.googleapis.com/maps/api/streetview?size=700x700&location=37.4449416,-122.1972638&pitch=0&fov=90&key=AIzaSyCJ1r8niN2r93HOkZdOyriPaWb0Igq-TdM",
+    "Tree_Trimming": "",
+    "Closed_Sale_with_Booking_Link_Email_Sent": "02/17/25",
+    "Tranche_ID": "",
+    "Submitted_to_Redball": "",
+    "Relationship_Letter_Required": "false",
+    "Meter_Number": "",
+    "Renter_Co_Owner_Authorized_Signer": [],
+    "Roof_Upgrade": "",
+    "Installation_Date_Time": "",
+    "Created_On": "09/16/24 08:32:42",
+    "PPA_Rate": "",
+    "Installation_Complete_Email_Sent": "",
+    "Tree_Work_Status": "",
+    "M3_Paid_Date": "",
+    "Relationship_Letter": "false",
+    "M1_Amount": "",
+    "Assigned_Auditor_has_Verified_ID_Matches": "",
+    "Business_Name": "",
+    "Roofing_Invoice": "false",
+    "Applicable_Rate": "",
+    "Permission_To_Operate": "false",
+    "Project_Cost": "",
+    "Need_Help": "false",
+    "Shade_Report": "false",
+    "Electrical_Permit": "false",
+    "Identification_Matches": "",
+    "Installation_Email_Sent": "",
+    "PTO_Email_Sent": "",
+    "Sales_Rep": {
+      "Name.last_name": "Test",
+      "Name.prefix": "",
+      "ID": "4663646000002417172",
+      "Name.suffix": "",
+      "zc_display_value": "   Johnny Test  ",
+      "Name.first_name": "Johnny"
+    },
+    "Notes": [
+      {
+        "Replied_To": {},
+        "Note": "test",
+        "Tagged_Users": [
+          {
+            "Name.last_name": "Ensermu",
+            "Name.prefix": "",
+            "ID": "4663646000001940051",
+            "Name.suffix": "",
+            "Name.first_name": "Waqgari",
+            "zc_display_value": "   Waqgari Ensermu  "
+          }
+        ],
+        "Author": "Tom Lombardo",
+        "ID": "4663646000003182015",
+        "Notify_Sales": "true",
+        "zc_display_value": "test,Tom Lombardo,01/10/25 10:50:51,true,,   Waqgari Ensermu  ,4663646000003182015",
+        "Added_Time": "01/10/25 10:50:51"
+      }
+    ],
+    "Is_PPA": "false",
+    "M2_Release_Date": "",
+    "Added_Time": "09/16/24 08:32:43",
+    "Lease_per_kW": "",
+    "Activities": [
+      {
+        "Activity": "Your customer has viewed their contract in Docusign",
+        "ID": "4663646000001570015",
+        "Is_Who": "Unknown User",
+        "Where": "OpenSolar",
+        "Created_Date": "09/19/24 15:31:28",
+        "zc_display_value": "Your customer has viewed their contract in Docusign,Unknown User,09/19/24 15:31:28,OpenSolar"
+      }
+    ],
+    "Design_Eng_Paid_Date": "",
+    "Approximate_Installation_Date": "",
+    "OpenSolar_Project_ID": "4221999",
+    "Is_Demo": "true",
+    "Site_Survey_Booking_Reminder_Email_Sent": "",
+    "Finance_Status": "",
+    "Annual_Usage": "27560.00",
+    "Tranche": {},
+    "Contacts1": [
+      {
+        "Primary_Contact_Type1": "Owner 1",
+        "Name.last_name": "Roberts (Demo)",
+        "ID": "4663646000001508005",
+        "Name.first_name": "Michelle",
+        "zc_display_value": " Michelle Roberts (Demo) - Owner 1"
+      }
+    ],
+    "Plan_Set_Matches_Contract": "false",
+    "System_Size_at_Signing": "",
+    "Site_Address": {
+      "country": "United States",
+      "district_city": "Atherton",
+      "latitude": "37.453773",
+      "address_line_1": "230 Valparaiso Ave (Demo)",
+      "state_province": "CA",
+      "address_line_2": "",
+      "postal_code": "94027",
+      "zc_display_value": "230 Valparaiso Ave (Demo), Atherton, CA, 94027, United States",
+      "longitude": "-122.2058272"
+    },
+    "PTO_Submission_Date": "",
+    "TES_Inspection_Report": "false",
+    "Permit_Updated": "false",
+    "M3_Status": "",
+    "Record_ID": "4663646000001508002",
+    "kW_STC": "8.84",
+    "PEPCO_ATO": "false",
+    "System_Turned_On_Date": "",
+    "Final_Inspection_Status": "",
+    "Finance_Info_Request_Email": "",
+    "Install_Date": "",
+    "Utility_Account_Number_Received": "true",
+    "Yield_Report": "false",
+    "Calculated_Project_Cost": "",
+    "Cancelled_Project_Email_Sent": "",
+    "ID": "4663646000001508002",
+    "Ownership_Check": "",
+    "Aduu_Solar_Portal_ID1": "",
+    "PU_Work_Status": "",
+    "Relationship_Letter_Missing": "false",
+    "Utility_Bill": "false",
+    "PTO_Submitted": "false",
+    "Owner_Name": {
+      "Name.last_name": "Roberts (Demo)",
+      "ID": "4663646000001508005",
+      "zc_display_value": " Michelle Roberts (Demo)",
+      "Name.first_name": "Michelle"
+    },
+    "Site_Survey_Report": "false",
+    "Investor_M2_Payment": "",
+    "Project_ID": "881",
+    "Project_Investor_Folder_Id": "",
+    "Roof_Material": "",
+    "Signed_Contract": "false",
+    "PEPCO_As_Built": "false",
+    "PTO_Funded": "false",
+    "Payment_Option": "Sungage - 20 years 5.99%",
+    "Total_Commission_Advance": "",
+    "Tree_Work_Date_Time": "",
+    "Final_Inspection_Date": "",
+    "Redball_ATO": "false",
+    "Owning_Company_LLC": [],
+    "Project_Investor_Folder_Link": {
+      "value": "Open Project Folder",
+      "url": "https://workdrive.zoho.com/folder/mr3f8929ca3d39f9b45d49d68347f241c7d0b"
+    },
+    "Info_for_Contract_Email_Sent": "",
+    "M2_Amount": "",
+    "Second_Permit_Interconnection_Email_Sent": "",
+    "Investor_M1_Date": "",
+    "M2_Paid_Date": "",
+    "M1_Status": "",
+    "Survey_Date_Time": "",
+    "Project_Folder_ID": "",
+    "Utility_Bill_Link": {},
+    "Proof_of_Ownership_Link": {},
+    "MD_Feeder": {},
+    "Inspection_Complete": "false",
+    "Site_Survey_Date": "",
+    "Third_Permit_Interconnection_Email_Sent": "",
+    "Funded_By_Redball": "false",
+    "Property_Database_Ownership_Info": "",
+    "Comm_Advance_Paid_Date": "",
+    "Purchase_Order_Link": {},
+    "M1_Release_Date": "",
+    "Proof_of_Ownership": "false",
+    "Permitting": [],
+    "Yield_Report_without_Tree_Trimming": "false",
+    "Sales_Rep.Email": "enswaq@gmail.com",
+    "Installation_Pictures_Received": "false",
+    "Offset_Percentage_Calculator": "0",
+    "Proposal": "false",
+    "Utility_Bill_Upload": "",
+    "Owner_ID_File": "",
+    "Survey_Results": [],
+    "New_Stage": {
+      "Stage_Name": "Pre-Sale",
+      "ID": "4663646000002634108",
+      "zc_display_value": "Pre-Sale"
+    },
+    "Issues": [
+      {
+        "Is_Resolved": "true",
+        "Issue": "test",
+        "Author": "Tom Lombardo",
+        "ID": "4663646000003182003",
+        "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:50:21,4663646000003182003",
+        "Added_Time": "01/10/25 10:50:21"
+      },
+      {
+        "Is_Resolved": "true",
+        "Issue": "test",
+        "Author": "Tom Lombardo",
+        "ID": "4663646000003182007",
+        "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:50:21,4663646000003182007",
+        "Added_Time": "01/10/25 10:50:21"
+      },
+      {
+        "Is_Resolved": "true",
+        "Issue": "test",
+        "Author": "Tom Lombardo",
+        "ID": "4663646000003182011",
+        "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:50:36,4663646000003182011",
+        "Added_Time": "01/10/25 10:50:36"
+      },
+      {
+        "Is_Resolved": "true",
+        "Issue": "test",
+        "Author": "Waqgari Ensermu",
+        "ID": "4663646000003174123",
+        "zc_display_value": "test,Waqgari Ensermu,true,01/10/25 10:52:16,4663646000003174123",
+        "Added_Time": "01/10/25 10:52:16"
+      },
+      {
+        "Is_Resolved": "true",
+        "Issue": "test",
+        "Author": "Tom Lombardo",
+        "ID": "4663646000003182019",
+        "zc_display_value": "test,Tom Lombardo,true,01/10/25 10:52:27,4663646000003182019",
+        "Added_Time": "01/10/25 10:52:27"
+      }
+    ],
+    "Sales_Rep.Sales_Org": {
+      "Org_Name": "Demo Org",
+      "ID": "4663646000001438003",
+      "zc_display_value": "Demo Org"
+    },
+    "Investor_M2_Date": "",
+    "Final_Inspection_Date_Time": "",
+    "Building_Permit": "false",
+    "AUDIT_Final_Engineering_Review": "false",
+    "Closed_Sale_Email_Sent": "02/17/25",
+    "Permit_Interconnection_Email_Sent": "",
+    "Feeder_Image": "false",
+    "Signed_Contract_Link": {},
+    "Interconnect_Submission_Date": "",
+    "Owner_Name.Email": "michelle@opensolar-demo.com",
+    "Investor_M3_Date": "",
+    "M1_Paid_Date": "",
+    "Domestic_Content": "false",
+    "Yield_Less": "false",
+    "Inspection_Scheduled": "false",
+    "System_Summary": [],
+    "On_MD_Feeder_Map": "false",
+    "EE_Stamp": "false",
+    "Roof_Work_Status": "",
+    "Note_Attachments": [],
+    "SSL": "",
+    "Final_Signed_Contract": "false",
+    "Commercial": "false",
+    "Structural_Stamp": "false",
+    "Is_Equipment_Purchased": "false",
+    "MPU_Invoice": "false",
+    "Aduu_Billed_Date": ""
+  }
+}
+```
+
+

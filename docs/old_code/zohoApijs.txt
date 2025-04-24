@@ -1,0 +1,14 @@
+const getDocTypes = async () => {
+    const response = await ZOHO.CREATOR.DATA.getRecords({
+        app_name: "nexgen-portal",
+        report_name: "All_Document_Types",
+    });
+    return response.data.map(docType => ({
+        ID: docType.ID,
+        Name: docType.Name,
+        Include_In_Checklist: docType.Include_In_Checklist == "true",
+        Documents: docType.Documents || []
+    }));
+};
+
+export { getDocTypes };

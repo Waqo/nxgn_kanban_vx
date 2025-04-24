@@ -1,0 +1,119 @@
+import React, { useState } from 'react';
+import { logError } from '../utils/errorHandling.js';
+import KanbanCard from './KanbanCard.js';
+
+const KanbanColumn = ({ 
+    stage, 
+    title, 
+    cards, 
+    isCollapsed, 
+    onDrop, 
+    onDragStart, 
+    onToggleCollapse, 
+    onCardClick 
+}) => {
+    const [isDropTarget, setIsDropTarget] = useState(false);
+
+    const calculateTotalSystemSize = (cards) => {
+        return cards.reduce((total, card) => {
+            const size = parseFloat(card.systemSize) || 0;
+            return total + size;
+        }, 0).toFixed(2);
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        if (!isDropTarget) {
+            setIsDropTarget(true);
+        }
+    };
+
+    const handleDragLeave = (e) => {
+        // Only set to false if we're leaving the column (not entering a child element)
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+            setIsDropTarget(false);
+        }
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setIsDropTarget(false);
+        const cardId = e.dataTransfer.getData('cardId');
+        if (onDrop) {
+            onDrop(cardId, stage);
+        }
+    };
+
+    return React.createElement(
+        'div',
+        {
+            className: `kanban-column ${isCollapsed ? 'collapsed' : ''} ${isDropTarget ? 'drop-target' : ''}`,
+            onDragOver: handleDragOver,
+            onDragLeave: handleDragLeave,
+            onDrop: handleDrop
+        },
+        [
+            // Header
+            React.createElement(
+                'div',
+                {
+                    className: `kanban-column-header px-3 py-2 text-sm font-semibold cursor-pointer bg-white border-b flex items-center justify-between ${
+                        isCollapsed ? 'h-full writing-mode-vertical' : ''
+                    }`,
+                    onClick: () => onToggleCollapse(stage)
+                },
+                [
+                    // Title and counts container
+                    React.createElement('div', { 
+                        className: `flex items-center gap-2 ${
+                            isCollapsed 
+                              ? 'flex-row h-full justify-center writing-mode-vertical'
+                                : 'items-center gap-2'
+                        }` 
+                    }, [
+                        title,
+                        React.createElement(
+                            'div',
+                            { 
+                                className: `flex items-center gap-1 ${
+                                    isCollapsed ? 'flex-row' : ''
+                                }`
+                            },
+                            [
+                                React.createElement(
+                                    'span',
+                                    { className: "px-2 py-1 bg-gray-200 rounded-full text-xs" },
+                                    cards.length
+                                ),
+                                React.createElement(
+                                    'span',
+                                    { className: "px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs" },
+                                    `${calculateTotalSystemSize(cards)} kW`
+                                )
+                            ]
+                        )
+                    ]),
+                    // Collapse icon
+                    React.createElement('i', { 
+                        className: `fas fa-chevron-${isCollapsed ? 'down' : 'up'} ml-2` 
+                    })
+                ]
+            ),
+            // Content
+            !isCollapsed && React.createElement(
+                'div',
+                { 
+                    className: "kanban-column-content p-3 space-y-3 overflow-y-auto flex-1 scrollbar-hide"
+                },
+                cards.map(card => React.createElement(KanbanCard, {
+                    key: card.id,
+                    card: card,
+                    onDragStart: onDragStart,
+                    onDoubleClick: () => onCardClick(card)
+                }))
+            )
+        ]
+    );
+};
+
+export default KanbanColumn;

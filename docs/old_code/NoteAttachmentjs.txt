@@ -1,0 +1,179 @@
+/* global React */
+import React from 'react';
+import { navigateToURL } from '../utils/navigation.js';
+import PDFPreview from './PDFPreview.js';
+
+const NoteAttachment = ({ attachment }) => {
+    const [previewImage, setPreviewImage] = React.useState(null);
+    const [pdfData, setPdfData] = React.useState(null);
+    
+    const handleFileClick = async (e) => {
+        e.preventDefault();
+        if (attachment.type === 'image') return; // Don't handle images here
+        downloadFile();
+    };
+
+    const processUrl = (url) => {
+        if (!url) return '';
+        // Handle v2.1 API URL format
+        if (url.includes('/api/v2.1/')) {
+            return `https://creator.zoho.com${url}`;
+        }
+        // Handle legacy format
+        const cleanPath = url.replace(/^\/api\/v2/, '').replace('report/', '');
+        return `https://creator.zoho.com/file${cleanPath}`;
+    };
+
+    const downloadFile = () => {
+        try {
+            const url = processUrl(attachment.url);
+            navigateToURL(url, "same");
+        } catch (e) {
+            console.error('Error processing file URL:', {
+                error: e,
+                attachment: attachment
+            });
+        }
+    };
+
+    const handlePreviewClick = () => {
+        if (!attachment.url) return;
+        
+        try {
+            const fullUrl = processUrl(attachment.url);
+            setPreviewImage(fullUrl);
+        } catch (e) {
+            console.error('Error processing preview URL:', e);
+        }
+    };
+
+    const closePreview = () => {
+        setPreviewImage(null);
+        setPdfData(null);
+        // Cleanup any created object URLs
+        if (pdfData) {
+            URL.revokeObjectURL(pdfData);
+        }
+    };
+
+    return React.createElement('div',
+        { className: "relative group" },
+        [
+            React.createElement('div', {
+                className: "cursor-pointer",
+                onClick: attachment.type === 'image' ? handlePreviewClick : handleFileClick
+            }, [
+                attachment.type === 'image' ?
+                    React.createElement('img', {
+                        src: processUrl(attachment.url),
+                        className: "h-16 w-16 object-cover rounded border",
+                        alt: attachment.name,
+                        onError: (e) => {
+                            console.error('Error loading image:', e);
+                            // Fallback to file icon if image fails to load
+                            e.target.style.display = 'none';
+                            e.target.parentElement.innerHTML = '<i class="fas fa-file-image text-gray-400 text-xl"></i>';
+                        }
+                    }) :
+                    React.createElement('div', {
+                        className: "h-16 w-16 flex flex-col items-center justify-center rounded border bg-gray-100",
+                    }, [
+                        React.createElement('i', { 
+                            className: attachment.name.toLowerCase().endsWith('.pdf') 
+                                ? "fas fa-file-pdf text-gray-400 text-xl"
+                                : "fas fa-file text-gray-400 text-xl"
+                        }),
+                        React.createElement('span', {
+                            className: "text-xs text-gray-500 mt-1 truncate max-w-full px-1",
+                        }, attachment.name)
+                    ])
+            ]),
+            // Preview Modal (for both images and PDFs)
+            pdfData && React.createElement(PDFPreview, {
+                pdfData: pdfData,
+                fileName: attachment.name,
+                onClose: closePreview,
+                onDownload: downloadFile
+            }),
+            // Image Preview Modal
+            previewImage && React.createElement('div',
+                {
+                    className: 'fixed inset-0 z-50 flex flex-col bg-black',
+                    onClick: closePreview
+                },
+                React.createElement('div',
+                    {
+                        className: 'relative w-full h-full flex flex-col bg-white',
+                        onClick: e => e.stopPropagation()
+                    },
+                    [
+                        // Header with filename and close button
+                        React.createElement('div',
+                            {
+                                className: 'px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50'
+                            },
+                            [
+                                React.createElement('h3',
+                                    {
+                                        className: 'text-lg font-medium text-gray-900 truncate max-w-lg'
+                                    },
+                                    attachment.name
+                                ),
+                                React.createElement('button',
+                                    {
+                                        onClick: closePreview,
+                                        className: 'flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors',
+                                        title: 'Close preview'
+                                    },
+                                    [
+                                        React.createElement('i', {
+                                            className: 'fas fa-times'
+                                        }),
+                                        'Close'
+                                    ]
+                                )
+                            ]
+                        ),
+                        // Image container
+                        React.createElement('div',
+                            {
+                                className: 'flex-grow flex items-center justify-center bg-gray-100 relative'
+                            },
+                            React.createElement('img', {
+                                src: previewImage,
+                                alt: attachment.name,
+                                className: 'max-h-full max-w-full object-contain p-4',
+                                onError: (e) => {
+                                    console.error('Error loading preview:', e);
+                                    closePreview();
+                                }
+                            })
+                        ),
+                        // Footer with download button
+                        React.createElement('div',
+                            {
+                                className: 'px-6 py-4 border-t border-gray-200 flex justify-end bg-gray-50'
+                            },
+                            React.createElement('button',
+                                {
+                                    onClick: downloadFile,
+                                    className: 'inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors gap-2',
+                                },
+                                [
+                                    React.createElement('i',
+                                        {
+                                            className: 'fas fa-download'
+                                        }
+                                    ),
+                                    'Download'
+                                ]
+                            )
+                        )
+                    ]
+                )
+            )
+        ]
+    );
+};
+
+export default NoteAttachment;

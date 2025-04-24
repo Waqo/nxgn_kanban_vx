@@ -1,0 +1,465 @@
+import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
+import { initializeZoho } from "./utils/zohoInit.js";
+import { logError } from "./utils/errorHandling.js";
+import ErrorBoundary from "./components/ErrorBoundary.js";
+import KanbanBoard from "./components/KanbanBoard.js";
+import ProjectDetailsModal from "./components/ProjectDetailsModal.js";
+import PDFPreview from "./components/PDFPreview.js";
+import {
+  fetchKanbanProjects,
+  fetchProjectDetails,
+  organizeProjectsByStage,
+  fetchEquipmentData,
+  processEquipmentData,
+  fetchInitialData,
+  processTagsData,
+  processStagesData,
+  processTranchesData,
+  processUsersData,
+  processSalesRepsData,
+} from "./utils/dataFetching.js";
+import { getQueryParams } from "./utils/queryParams.js";
+import { updateActiveDetailWindow, updateRecord } from "./utils/recordUpdates.js";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ToastProvider, useToast } from "./contexts/ToastContext.js";
+import { getCurrentUser, getAllUsersExceptCurrent } from "./utils/userInfo.js";
+
+// Separate App component
+const AppContent = () => {
+  const { showToast } = useToast();
+  const [projects, setProjects] = React.useState([]);
+  const [selectedProject, setSelectedProject] = React.useState(null);
+  const [stages, setStages] = React.useState([]);
+  const [collapsedColumns, setCollapsedColumns] = React.useState({});
+  const [users, setUsers] = React.useState([]);
+  const [currentUser, setCurrentUser] = React.useState(null);
+  const [showProjectModal, setShowProjectModal] = React.useState(false);
+  const [selectedProjectId, setSelectedProjectId] = React.useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [currentView, setCurrentView] = useState("all");
+  const [isTranchesView, setIsTranchesView] = useState(false);
+  const [tranchesData, setTranchesData] = useState([]);
+
+  // Add searchConfig state
+  const [searchConfig, setSearchConfig] = useState({
+    term: "",
+    category: "contactName",
+  });
+
+  // Add equipment data state
+  const [equipmentData, setEquipmentData] = useState(null);
+
+  // Add tagMap state
+  const [tagMap, setTagMap] = React.useState(new Map());
+
+  const [salesReps, setSalesReps] = useState([]);
+
+  // Add PDFPreview state
+  const [previewDoc, setPreviewDoc] = React.useState(null);
+
+  const [filterConfig, setFilterConfig] = useState({
+    projectType: "all",
+    needHelp: false,
+    hasTags: false,
+    salesOrg: "",
+    salesRep: "",
+  });
+
+  const handleProjectClick = async (project) => {
+    try {
+      // 1. Get project ID
+      const projectId = project.id || project.ID;
+
+      setSelectedProjectId(projectId);
+      setShowProjectModal(true);
+
+      // 2. Fetch full project details
+      const projectDetails = await fetchProjectDetails(projectId);
+
+      // 3. Show modal with details
+      setSelectedProject(projectDetails);
+
+      // 4. Update active detail window in background
+      await updateActiveDetailWindow(projectId);
+
+      // 5. Check if project folders need to be created
+      if (!projectDetails.project_folder) {
+        try {
+          // Trigger folder creation
+          await updateRecord(
+            "PM_Kanban_Projects",
+            projectId,
+            {
+              data: {
+                TRIG_Create_Project_Folders: "true"
+              }
+            }
+          );
+
+          // Poll every 5 seconds until folder is created (max 6 attempts = 30 seconds)
+          let attempts = 0;
+          const maxAttempts = 6;
+          let updatedProjectDetails = null;
+
+          while (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            updatedProjectDetails = await fetchProjectDetails(projectId);
+            
+            if (updatedProjectDetails.project_folder) {
+              setSelectedProject(updatedProjectDetails);
+              break;
+            }
+            
+            attempts++;
+          }
+        } catch (error) {
+          console.error('Error in folder creation process:', error);
+          // Silently handle error - don't show to user
+        }
+      }
+
+      showToast("Project loaded successfully", "success");
+    } catch (error) {
+      console.error("Error opening project details:", error);
+    }
+  };
+
+  const handleCloseModal = async () => {
+    try {
+      // Reset UI states
+      setSelectedProject(null);
+      setShowProjectModal(false);
+      setSelectedProjectId(null);
+
+      // Reset search states - update to include category
+      setSearchConfig({
+        term: "",
+        category: "contactName",
+      });
+
+      // Then update backend state
+      await updateActiveDetailWindow("");
+
+      // Finally refresh data in background without showing loading state
+      const projectData = await fetchKanbanProjects();
+      const organizedProjects = organizeProjectsByStage(projectData, stages);
+      setProjects(organizedProjects);
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error("Error closing project details:", error);
+    }
+  };
+
+  const handleToggleCollapse = (stageId) => {
+    setCollapsedColumns((prev) => ({
+      ...prev,
+      [stageId]: !prev[stageId],
+    }));
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const projectData = await fetchKanbanProjects();
+      const organizedProjects = organizeProjectsByStage(projectData, stages);
+      setProjects(organizedProjects);
+      setLastUpdated(new Date());
+    } catch (error) {
+      logError(error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const fetchModalData = async (projectId) => {
+    try {
+      const projectDetails = await fetchProjectDetails(projectId);
+      setSelectedProject(projectDetails);
+    } catch (error) {
+      logError(error);
+    }
+  };
+
+  const handleViewChange = (view) => {
+    setCurrentView(view);
+    // Add this to trigger a re-fetch when view changes
+    const fetchAndOrganizeProjects = async () => {
+      try {
+        const projectData = await fetchKanbanProjects();
+        const organizedProjects = organizeProjectsByStage(projectData, stages);
+        setProjects(organizedProjects);
+      } catch (error) {
+        logError(error);
+      }
+    };
+    fetchAndOrganizeProjects();
+  };
+
+  // Add this function to initialize collapsed columns
+  const initializeCollapsedColumns = (stages, projects) => {
+    const initialCollapsed = {};
+    stages.forEach((stage) => {
+      const stageCards = projects.find((p) => p.id === stage.id)?.cards || [];
+      initialCollapsed[stage.id] =
+        !stageCards.length || // Collapse empty columns
+        stage.title === "Cancelled" ||
+        stage.title === "Not Viable";
+    });
+    return initialCollapsed;
+  };
+
+  // New helper function to handle project opening
+  const openProject = async (projectDetails, projectId) => {
+    try {
+      setSelectedProjectId(projectId);
+      setSelectedProject(projectDetails);
+      setShowProjectModal(true);
+      await updateActiveDetailWindow(projectId);
+    } catch (error) {
+      console.error("Error opening project:", error);
+      showToast("Failed to update active project window", "error");
+    }
+  };
+
+  // New helper function to initialize stages
+  const initializeStages = (queryParams) => {
+    if (!queryParams.stages) return [];
+
+    try {
+      const parsedStages = JSON.parse(queryParams.stages);
+      return parsedStages.map((stageStr) => {
+        const [id, title, view] = stageStr.split(", ");
+        return { id, title, view };
+      });
+    } catch (error) {
+      console.error("Error parsing stages:", error);
+      showToast("Failed to initialize stages", "error");
+      return [];
+    }
+  };
+
+  // New helper function to initialize users
+  const initializeUsers = (queryParams) => {
+    if (!queryParams.users) return [];
+
+    try {
+      const parsedUsers = JSON.parse(queryParams.users);
+      return parsedUsers.map((userStr) => {
+        const [id, name, username, email, activeDetailWindow] =
+          userStr.split(", ");
+        return { id, name, username, email, activeDetailWindow };
+        console.log("InitializeUsers - Parsed user:", {
+          id,
+          name,
+          username,
+          email,
+          activeDetailWindow,
+        });
+      });
+    } catch (error) {
+      console.error("Error parsing users:", error);
+      showToast("Failed to initialize users", "error");
+      return [];
+    }
+  };
+
+  const initializeProjectView = async (queryParams, currentUser, tagMap) => {
+    try {
+      // Priority 1: URL project_view parameter
+      if (queryParams.project_view) {
+        showToast("Opening project...", "loading");
+        const projectDetails = await fetchProjectDetails(
+          queryParams.project_view
+        );
+        await openProject(projectDetails, queryParams.project_view);
+        return;
+      }
+
+      // Priority 2: User's active detail window
+      if (currentUser?.activeDetailWindow) {
+        showToast("Opening project...", "loading");
+        const projectDetails = await fetchProjectDetails(
+          currentUser.activeDetailWindow
+        );
+        await openProject(projectDetails, currentUser.activeDetailWindow);
+        return;
+      }
+    } catch (error) {
+      console.error("Error initializing project view:", error);
+      showToast("Failed to load project details", "error");
+    }
+  };
+
+  // Main initialization function
+  const initializeApp = async () => {
+    setIsLoading(true);
+    let processedStages = []; // Declare at the top level of the function
+    let processedTags = new Map(); // Declare tags at the top level too
+    let processedTranches = []; // Add tranches at top level
+    let currentUser = null;
+
+    try {
+        // Check Zoho SDK availability
+        console.log('Checking Zoho SDK availability...');
+        const zohoAvailable = await initializeZoho();
+        if (!zohoAvailable) {
+            throw new Error('Zoho SDK not available. Please check if the SDK script is properly loaded.');
+        }
+        console.log('Zoho SDK is available');
+
+        // Fetch initial data
+        try {
+            const initialData = await fetchInitialData();
+           
+            const processedTags = processTagsData(initialData.tags);
+
+            processedStages = processStagesData(initialData.stages);
+            processedTranches = processTranchesData(initialData.tranches);
+            const processedUsers = await processUsersData(initialData.users);
+            const processedSalesReps = processSalesRepsData(initialData.salesReps);
+
+            currentUser = processedUsers.currentUser;
+
+            // Fetch equipment data
+            try {
+                const equipmentResponse = await fetchEquipmentData();
+                const processedEquipment = processEquipmentData(equipmentResponse);
+                setEquipmentData(processedEquipment);
+            } catch (error) {
+                console.error("Error fetching equipment data:", error);
+                showToast("Failed to fetch equipment data", "warning");
+                // Set default empty equipment data structure
+                setEquipmentData({
+                    'Module': [],
+                    'Inverter': [],
+                    'Battery': [],
+                    'Other Component': []
+                });
+            }
+        
+            setTagMap(processedTags);
+            setStages(processedStages);
+            setTranchesData(processedTranches);
+            setCurrentUser(currentUser);
+            setUsers(processedUsers.users);
+            setSalesReps(processedSalesReps);
+        } catch (error) {
+            console.error("Error fetching initial data:", error);
+            showToast("Failed to fetch initial data", "warning");
+          
+            setTagMap(new Map());
+            setStages([]);
+            setUsers([]);
+            return;
+        }
+
+        const queryParams = getQueryParams();
+
+        // Log raw query parameters
+        console.log("Raw Query Parameters:", queryParams);
+
+        // Fetch and organize projects using our scoped processedStages
+        showToast("Loading projects...", "loading");
+        const projectData = await fetchKanbanProjects();
+        const organizedProjects = organizeProjectsByStage(
+          projectData,
+          processedStages
+        );
+        setProjects(organizedProjects);
+        setCollapsedColumns(
+          initializeCollapsedColumns(processedStages, organizedProjects)
+        );
+
+        // Initialize project view using scoped variables
+        await initializeProjectView(queryParams, currentUser, processedTags);
+
+        showToast("Projects fetched successfully", "success");
+    } catch (error) {
+        console.error("Initialization failed:", error);
+        showToast(
+            "Failed to initialize application. Please refresh the page.",
+            "error"
+        );
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+  // Use effect to initialize app
+  useEffect(() => {
+    initializeApp();
+  }, []);
+
+  return React.createElement(
+    "div",
+    { className: "h-screen flex flex-col overflow-hidden" },
+    [
+      React.createElement(KanbanBoard, {
+        projects: projects,
+        onProjectClick: handleProjectClick,
+        stages: stages,
+        collapsedColumns: collapsedColumns,
+        setCollapsedColumns: setCollapsedColumns,
+        setProjects: setProjects,
+        onRefresh: handleRefresh,
+        isLoading: isLoading,
+        isRefreshing: isRefreshing,
+        lastUpdated: lastUpdated,
+        currentView: currentView,
+        onViewChange: handleViewChange,
+        isTranchesView: isTranchesView,
+        setIsTranchesView: setIsTranchesView,
+        tranchesData: tranchesData,
+        searchConfig: searchConfig,
+        setSearchConfig: setSearchConfig,
+        currentUser: currentUser,
+        users: users,
+        salesReps: salesReps,
+        tags: tagMap,
+      }),
+      showProjectModal &&
+        React.createElement(ProjectDetailsModal, {
+          project: selectedProject,
+          isOpen: showProjectModal,
+          onClose: handleCloseModal,
+          currentUser: currentUser,
+          users: users,
+          stages: stages,
+          fetchModalData: fetchModalData,
+          isRefreshing: false,
+          setIsRefreshing: () => {},
+          openHelpModal: () => {},
+          selectedProjectForHelp: null,
+          handleResolveIssue: () => {},
+          equipmentData: equipmentData,
+          tagMap: tagMap,
+          salesReps: salesReps,
+          tranchesData: tranchesData,
+          showToast: showToast,
+          previewDoc: previewDoc,
+          setPreviewDoc: setPreviewDoc
+        }),
+      React.createElement("div", { id: "modal-root" }, null),
+      previewDoc && React.createElement(PDFPreview, {
+        pdfData: previewDoc.url,
+        fileName: previewDoc.name,
+        onClose: () => setPreviewDoc(null)
+      })
+    ]
+  );
+};
+
+// Root component that provides context
+const Root = () => {
+  return React.createElement(
+    ToastProvider,
+    null,
+    React.createElement(AppContent)
+  );
+};
+
+// Render the Root component
+ReactDOM.render(React.createElement(Root), document.getElementById("app"));

@@ -1,0 +1,81 @@
+/* global React */
+import React from 'react';
+
+const TagModal = ({ 
+    isOpen, 
+    onClose, 
+    selectedTag,
+    setSelectedTag,
+    availableTags,
+    onSubmit
+}) => {
+    if (!isOpen) return null;
+
+    // Sort tags alphabetically by name
+    const sortedTags = [...availableTags].sort((a, b) => 
+        a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+    );
+
+    return React.createElement('div',
+        {
+            className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        },
+        React.createElement('div',
+            {
+                className: "bg-white p-6 rounded-lg shadow-xl max-w-md w-full"
+            },
+            [
+                React.createElement('h3',
+                    { className: "text-lg font-medium mb-4" },
+                    "Add Tag"
+                ),
+                
+                React.createElement('select',
+                    {
+                        className: "w-full p-2 border rounded mb-4",
+                        value: selectedTag,
+                        onChange: (e) => setSelectedTag(e.target.value)
+                    },
+                    [
+                        React.createElement('option', { value: '' }, "Select a tag..."),
+                        ...sortedTags.map(tag =>
+                            React.createElement('option',
+                                {
+                                    key: tag.ID,
+                                    value: tag.name
+                                },
+                                tag.name
+                            )
+                        )
+                    ]
+                ),
+                
+                React.createElement('div',
+                    { className: "flex justify-end gap-2" },
+                    [
+                        React.createElement('button',
+                            {
+                                className: "px-4 py-2 text-gray-600 hover:text-gray-800",
+                                onClick: () => {
+                                    onClose();
+                                    setSelectedTag('');
+                                }
+                            },
+                            "Cancel"
+                        ),
+                        React.createElement('button',
+                            {
+                                className: "px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700",
+                                onClick: onSubmit,
+                                disabled: !selectedTag
+                            },
+                            "Add"
+                        )
+                    ]
+                )
+            ]
+        )
+    );
+};
+
+export default TagModal;

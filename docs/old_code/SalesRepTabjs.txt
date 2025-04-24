@@ -1,0 +1,903 @@
+import React from 'react';
+import { updateRecord } from '../utils/recordUpdates.js';
+import { getQueryParams } from '../utils/queryParams.js';
+import { navigateToURL } from '../utils/navigation.js';
+import { updateUserCallStatus } from '../utils/recordUpdates.js';
+import CommissionNotes from './CommissionNotes.js';
+import { MoreVertical } from 'lucide-react';
+import EditSalesRepModal from './EditSalesRepModal.js';
+
+
+const formatPhoneNumber = (phoneNumber) => {
+    if (!phoneNumber) return { display: '', link: '' };
+    const cleaned = phoneNumber.replace(/\D/g, '');
+    if (cleaned.length === 10) {
+        const display = `(${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+        return { display, link: cleaned };
+    }
+    return { 
+        display: phoneNumber,
+        link: cleaned
+    };
+};
+
+const SalesRepTab = ({ project, salesReps, fetchModalData, users, currentUser }) => {
+   // console.log('SalesRepTab received project data:', {
+   //     salesRep: project.salesRep,        // This is from our new fetch
+   //     salesReps: salesReps,     // This would be from query params
+   //     salesRepId: project.salesRep.ID    // This is likely from query params
+   // });
+
+    const [selectedSalesRep, setSelectedSalesRep] = React.useState(null);
+    const [isUpdating, setIsUpdating] = React.useState(false);
+    const phone = formatPhoneNumber(project.salesRep.phone);
+
+    // Update the milestones state
+    const [milestones, setMilestones] = React.useState([
+        { 
+            id: 'advance',
+            amount: project.Total_Commission_Advance || '', 
+            status: project.Commission_Advance_Status || 'Pending',
+            paidDate: project.Comm_Advance_Paid_Date || null
+        },
+        { 
+            id: 'M1', 
+            amount: project.M1_Amount || '', 
+            status: project.M1_Status || 'Pending',
+            paidDate: project.M1_Paid_Date || null
+        },
+        { 
+            id: 'M2', 
+            amount: project.M2_Amount || '', 
+            status: project.M2_Status || 'Pending',
+            paidDate: project.M2_Paid_Date || null
+        },
+        { 
+            id: 'M3', 
+            amount: project.M3_Amount || '', 
+            status: project.M3_Status || 'Pending',
+            paidDate: project.M3_Paid_Date || null
+        }
+    ]);
+    const [isMilestonesChanged, setIsMilestonesChanged] = React.useState(false);
+    const [isMilestonesUpdating, setIsMilestonesUpdating] = React.useState(false);
+
+    // Add new state for displayed totals
+    const [displayedTotals, setDisplayedTotals] = React.useState({
+        pending: 0,
+        paid: 0
+    });
+
+    // Add state for menu visibility
+    const [showActionMenu, setShowActionMenu] = React.useState(false);
+
+    // Add these state declarations
+    const [showEditModal, setShowEditModal] = React.useState(false);
+
+    // Add state for active commission rate
+    const [activeCommissionRate, setActiveCommissionRate] = React.useState(project.activeCommissionRate || '');
+
+    // Add state for tracking if rate needs saving
+    const [isRateChanged, setIsRateChanged] = React.useState(false);
+    const [isRateSaving, setIsRateSaving] = React.useState(false);
+
+    // Add state at the top of component
+    const [isM3DrawerOpen, setIsM3DrawerOpen] = React.useState(false);
+
+    // Add useEffect to handle project updates
+    React.useEffect(() => {
+        setActiveCommissionRate(project.activeCommissionRate || '');
+    }, [project.activeCommissionRate]);
+
+    React.useEffect(() => {
+        if (project.salesReps) {
+            setSalesReps(project.salesReps.map(rep => ({
+                id: rep.ID,
+                name: rep.fullName,
+                lastName: rep.Last_Name,
+                firstName: rep.First_Name,
+                sortName: `${rep.Last_Name}, ${rep.First_Name}`
+            })));
+            
+            if (selectedSalesRep === null) {
+                setSelectedSalesRep(project.salesRep.id || '');
+            }
+        }
+    }, [project.salesReps, project.salesRep.id]);
+
+    const handleSalesRepUpdate = async () => {
+        if (!selectedSalesRep || selectedSalesRep === project.salesRep.id) return;
+        setIsUpdating(true);
+        try {
+            await updateRecord("PM_Kanban_Projects", project.id, {
+                data: { Sales_Rep: selectedSalesRep }
+            });
+            await fetchModalData(project.id);
+            setSelectedSalesRep(selectedSalesRep);
+        } catch (error) {
+            console.error("Error updating sales rep:", error);
+            alert("Failed to update sales representative");
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    const handleAmountChange = (index, value) => {
+        console.log('handleAmountChange called with:', { index, value }); // Debug log
+        const cleanValue = value.replace(/[^0-9.]/g, '');
+        
+        const newMilestones = [...milestones];
+        console.log('Current milestones:', newMilestones); // Debug log
+        
+        // Find the correct index if it's 'advance'
+        const targetIndex = index === 'advance' ? 0 : index;
+        
+        // Update the milestone at the correct index
+        newMilestones[targetIndex] = {
+            ...newMilestones[targetIndex],
+            amount: cleanValue
+        };
+        
+        console.log('Updated milestones:', newMilestones); // Debug log
+        setMilestones(newMilestones);
+        setIsMilestonesChanged(true);
+    };
+
+    const handleStatusChange = (index, value) => {
+        const currentDate = new Date().toLocaleDateString('en-US', {
+            month: '2-digit',
+            day: '2-digit',
+            year: '2-digit'
+        });
+
+        const newMilestones = [...milestones];
+        newMilestones[index] = {
+            ...newMilestones[index],
+            status: value,
+            paidDate: value === 'Paid' ? currentDate : null  // Set new date when marked Paid, null when Pending
+        };
+        setMilestones(newMilestones);
+        setIsMilestonesChanged(true);
+    };
+
+    const handleMilestoneSave = async () => {
+        setIsMilestonesUpdating(true);
+        try {
+            const currentDate = new Date().toLocaleDateString('en-US', {
+                month: '2-digit',
+                day: '2-digit',
+                year: '2-digit'
+            });
+
+            await updateRecord("PM_Kanban_Projects", project.id, {
+                data: {
+                    Total_Commission_Advance: milestones[0].amount,
+                    Commission_Advance_Status: milestones[0].status,
+                    Comm_Advance_Paid_Date: milestones[0].status === 'Paid' ? currentDate : null,
+                    M1_Amount: milestones[1].amount,
+                    M1_Status: milestones[1].status,
+                    M1_Paid_Date: milestones[1].status === 'Paid' ? currentDate : null,
+                    M2_Amount: milestones[2].amount,
+                    M2_Status: milestones[2].status,
+                    M2_Paid_Date: milestones[2].status === 'Paid' ? currentDate : null,
+                    M3_Amount: milestones[3].amount,
+                    M3_Status: milestones[3].status,
+                    M3_Paid_Date: milestones[3].status === 'Paid' ? currentDate : null
+                }
+            });
+
+            // Refresh the data to get the server-side values
+            await fetchModalData(project.id);
+            
+            setIsMilestonesChanged(false);
+        } catch (error) {
+            console.error("Error updating milestones:", error);
+            alert("Failed to update milestones");
+        } finally {
+            setIsMilestonesUpdating(false);
+        }
+    };
+
+    // Update useEffect to properly set initial values
+    React.useEffect(() => {
+        setMilestones([
+            { 
+                id: 'advance',
+                amount: project.Total_Commission_Advance || '', 
+                status: project.Commission_Advance_Status || 'Pending',
+                paidDate: project.Comm_Advance_Paid_Date || null
+            },
+            { 
+                id: 'M1', 
+                amount: project.M1_Amount || '', 
+                status: project.M1_Status || 'Pending',
+                paidDate: project.M1_Paid_Date || null
+            },
+            { 
+                id: 'M2', 
+                amount: project.M2_Amount || '', 
+                status: project.M2_Status || 'Pending',
+                paidDate: project.M2_Paid_Date || null
+            },
+            { 
+                id: 'M3', 
+                amount: project.M3_Amount || '', 
+                status: project.M3_Status || 'Pending',
+                paidDate: project.M3_Paid_Date || null
+            }
+        ]);
+
+        // Calculate initial totals
+        const initial = milestones.reduce((acc, m) => ({
+            pending: acc.pending + (m.status === 'Pending' && m.amount ? parseFloat(m.amount) : 0),
+            paid: acc.paid + (m.status === 'Paid' && m.amount ? parseFloat(m.amount) : 0)
+        }), { pending: 0, paid: 0 });
+
+        setDisplayedTotals(initial);
+    }, [project.M1_Amount, project.M1_Status, project.M1_Paid_Date, 
+        project.M2_Amount, project.M2_Status, project.M2_Paid_Date,
+        project.M3_Amount, project.M3_Status, project.M3_Paid_Date,
+        project.Total_Commission_Advance, project.Commission_Advance_Status, project.Comm_Advance_Paid_Date]);
+
+    // Before rendering CommissionNotes
+   // console.log('SalesRepTab rendering CommissionNotes with project:', project);
+   // console.log('Project notes available:', project?.notes?.length);
+
+    // Add handler for edit mode
+    const handleEditClick = () => {
+        setShowEditModal(true);
+        setShowActionMenu(false);
+    };
+
+    // Helper function to format commission rate
+    const formatCommissionRate = (rate) => {
+        if (!rate && rate !== 0) return '0%';
+        return `${rate}%`;
+    };
+
+    // Helper function to get selected rate value
+    const getSelectedRateValue = (rateType) => {
+        if (!project.salesRep) return null;
+        switch(rateType) {
+            case 'Regular Commission Rate':
+                return project.salesRep.regularCommissionRate;
+            case 'Commercial Commission Rate':
+                return project.salesRep.commercialCommissionRate;
+            case 'Shared Commission Rate':
+                return project.salesRep.sharedCommissionRate;
+            default:
+                return null;
+        }
+    };
+
+    const handleRateSave = async () => {
+        setIsRateSaving(true);
+        try {
+            await updateRecord("PM_Kanban_Projects", project.id, {
+                data: {
+                    Active_Commission_Rate: activeCommissionRate
+                }
+            });
+            
+            await fetchModalData(project.id);  // This refreshes the project data
+            
+            // After fetching new data, check if the saved rate has a valid value
+            if (getSelectedRateValue(activeCommissionRate) === null || getSelectedRateValue(activeCommissionRate) === 0) {
+                alert("The selected rate is not set for this sales rep. Please edit the sales rep to add the rate.");
+            }
+            
+            setIsRateChanged(false);
+        } catch (error) {
+            console.error("Error saving rate:", error);
+            alert("Failed to save rate");
+        } finally {
+            setIsRateSaving(false);
+        }
+    };
+
+    return React.createElement('div',
+        { className: "p-6 max-w-4xl mx-auto space-y-6" },
+        [
+            React.createElement('div',
+                { className: "bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden" },
+                [
+                    // Header Section with Dropdown
+                    React.createElement('div',
+                        { className: "p-6 border-b border-gray-200" },
+                        React.createElement('div',
+                            { className: "flex items-center justify-between" },
+                            [
+                                React.createElement('div',
+                                    { className: "flex items-center space-x-4" },
+                                    [
+                                        React.createElement('div',
+                                            { className: "p-2 bg-blue-50 rounded-lg" },
+                                            React.createElement('i',
+                                                { className: "fas fa-user text-blue-500 text-xl" }
+                                            )
+                                        ),
+                                        React.createElement('select',
+                                            {
+                                                className: "text-xl font-medium text-gray-900 bg-transparent border-0 cursor-pointer hover:text-blue-600 focus:outline-none focus:ring-0",
+                                                value: selectedSalesRep || '',
+                                                onChange: (e) => setSelectedSalesRep(e.target.value)
+                                            },
+                                            [
+                                                React.createElement('option',
+                                                    { value: project.salesRep.id },
+                                                    project.salesRep.name || "Select a Sales Rep"
+                                                ),
+                                                ...salesReps
+                                                    .filter(rep => rep.id !== project.salesRep.id)
+                                                    .map(rep =>
+                                                        React.createElement('option',
+                                                            { key: rep.id, value: rep.id },
+                                                            rep.name
+                                                        )
+                                                    )
+                                            ]
+                                        )
+                                    ]
+                                ),
+                                React.createElement('div',
+                                    { className: "flex items-center space-x-4" },
+                                    [
+                                        React.createElement('div',
+                                            { className: "relative" },
+                                            [
+                                                React.createElement('button',
+                                                    {
+                                                        className: "p-2 rounded-full hover:bg-gray-100",
+                                                        onClick: () => setShowActionMenu(!showActionMenu)
+                                                    },
+                                                    React.createElement(MoreVertical, {
+                                                        className: "w-5 h-5 text-gray-500"
+                                                    })
+                                                ),
+                                                showActionMenu && React.createElement('div',
+                                                    {
+                                                        className: "absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10"
+                                                    },
+                                                    React.createElement('div',
+                                                        { className: "py-1" },
+                                                        React.createElement('button',
+                                                            {
+                                                                className: "w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100",
+                                                                onClick: handleEditClick
+                                                            },
+                                                            "Edit Sales Rep"
+                                                        )
+                                                    )
+                                                )
+                                            ]
+                                        ),
+                                        selectedSalesRep && selectedSalesRep !== project.salesRep.id && React.createElement('button',
+                                            {
+                                                className: "px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
+                                                onClick: handleSalesRepUpdate,
+                                                disabled: isUpdating
+                                            },
+                                            isUpdating ? 
+                                                React.createElement('span',
+                                                    { className: "flex items-center justify-center" },
+                                                    [
+                                                        React.createElement('i',
+                                                            { className: "fas fa-spinner fa-spin mr-2" }
+                                                        ),
+                                                        "Updating..."
+                                                    ]
+                                                ) : 
+                                                "Save Changes"
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ),
+
+                    // Contact Information Section
+                    React.createElement('div',
+                        { className: "p-6" },
+                        React.createElement('div',
+                            { className: "space-y-6" },
+                            [
+                                React.createElement('h4',
+                                    { className: "font-medium text-gray-900" },
+                                    "Contact Information"
+                                ),
+                                React.createElement('div',
+                                    { className: "grid grid-cols-3 gap-6" },
+                                    [
+                                        // Email
+                                        React.createElement('div',
+                                            { className: "flex items-start space-x-3" },
+                                            [
+                                                React.createElement('i',
+                                                    { className: "fas fa-envelope text-gray-400 mt-1" }
+                                                ),
+                                                React.createElement('div',
+                                                    null,
+                                                    [
+                                                        React.createElement('p',
+                                                            { className: "text-sm font-medium text-gray-500" },
+                                                            "Email"
+                                                        ),
+                                                        React.createElement('button',
+                                                            {
+                                                                className: "mt-1 text-gray-900 hover:text-blue-600",
+                                                                onClick: (e) => {
+                                                                    e.preventDefault();
+                                                                    const mailtoUrl = `mailto:${project.salesRep.email}`;
+                                                                    navigateToURL(mailtoUrl);
+                                                                }
+                                                            },
+                                                            project.salesRep.email || "Not available"
+                                                        )
+                                                    ]
+                                                )
+                                            ]
+                                        ),
+                                        // Phone
+                                        React.createElement('div',
+                                            { className: "flex items-start space-x-3" },
+                                            [
+                                                React.createElement('i',
+                                                    { className: "fas fa-phone text-gray-400 mt-1" }
+                                                ),
+                                                React.createElement('div',
+                                                    null,
+                                                    [
+                                                        React.createElement('p',
+                                                            { className: "text-sm font-medium text-gray-500" },
+                                                            "Phone"
+                                                        ),
+                                                        React.createElement('button',
+                                                            {
+                                                                className: "mt-1 text-gray-900 hover:text-blue-600",
+                                                                onClick: async (e) => {
+                                                                    e.preventDefault();
+                                                                    try {
+                                                                        const cleanPhone = project.salesRep.phone.replace(/\D/g, '');
+                                                                        const cleanName = project.salesRep.name.trim();
+                                                                        await updateUserCallStatus(cleanPhone, cleanName);
+                                                                    } catch (error) {
+                                                                        console.error("Error initiating call:", error);
+                                                                    }
+                                                                }
+                                                            },
+                                                            phone.display || "Not available"
+                                                        )
+                                                    ]
+                                                )
+                                            ]
+                                        ),
+                                        // Sales Organization
+                                        React.createElement('div',
+                                            { className: "flex items-start space-x-3" },
+                                            [
+                                                React.createElement('i',
+                                                    { className: "fas fa-building text-gray-400 mt-1" }
+                                                ),
+                                                React.createElement('div',
+                                                    null,
+                                                    [
+                                                        React.createElement('p',
+                                                            { className: "text-sm font-medium text-gray-500" },
+                                                            "Sales Organization"
+                                                        ),
+                                                        React.createElement('p',
+                                                            { className: "mt-1 text-gray-900" },
+                                                            project.salesRep.organization || "None"
+                                                        )
+                                                    ]
+                                                )
+                                            ]
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ),
+
+                    // Commission Milestones Section
+                    React.createElement('div',
+                        { className: "p-6 border-t border-gray-200" },
+                        [
+                            React.createElement('div',
+                                { className: "flex items-center justify-between mb-4" },
+                                [
+                                    React.createElement('h4',
+                                        { className: "font-medium text-gray-900" },
+                                        "Commission Milestones"
+                                    ),
+                                    React.createElement('div',
+                                        { className: "flex items-center gap-2" },
+                                        [
+                                            // Show appropriate badge/button based on state
+                                            !activeCommissionRate ? 
+                                                // No rate selected
+                                                React.createElement('span',
+                                                    { 
+                                                        className: "px-2 py-1 text-xs font-medium text-yellow-800 bg-yellow-100 rounded-full"
+                                                    },
+                                                    "Rate Not Set"
+                                                ) 
+                                            : getSelectedRateValue(activeCommissionRate) === null || getSelectedRateValue(activeCommissionRate) === 0 ?
+                                                // Selected rate not available or is 0
+                                                React.createElement('span',
+                                                    { 
+                                                        className: "px-2 py-1 text-xs font-medium text-red-800 bg-red-100 rounded-full"
+                                                    },
+                                                    "Edit Sales Rep to Add Rate"
+                                                )
+                                            : isRateChanged && activeCommissionRate !== project.activeCommissionRate ?  // Added check for rate change
+                                                // Rate changed and different from current rate, show save button
+                                                React.createElement('button',
+                                                    {
+                                                        className: "px-2 py-1 text-xs font-medium text-white bg-gray-600 rounded-full hover:bg-gray-700 disabled:opacity-50",
+                                                        onClick: handleRateSave,
+                                                        disabled: isRateSaving
+                                                    },
+                                                    isRateSaving ? "Saving..." : "Save Rate"
+                                                )
+                                            : null,
+                                            // Dropdown
+                                            React.createElement('select',
+                                                {
+                                                    className: "px-3 py-1 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                                    value: activeCommissionRate || '',
+                                                    onChange: (e) => {
+                                                        setActiveCommissionRate(e.target.value);
+                                                        setIsRateChanged(e.target.value !== project.activeCommissionRate);
+                                                    }
+                                                },
+                                                [
+                                                    React.createElement('option', { value: "" }, "Select Rate"),
+                                                    React.createElement('option',
+                                                        { value: "Regular Commission Rate" },
+                                                        "Regular Commission Rate"
+                                                    ),
+                                                    React.createElement('option',
+                                                        { value: "Commercial Commission Rate" },
+                                                        "Commercial Commission Rate"
+                                                    ),
+                                                    React.createElement('option',
+                                                        { value: "Shared Commission Rate" },
+                                                        "Shared Commission Rate"
+                                                    )
+                                                ]
+                                            )
+                                        ]
+                                    )
+                                ]
+                            ),
+                            React.createElement('div',
+                                { className: "space-y-4" },
+                                [
+                                    React.createElement('div',
+                                        { className: "divide-y divide-gray-200 border border-gray-200 rounded-lg" },
+                                        milestones.map((milestone, index) =>
+                                            React.createElement('div',
+                                                { 
+                                                    key: milestone.id,
+                                                    className: "flex items-center p-4"
+                                                },
+                                                React.createElement('div',
+                                                    { className: "flex items-center justify-between w-full" },
+                                                    [
+                                                        // Milestone ID and details group
+                                                        React.createElement('div',
+                                                            { 
+                                                                className: `flex items-center ${milestone.id === 'M3' ? 'gap-8' : 'gap-2'}`
+                                                            },
+                                                            milestone.id === 'M3' ?
+                                                                // Special M3 row with calculations
+                                                                [
+                                                                    // M3 label with paid date below
+                                                                    React.createElement('div',
+                                                                        { className: "flex flex-col" },
+                                                                        [
+                                                                            React.createElement('span',
+                                                                                { className: "font-medium" },
+                                                                                "M3"
+                                                                            ),
+                                                                            React.createElement('span',
+                                                                                { className: "text-xxs-reduced text-gray-500" },  // Using the smallest custom size
+                                                                                milestone.status === 'Paid' && milestone.paidDate ? 
+                                                                                    `Paid ${milestone.paidDate}`
+                                                                                    : null
+                                                                            )
+                                                                        ]
+                                                                    ),
+                                                                    // System Size
+                                                                    React.createElement('div',
+                                                                        { className: "flex flex-col items-center w-24" },
+                                                                        [
+                                                                            React.createElement('span',
+                                                                                { className: "text-xs text-gray-500 w-full text-center" },
+                                                                                "System Size"
+                                                                            ),
+                                                                            React.createElement('span',
+                                                                                { className: "text-xs font-medium" },
+                                                                                `${project.systemSize || 0} kW`
+                                                                            )
+                                                                        ]
+                                                                    ),
+                                                                    // Rate
+                                                                    React.createElement('div',
+                                                                        { className: "flex flex-col items-center" },
+                                                                        [
+                                                                            React.createElement('span',
+                                                                                { className: "text-xs text-gray-500 mb-1" },
+                                                                                "Rate"
+                                                                            ),
+                                                                            React.createElement('span',
+                                                                                { className: "text-xs font-medium" },
+                                                                                getSelectedRateValue(activeCommissionRate) ? 
+                                                                                    `${getSelectedRateValue(activeCommissionRate)}%` : 
+                                                                                    "No Rate"
+                                                                            )
+                                                                        ]
+                                                                    ),
+                                                                    // Gross Commission
+                                                                    React.createElement('div',
+                                                                        { className: "flex flex-col items-center w-24" },
+                                                                        [
+                                                                            React.createElement('span',
+                                                                                { className: "text-xs text-gray-500 w-full text-center" },
+                                                                                "Gross"
+                                                                            ),
+                                                                            React.createElement('span',
+                                                                                { className: "text-xs font-medium" },
+                                                                                `$${((project.systemSize || 0) * 1000 * (getSelectedRateValue(activeCommissionRate) || 0)).toFixed(2)}`
+                                                                            )
+                                                                        ]
+                                                                    ),
+                                                                    // Final Commission
+                                                                    React.createElement('div',
+                                                                        { className: "flex flex-col items-center w-24" },
+                                                                        [
+                                                                            React.createElement('span',
+                                                                                { className: "text-xs text-gray-500 w-full text-center" },
+                                                                                "Final"
+                                                                            ),
+                                                                            React.createElement('span',
+                                                                                { className: "text-xs font-medium" },
+                                                                                (() => {
+                                                                                    const grossCommission = (project.systemSize || 0) * 1000 * (getSelectedRateValue(activeCommissionRate) || 0);
+                                                                                    
+                                                                                    // Only include amounts if status is 'Paid'
+                                                                                    const m1Amount = milestones[1].status === 'Paid' ? (parseFloat(milestones[1].amount) || 0) : 0;
+                                                                                    const m2Amount = milestones[2].status === 'Paid' ? (parseFloat(milestones[2].amount) || 0) : 0;
+                                                                                    const advanceAmount = milestones[0].status === 'Paid' ? (parseFloat(milestones[0].amount) || 0) : 0;
+                                                                                    
+                                                                                    const finalCommission = grossCommission - m1Amount - m2Amount - advanceAmount;
+                                                                                    return `$${finalCommission.toFixed(2)}`;
+                                                                                })()
+                                                                            )
+                                                                        ]
+                                                                    )
+                                                                ]
+                                                                :
+                                                                // Regular milestone rows
+                                                                React.createElement('div',
+                                                                    { className: "flex flex-col" },
+                                                                    [
+                                                                        React.createElement('span',
+                                                                            { className: "font-medium" },
+                                                                            milestone.id === 'advance' ? 'Advance' : milestone.id
+                                                                        ),
+                                                                        React.createElement('span',
+                                                                            { className: "text-xxs-reduced text-gray-500" },  // Using the smallest custom size
+                                                                            milestone.status === 'Paid' && milestone.paidDate ? 
+                                                                                `Paid ${milestone.paidDate}`
+                                                                                : null
+                                                                        )
+                                                                    ]
+                                                                )
+                                                        ),
+                                                        // Amount and Status group
+                                                        React.createElement('div',
+                                                            { className: "flex items-center gap-4" },
+                                                            [
+                                                                React.createElement('div',
+                                                                    { className: "relative" },
+                                                                    [
+                                                                        React.createElement('span',
+                                                                            { 
+                                                                                className: "absolute left-2 text-gray-500 pointer-events-none"
+                                                                            },
+                                                                            "$"
+                                                                        ),
+                                                                        React.createElement('input',
+                                                                            {
+                                                                                type: "text",
+                                                                                className: "w-24 pl-6 pr-2 text-right border border-gray-200 rounded",
+                                                                                placeholder: "0.00",
+                                                                                value: milestone.amount || '',
+                                                                                onChange: (e) => {
+                                                                                    // Allow only numbers, decimal point, and backspace
+                                                                                    const value = e.target.value.replace(/[^0-9.]/g, '');
+                                                                                    
+                                                                                    // Prevent multiple decimal points
+                                                                                    const decimalCount = (value.match(/\./g) || []).length;
+                                                                                    if (decimalCount > 1) return;
+                                                                                    
+                                                                                    // Allow empty string for clearing the input
+                                                                                    if (value === '') {
+                                                                                        handleAmountChange(index, '');
+                                                                                        return;
+                                                                                    }
+
+                                                                                    // Allow any valid number input
+                                                                                    if (!isNaN(value)) {
+                                                                                        handleAmountChange(index, value);
+                                                                                    }
+                                                                                },
+                                                                                // Format to 2 decimal places only when the input loses focus
+                                                                                onBlur: (e) => {
+                                                                                    if (milestone.amount) {
+                                                                                        const formattedValue = parseFloat(milestone.amount).toFixed(2);
+                                                                                        handleAmountChange(index, formattedValue);
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        )
+                                                                    ]
+                                                                ),
+                                                                React.createElement('select',
+                                                                    {
+                                                                        className: `px-3 py-1 rounded-full text-sm font-medium ${
+                                                                            milestone.status === 'Pending'
+                                                                                ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                                                                                : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                                        } border-none cursor-pointer focus:ring-0 pr-8`,
+                                                                        value: milestone.status,
+                                                                        onChange: (e) => handleStatusChange(index, e.target.value)
+                                                                    },
+                                                                    [
+                                                                        React.createElement('option',
+                                                                            { value: "Pending" },
+                                                                            "Pending"
+                                                                        ),
+                                                                        React.createElement('option',
+                                                                            { value: "Paid" },
+                                                                            "Paid"
+                                                                        )
+                                                                    ]
+                                                                )
+                                                            ]
+                                                        )
+                                                    ]
+                                                )
+                                            )
+                                        )
+                                    ),
+                                    isMilestonesChanged && React.createElement('div',
+                                        { className: "flex justify-end mt-4" },
+                                        React.createElement('button',
+                                            {
+                                                className: "px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
+                                                onClick: handleMilestoneSave,
+                                                disabled: isMilestonesUpdating
+                                            },
+                                            isMilestonesUpdating ?
+                                                React.createElement('span',
+                                                    { className: "flex items-center justify-center" },
+                                                    [
+                                                        React.createElement('i',
+                                                            { className: "fas fa-spinner fa-spin mr-2" }
+                                                        ),
+                                                        "Saving..."
+                                                    ]
+                                                ) :
+                                                "Save Changes"
+                                        )
+                                    )
+                                ]
+                            )
+                        ]
+                    ),
+                    React.createElement('div',
+                        { className: "mt-4 flex items-center justify-between p-4 bg-gray-50 rounded-lg" },
+                        [
+                            // Regular Commission Rate
+                            React.createElement('div',
+                                { className: "flex flex-col items-center" },
+                                [
+                                    React.createElement('span',
+                                        { className: "text-sm text-gray-500" },
+                                        "Regular Commission Rate"
+                                    ),
+                                    React.createElement('span',
+                                        { className: "text-lg font-medium" },
+                                        `${getSelectedRateValue("Regular Commission Rate") || 0}%`
+                                    )
+                                ]
+                            ),
+                            // Commercial Rate
+                            React.createElement('div',
+                                { className: "flex flex-col items-center" },
+                                [
+                                    React.createElement('span',
+                                        { className: "text-sm text-gray-500" },
+                                        "Commercial Rate"
+                                    ),
+                                    React.createElement('span',
+                                        { className: "text-lg font-medium" },
+                                        `${getSelectedRateValue("Commercial Commission Rate") || 0}%`
+                                    )
+                                ]
+                            ),
+                            // Shared Rate
+                            React.createElement('div',
+                                { className: "flex flex-col items-center" },
+                                [
+                                    React.createElement('span',
+                                        { className: "text-sm text-gray-500" },
+                                        "Shared Rate"
+                                    ),
+                                    React.createElement('span',
+                                        { className: "text-lg font-medium" },
+                                        `${getSelectedRateValue("Shared Commission Rate") || 0}%`
+                                    )
+                                ]
+                            ),
+                            // Net Pending Commission
+                            React.createElement('div',
+                                { className: "flex flex-col items-center" },
+                                [
+                                    React.createElement('span',
+                                        { className: "text-sm text-gray-500" },
+                                        "Net Pending Commission"
+                                    ),
+                                    React.createElement('span',
+                                        { className: "text-lg font-medium" },
+                                        `$${displayedTotals.pending.toFixed(2)}`
+                                    )
+                                ]
+                            ),
+                            // Net Paid Commission
+                            React.createElement('div',
+                                { className: "flex flex-col items-center" },
+                                [
+                                    React.createElement('span',
+                                        { className: "text-sm text-gray-500" },
+                                        "Net Paid Commission"
+                                    ),
+                                    React.createElement('span',
+                                        { className: "text-lg font-medium" },
+                                        `$${displayedTotals.paid.toFixed(2)}`
+                                    )
+                                ]
+                            )
+                        ]
+                    ),
+                    React.createElement('div',
+                        { className: "mt-6" },
+                        [
+                            React.createElement(CommissionNotes, {
+                                project,
+                                fetchModalData,
+                                currentUser,
+                                users
+                            })
+                        ]
+                    )
+                ]
+            ),
+            React.createElement(EditSalesRepModal, {
+                isOpen: showEditModal,
+                onClose: () => setShowEditModal(false),
+                salesRep: project.salesRep,
+                onSave: () => {
+                    setShowEditModal(false);
+                    fetchModalData(project.id);
+                },
+                fetchModalData: () => fetchModalData(project.id)
+            })
+        ]
+    );
+};
+
+export default SalesRepTab;

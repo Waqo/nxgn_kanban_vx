@@ -1,0 +1,257 @@
+import React from 'react';
+import { updateRecord } from '../utils/recordUpdates.js';
+import { useToast } from '../contexts/ToastContext.js';
+
+const EditSalesRepModal = ({ isOpen, onClose, salesRep, onSave, fetchModalData }) => {
+    const { showToast } = useToast();
+    
+    // Update state when salesRep changes
+    React.useEffect(() => {
+        if (salesRep) {
+            // Extract first and last name from the full name
+            const nameParts = salesRep.name ? salesRep.name.split(' ') : ['', ''];
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            
+            setEditedSalesRep({
+                Commercial_Commission_Rate: salesRep.commercialCommissionRate || '',
+                Regular_Commission_Rate: salesRep.regularCommissionRate || '',
+                Email: salesRep.email || '',
+                First_Name: firstName,
+                Last_Name: lastName,
+                Phone: salesRep.phone || '',
+                Shared_Commission_Rate: salesRep.sharedCommissionRate || ''
+            });
+        }
+    }, [salesRep]);
+    
+    const [editedSalesRep, setEditedSalesRep] = React.useState({
+        Commercial_Commission_Rate: salesRep?.commercialCommissionRate || '',
+        Regular_Commission_Rate: salesRep?.regularCommissionRate || '',
+        Email: salesRep?.email || '',
+        First_Name: salesRep?.name ? salesRep.name.split(' ')[0] : '',
+        Last_Name: salesRep?.name ? salesRep.name.split(' ').slice(1).join(' ') : '',
+        Phone: salesRep?.phone || '',
+        Shared_Commission_Rate: salesRep?.sharedCommissionRate || ''
+    });
+
+    const handleSave = async () => {
+        try {
+            // Check if we have a valid salesRep ID
+            const salesRepId = salesRep?.id || salesRep?.ID;
+            
+            if (!salesRepId) {
+                console.error("Cannot update sales rep: Missing ID", salesRep);
+                showToast("Cannot update sales rep: Missing ID", "error");
+                return;
+            }
+            
+            const formattedData = {
+                Commercial_Commission_Rate: editedSalesRep.Commercial_Commission_Rate,
+                Regular_Commission_Rate: editedSalesRep.Regular_Commission_Rate,
+                Email: editedSalesRep.Email,
+                Phone: editedSalesRep.Phone,
+                Shared_Commission_Rate: editedSalesRep.Shared_Commission_Rate,
+                Name: {
+                    first_name: editedSalesRep.First_Name,
+                    last_name: editedSalesRep.Last_Name
+                }
+            };
+
+            console.log('Sending updated data:', formattedData); // Debug log
+            console.log('Sales Rep ID:', salesRepId); // Debug log
+            
+            const response = await updateRecord(
+                "PM_Kanban_Sales_Reps",
+                salesRepId,
+                {
+                    data: formattedData
+                },
+                showToast,
+                {
+                    loadingMessage: "Updating sales representative...",
+                    successMessage: "Sales representative updated successfully",
+                    errorMessage: "Failed to update sales representative:"
+                }
+            );
+            
+            await fetchModalData();
+            onSave();
+            onClose();
+        } catch (error) {
+            // Error handling is now managed by updateRecord with toast
+            console.error("Error in handleSave:", error);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return React.createElement('div', {
+        className: "fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[9999] flex items-center justify-center",
+        style: { 
+            display: isOpen ? 'block' : 'none',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0
+        },
+        onClick: (e) => {
+            if (e.target === e.currentTarget) {
+                onClose();
+            }
+        }
+    }, [
+        // Modal content
+        React.createElement('div', {
+            className: "absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-6 border w-full max-w-2xl shadow-lg rounded-md bg-white"
+        }, [
+            // Header
+            React.createElement('div', {
+                className: "flex justify-between items-center mb-6"
+            }, [
+                React.createElement('h2', {
+                    className: "text-xl font-semibold"
+                }, "Edit Sales Representative"),
+                React.createElement('button', {
+                    className: "text-gray-500 hover:text-gray-700",
+                    onClick: onClose
+                }, "×")
+            ]),
+
+            // Form
+            React.createElement('div', {
+                className: "grid grid-cols-2 gap-6"
+            }, [
+                // First Name
+                React.createElement('div', null, [
+                    React.createElement('label', {
+                        className: "block text-sm font-medium text-gray-700 mb-1"
+                    }, "First Name"),
+                    React.createElement('input', {
+                        type: "text",
+                        className: "w-full p-2 border border-gray-300 rounded-md",
+                        value: editedSalesRep.First_Name,
+                        onChange: (e) => setEditedSalesRep({
+                            ...editedSalesRep,
+                            First_Name: e.target.value
+                        })
+                    })
+                ]),
+
+                // Last Name
+                React.createElement('div', null, [
+                    React.createElement('label', {
+                        className: "block text-sm font-medium text-gray-700 mb-1"
+                    }, "Last Name"),
+                    React.createElement('input', {
+                        type: "text",
+                        className: "w-full p-2 border border-gray-300 rounded-md",
+                        value: editedSalesRep.Last_Name,
+                        onChange: (e) => setEditedSalesRep({
+                            ...editedSalesRep,
+                            Last_Name: e.target.value
+                        })
+                    })
+                ]),
+
+                // Email
+                React.createElement('div', null, [
+                    React.createElement('label', {
+                        className: "block text-sm font-medium text-gray-700 mb-1"
+                    }, "Email"),
+                    React.createElement('input', {
+                        type: "email",
+                        className: "w-full p-2 border border-gray-300 rounded-md",
+                        value: editedSalesRep.Email,
+                        onChange: (e) => setEditedSalesRep({
+                            ...editedSalesRep,
+                            Email: e.target.value
+                        })
+                    })
+                ]),
+
+                // Phone
+                React.createElement('div', null, [
+                    React.createElement('label', {
+                        className: "block text-sm font-medium text-gray-700 mb-1"
+                    }, "Phone"),
+                    React.createElement('input', {
+                        type: "tel",
+                        className: "w-full p-2 border border-gray-300 rounded-md",
+                        value: editedSalesRep.Phone,
+                        onChange: (e) => setEditedSalesRep({
+                            ...editedSalesRep,
+                            Phone: e.target.value
+                        })
+                    })
+                ]),
+
+
+                // Regular Commission Rate
+                React.createElement('div', null, [
+                    React.createElement('label', {
+                        className: "block text-sm font-medium text-gray-700 mb-1"
+                    }, "Regular Commission Rate"),
+                    React.createElement('input', {
+                        type: "text",
+                        className: "w-full p-2 border border-gray-300 rounded-md",
+                        value: editedSalesRep.Regular_Commission_Rate,
+                        onChange: (e) => setEditedSalesRep({
+                            ...editedSalesRep,
+                            Regular_Commission_Rate: e.target.value
+                        })
+                    })
+                ]),
+
+                // Commercial Commission Rate
+                React.createElement('div', null, [
+                    React.createElement('label', {
+                        className: "block text-sm font-medium text-gray-700 mb-1"
+                    }, "Commercial Commission Rate"),
+                    React.createElement('input', {
+                        type: "text",
+                        className: "w-full p-2 border border-gray-300 rounded-md",
+                        value: editedSalesRep.Commercial_Commission_Rate,
+                        onChange: (e) => setEditedSalesRep({
+                            ...editedSalesRep,
+                            Commercial_Commission_Rate: e.target.value
+                        })
+                    })
+                ]),
+
+                // Shared Commission Rate
+                React.createElement('div', null, [
+                    React.createElement('label', {
+                        className: "block text-sm font-medium text-gray-700 mb-1"
+                    }, "Shared Commission Rate"),
+                    React.createElement('input', {
+                        type: "text",
+                        className: "w-full p-2 border border-gray-300 rounded-md",
+                        value: editedSalesRep.Shared_Commission_Rate,
+                        onChange: (e) => setEditedSalesRep({
+                            ...editedSalesRep,
+                            Shared_Commission_Rate: e.target.value
+                        })
+                    })
+                ])
+            ]),
+
+            // Footer with buttons
+            React.createElement('div', {
+                className: "flex justify-end space-x-4 mt-6"
+            }, [
+                React.createElement('button', {
+                    className: "px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200",
+                    onClick: onClose
+                }, "Cancel"),
+                React.createElement('button', {
+                    className: "px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700",
+                    onClick: handleSave
+                }, "Save Changes")
+            ])
+        ])
+    ]);
+};
+
+export default EditSalesRepModal;

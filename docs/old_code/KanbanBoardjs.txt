@@ -1,0 +1,526 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { navigateToURL } from '../utils/navigation.js';
+import { logError } from '../utils/errorHandling.js';
+import KanbanColumn from './KanbanColumn.js';
+import KanbanCard from './KanbanCard.js';
+import { updateProjectStage, updateProjectTranche } from '../utils/stagecardUpdate.js';
+import Toolbar from './Toolbar.js';
+import { fetchKanbanProjects } from '../utils/dataFetching.js';
+import KanbanBoardSkeleton from './KanbanBoardSkeleton.js';
+import { useToast } from '../contexts/ToastContext.js';
+import TranchesKanbanBoard from './TranchesKanbanBoard.js';
+
+
+const KanbanBoard = ({ 
+    projects, 
+    onProjectClick, 
+    stages, 
+    collapsedColumns,
+    setCollapsedColumns,
+    setProjects,
+    onRefresh,
+    isLoading,
+    isRefreshing,
+    lastUpdated,
+    currentView,
+    onViewChange,
+    isTranchesView,
+    setIsTranchesView,
+    tranchesData,
+    searchConfig: initialSearchConfig,
+    tags,
+    salesReps,
+    salesOrgs
+}) => {
+    const { showToast } = useToast();
+    
+    // Track the card being dragged
+    const [draggedCard, setDraggedCard] = useState(null);
+    const [sourceStage, setSourceStage] = useState(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragError, setDragError] = useState(null);
+   
+
+    // Enhanced search and filter state
+    const [searchConfig, setSearchConfig] = useState(initialSearchConfig || {
+        term: '',
+        category: 'contactName'
+    });
+    const [filterConfig, setFilterConfig] = useState({
+        projectType: [],
+        tags: [],
+        workRequired: [],
+        salesRep: [],
+        salesOrg: [],
+        cashDeal: false,
+        needHelp: false
+    });
+    const [sortConfig, setSortConfig] = useState({
+        field: 'contactName',
+        direction: 'asc'
+    });
+
+    // Add state for view filter
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // Add this state at the top with other state declarations
+    const [scrollPosition, setScrollPosition] = useState(0);
+    const containerRef = useRef(null);
+
+    // Add this effect to restore scroll position after refresh
+    useEffect(() => {
+        if (containerRef.current && !isLoading && !isRefreshing) {
+            containerRef.current.scrollLeft = scrollPosition;
+        }
+    }, [isLoading, isRefreshing]);
+
+    // Add this function to save scroll position before refresh
+    const handleRefresh = () => {
+        if (containerRef.current) {
+            setScrollPosition(containerRef.current.scrollLeft);
+        }
+        onRefresh();
+    };
+
+    // Update useEffect to sync with initialSearchConfig changes
+    useEffect(() => {
+        setSearchConfig(initialSearchConfig);
+        setSearchTerm(''); // Reset local search term when searchConfig changes
+    }, [initialSearchConfig]);
+
+    // Filter stages based on view
+    const getFilteredStages = () => {
+        if (!stages) return [];
+        
+        return stages
+            .filter(stage => {
+                // Filter out the specific stage ID
+                if (stage.id === "4663646000002634108") return false;
+                
+                // Show all stages if view is 'all'
+                if (currentView === 'all') return true;
+                
+                // Show stages that match current view or are marked as 'Both'
+                return stage.view.toLowerCase() === currentView.toLowerCase() || 
+                       stage.view.toLowerCase() === 'both';
+            })
+            .map(stage => {
+                // Find matching project column
+                const projectColumn = projects.find(col => col.id === stage.id);
+                
+                return {
+                    id: stage.id,
+                    title: stage.title,
+                    view: stage.view,
+                    cards: projectColumn?.cards || []
+                };
+            });
+    };
+
+    // Add debugging
+    //console.log('Projects:', projects);
+    //console.log('Filtered Stages:', getFilteredStages());
+
+    // Add handler for view changes
+    const handleViewChange = (view) => {
+        setCurrentView(view);
+    };
+
+    const handleCardClick = (card) => {
+        try {
+            // Save scroll position before opening modal
+            if (containerRef.current) {
+                setScrollPosition(containerRef.current.scrollLeft);
+            }
+            
+            if (onProjectClick) {
+                onProjectClick(card);
+            }
+        } catch (error) {
+            logError(error);
+        }
+    };
+
+    const handleDragStart = (card, stage) => {
+        setDraggedCard(card);
+        setSourceStage(stage);
+    };
+
+    const handleDragEnd = (e) => {
+        setIsDragging(false);
+        setDraggedCard(null);
+        setSourceStage(null);
+        // Remove dragging class from all cards (in case of any stuck states)
+        document.querySelectorAll('.kanban-card').forEach(card => {
+            card.classList.remove('dragging');
+        });
+        if (dragError) {
+            console.error(dragError);
+            setDragError(null);
+        }
+    };
+
+    const handleDrop = async (targetStage) => {
+        if (!draggedCard || !sourceStage) return;
+
+        // Skip if dropped in same stage
+        if (sourceStage.id === targetStage.id) {
+            setDraggedCard(null);
+            setSourceStage(null);
+            return;
+        }
+
+        // Show loading toast
+        showToast('Updating project stage...', 'loading');
+
+        // Optimistically update UI
+        const updatedProjects = projects.map(project => {
+            if (project.id === sourceStage.id) {
+                return {
+                    ...project,
+                    cards: project.cards.filter(c => c.id !== draggedCard.id)
+                };
+            }
+            if (project.id === targetStage.id) {
+                return {
+                    ...project,
+                    cards: [...project.cards, draggedCard]
+                };
+            }
+            return project;
+        });
+
+        // Update UI immediately
+        setProjects(updatedProjects);
+
+        try {
+            // Attempt API update
+            await updateProjectStage(draggedCard.id, targetStage.id);
+            showToast('Project stage updated successfully', 'success');
+        } catch (error) {
+            console.error('Failed to update stage:', error);
+            // Revert on failure
+            setProjects(projects);
+            showToast('Failed to update stage. Changes reverted.', 'error');
+        } finally {
+            setDraggedCard(null);
+            setSourceStage(null);
+        }
+    };
+
+    // Update handleSearch to use both local and parent state
+    const handleSearch = ({ term, category }) => {
+        setSearchTerm(term);
+        setSearchConfig({ term: term.toLowerCase(), category });
+    };
+
+    const handleFilter = (newFilters) => {
+        
+        // Ensure all array-based filters are initialized
+        const sanitizedFilters = {
+            projectType: [],
+            tags: [],
+            workRequired: [],
+            salesRep: [],
+            salesOrg: [],
+            cashDeal: false,
+            needHelp: false,
+            ...newFilters
+        };
+      
+        setFilterConfig(sanitizedFilters);
+    };
+
+    const handleSort = ({ field, direction }) => {
+       
+        setSortConfig({ field, direction });
+    };
+
+    // Enhanced filter function
+    const getFilteredCards = (cards, stageId) => {
+      
+        if (!cards) return [];
+        
+        // First filter the cards
+        const filteredCards = cards.filter(card => {
+            // Log card data for debugging
+           
+
+            // Apply search filter
+            const matchesSearch = !searchConfig.term || 
+                card[searchConfig.category]?.toString().toLowerCase().includes(searchConfig.term.toLowerCase());
+
+            // Apply tag filters
+            const matchesTags = !filterConfig.tags?.length || 
+                filterConfig.tags.every(tagId => 
+                    card.Tags?.some(cardTag => cardTag.ID === tagId)
+                );
+
+            // Apply work required filters
+            const matchesWorkRequired = !filterConfig.workRequired?.length ||
+                filterConfig.workRequired.some(work => {
+                    switch (work) {
+                        case 'tree':
+                            return card.treeWork === "Yes";
+                        case 'roof':
+                            return card.roofWork === "Yes";
+                        case 'panel':
+                            return card.panelUpgrade === "Yes";
+                        default:
+                            return false;
+                    }
+                });
+
+            // Apply project type filter
+            const matchesProjectType = !filterConfig.projectType?.length ||
+                (Array.isArray(filterConfig.projectType) && filterConfig.projectType.some(type => {
+                    switch (type) {
+                        case 'commercial':
+                            return card.isCommercial === "true" || card.isCommercial === true;
+                        case 'residential':
+                            return card.isCommercial !== "true" && card.isCommercial !== true;
+                        default:
+                            return false;
+                    }
+                }));
+
+            // Apply cash deal filter
+            const matchesCashDeal = !filterConfig.cashDeal || 
+                card.isCashDeal === "true" || card.isCashDeal === true;
+
+            // Apply other filters...
+            const matchesSalesRep = !filterConfig.salesRep?.length || 
+                filterConfig.salesRep.includes(card.salesRepName);
+
+            const matchesSalesOrg = !filterConfig.salesOrg?.length || 
+                filterConfig.salesOrg.includes(card.salesRepOrg);
+
+            const matchesNeedHelp = !filterConfig.needHelp || 
+                (card.needHelp === true || card.needHelp === "true");
+
+          
+
+            return matchesSearch && 
+                   matchesTags && 
+                   matchesWorkRequired && 
+                   matchesProjectType &&
+                   matchesCashDeal &&
+                   matchesSalesRep && 
+                   matchesSalesOrg && 
+                   matchesNeedHelp;
+        });
+
+        // Then sort the filtered cards
+        return filteredCards.sort((a, b) => {
+            const aValue = a[sortConfig.field];
+            const bValue = b[sortConfig.field];
+
+            // Handle date fields
+            if (['dateSold', 'addedTime', 'modifiedTime'].includes(sortConfig.field)) {
+                const dateA = new Date(aValue || 0);
+                const dateB = new Date(bValue || 0);
+                return sortConfig.direction === 'asc' 
+                    ? dateA - dateB 
+                    : dateB - dateA;
+            }
+
+            // Handle string fields
+            const stringA = (aValue || '').toString().toLowerCase();
+            const stringB = (bValue || '').toString().toLowerCase();
+            return sortConfig.direction === 'asc'
+                ? stringA.localeCompare(stringB)
+                : stringB.localeCompare(stringA);
+        });
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        const container = e.currentTarget;
+        const containerRect = container.getBoundingClientRect();
+        const scrollSpeed = 15;
+        const scrollThreshold = 100; // pixels from edge
+
+        // Calculate distance from edges
+        const distanceFromLeft = e.clientX - containerRect.left;
+        const distanceFromRight = containerRect.right - e.clientX;
+
+        // Auto-scroll horizontally
+        if (distanceFromLeft < scrollThreshold) {
+            container.scrollLeft -= scrollSpeed;
+        } else if (distanceFromRight < scrollThreshold) {
+            container.scrollLeft += scrollSpeed;
+        }
+    };
+
+    // Add/modify the useEffect to restore scroll position
+    useEffect(() => {
+        if (containerRef.current && !isLoading && !isRefreshing) {
+            containerRef.current.scrollLeft = scrollPosition;
+        }
+    }, [isLoading, isRefreshing, onProjectClick]); // Add onProjectClick to dependencies
+
+    // Add this function to check if a column has any matching results
+    const hasSearchResults = (cards) => {
+        if (!searchTerm) return true;
+        
+        return cards.some(card => 
+            card.contactName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            card.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            card.projectId?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    };
+
+    // Add this function to determine if a column should be collapsed
+    const shouldCollapseColumn = (stage, cards, isInitialLoad = false) => {
+        // If it's initial load or reset
+        if (isInitialLoad) {
+            return !cards?.length || // Collapse empty columns
+                stage.title === 'Cancelled' ||
+                stage.title === 'Not Viable';
+        }
+        
+        // During filtering
+        return !cards?.length; // Only collapse empty columns
+    };
+
+    // Add effect to handle column collapse states when filters change
+    useEffect(() => {
+        const newCollapsedStates = {};
+        stages.forEach(stage => {
+            const columnCards = getFilteredCards(
+                projects.find(p => p.id === stage.id)?.cards || [],
+                stage.id
+            );
+            // Always collapse if no cards after filtering or if it's Cancelled/Not Viable
+            newCollapsedStates[stage.id] = columnCards.length === 0 || 
+                stage.title === 'Cancelled' ||
+                stage.title === 'Not Viable';
+        });
+        // Update all columns at once
+        setCollapsedColumns(prev => ({
+            ...prev,
+            ...newCollapsedStates
+        }));
+    }, [searchConfig, filterConfig, sortConfig]);
+
+    // Modify the reset handler
+    const handleReset = () => {
+        setSearchConfig({ term: '', category: 'contactName' });
+        setFilterConfig({
+            tags: [],
+            workRequired: [],
+            projectType: [],
+            salesRep: [],
+            salesOrg: [],
+            cashDeal: false,
+            needHelp: false
+        });
+        setSortConfig({
+            field: 'contactName',
+            direction: 'asc'
+        });
+    };
+
+    // Add this helper function
+    const calculateTotalSystemSize = (cards) => {
+        return cards
+            .filter(card => 
+                card.stageField?.ID !== "4663646000003176007" && // Not Viable
+                card.stageField?.ID !== "4663646000002891015"    // Cancelled
+            )
+            .reduce((total, card) => {
+                const size = parseFloat(card.systemSize) || 0;
+                return total + size;
+            }, 0).toFixed(2);
+    };
+
+    return React.createElement(
+        'div',
+        { className: "h-screen flex flex-col overflow-hidden" },
+        [
+            React.createElement(Toolbar, {
+                onSearch: setSearchConfig,
+                onFilter: setFilterConfig,
+                onSort: setSortConfig,
+                onRefresh: handleRefresh,
+                onViewChange: onViewChange,
+                currentView,
+                disabled: isLoading || isRefreshing,
+                lastUpdated,
+                isRefreshing,
+                searchConfig,
+                filterConfig,
+                sortConfig,
+                onCardClick: onProjectClick,
+                projects: isTranchesView 
+                    ? projects.flatMap(column => column.cards || [])
+                    : projects,
+                salesOrgs: Array.from(new Set(projects.flatMap(column => 
+                    column.cards.map(card => card.salesRepOrg)
+                ))).filter(Boolean),
+                salesReps: Array.from(new Set(projects.flatMap(column => 
+                    column.cards.map(card => card.salesRepName)
+                ))).filter(Boolean),
+                isTranchesView,
+                setIsTranchesView,
+                tranchesData,
+                tags: tags,
+                totalSystemSize: calculateTotalSystemSize(projects.flatMap(column => column.cards))
+            }),
+            (isLoading)
+                ? React.createElement(KanbanBoardSkeleton)
+                : React.createElement(
+                    'div',
+                    { 
+                        className: "flex-1 min-h-0 overflow-hidden bg-gray-100",
+                        onDragOver: handleDragOver,
+                        ref: containerRef
+                    },
+                    isTranchesView
+                        ? [
+                            React.createElement(TranchesKanbanBoard, {
+                                projects,
+                                tranchesData,
+                                collapsedColumns,
+                                setCollapsedColumns,
+                                getFilteredCards,
+                                onDrop: handleDrop,
+                                onDragStart: handleDragStart,
+                                onDragEnd: handleDragEnd,
+                                onCardClick: handleCardClick,
+                                isRefreshing,
+                                onDragOver: handleDragOver,
+                                containerRef,
+                                setProjects
+                            })
+                        ]
+                        : [
+                            // Existing board content
+                            React.createElement('div',
+                                { className: "h-full flex gap-4 p-4 overflow-x-auto overflow-y-hidden" },
+                                getFilteredStages().map(stage => {
+                                    const shouldShow = hasSearchResults(stage.cards);
+                                    return shouldShow ? React.createElement(KanbanColumn, {
+                                        key: stage.id,
+                                        stage: stage,
+                                        title: stage.title,
+                                        cards: getFilteredCards(stage.cards || [], stage.id),
+                                        isCollapsed: collapsedColumns[stage.id],
+                                        onDrop: () => handleDrop(stage),
+                                        onDragStart: (card) => handleDragStart(card, stage),
+                                        onToggleCollapse: () => setCollapsedColumns(prev => ({
+                                            ...prev,
+                                            [stage.id]: !prev[stage.id]
+                                        })),
+                                        onCardClick: handleCardClick
+                                    }) : null;
+                                })
+                            )
+                        ]
+                )
+        ]
+    );
+};
+
+export default KanbanBoard;
+

@@ -1,0 +1,195 @@
+/* global React */
+import React from 'react';
+import { getCurrentUser } from '../utils/userInfo.js';
+
+const IssueModal = ({ 
+    isOpen, 
+    onClose, 
+    issueInput, 
+    setIssueInput, 
+    selectedUsers, 
+    setSelectedUsers, 
+    users, 
+    onSubmit,
+    showUserDropdown,
+    setShowUserDropdown,
+    currentUser,
+    notifySales,
+    setNotifySales
+}) => {
+    const [filteredUsers, setFilteredUsers] = React.useState([]);
+    const dropdownRef = React.useRef(null);
+
+    // Add click outside handler
+    React.useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setShowUserDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [setShowUserDropdown]);
+
+    React.useEffect(() => {
+        const filterUsers = () => {
+            try {
+                if (!users) {
+                    setFilteredUsers([]);
+                    return;
+                }
+
+                // Filter out current user and sales reps only for the dropdown
+                setFilteredUsers(users.filter(user => 
+                    user.id !== currentUser?.id &&  // Filter current user locally
+                    user?.role !== "Sales Rep"
+                ));
+            } catch (error) {
+                console.error("Error filtering users:", error);
+                setFilteredUsers([]);
+            }
+        };
+        filterUsers();
+    }, [users, currentUser]);  // Add currentUser to dependencies
+
+    if (!isOpen) return null;
+
+    return React.createElement('div', {
+        className: "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]"
+    }, React.createElement('div', {
+        className: "bg-white rounded-lg shadow-xl w-full max-w-lg p-6"
+    }, [
+        React.createElement('div', {
+            className: "flex justify-between items-center mb-4"
+        }, [
+            React.createElement('h3', {
+                className: "text-lg font-medium text-gray-900"
+            }, "Raise New Issue"),
+            React.createElement('button', {
+                className: "text-gray-400 hover:text-gray-500",
+                onClick: onClose
+            }, React.createElement('i', { 
+                className: "fas fa-times" 
+            }))
+        ]),
+
+        React.createElement('textarea', {
+            className: "w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 mb-4",
+            placeholder: "Describe the issue...",
+            rows: 4,
+            value: issueInput,
+            onChange: (e) => setIssueInput(e.target.value)
+        }),
+
+        React.createElement('div', {
+            className: "flex items-center mb-4"
+        }, [
+            React.createElement('input', {
+                type: "checkbox",
+                id: "notifySales",
+                checked: notifySales,
+                onChange: (e) => setNotifySales(e.target.checked),
+                className: "h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+            }),
+            React.createElement('label', {
+                htmlFor: "notifySales",
+                className: "ml-2 text-sm text-gray-700"
+            }, "Notify Sales")
+        ]),
+
+        React.createElement('div', {
+            className: "relative mb-4",
+            ref: dropdownRef  // Add ref to the dropdown container
+        }, [
+            React.createElement('button', {
+                type: "button",
+                className: "inline-flex items-center gap-2 px-3 py-2 text-sm border rounded-md hover:bg-gray-50",
+                onClick: () => setShowUserDropdown(!showUserDropdown)
+            }, [
+                React.createElement('i', { 
+                    className: "fas fa-users" 
+                }),
+                "Tag Users",
+                selectedUsers.length > 0 && React.createElement('span', {
+                    className: "bg-blue-100 text-blue-600 px-2 rounded-full text-xs"
+                }, selectedUsers.length)
+            ].filter(Boolean)),
+
+            showUserDropdown && React.createElement('div', {
+                className: "absolute z-10 mt-1 w-64 bg-white shadow-lg rounded-lg border border-gray-200 max-h-48 overflow-y-auto",
+                style: { display: showUserDropdown ? 'block' : 'none' }
+            }, [
+                React.createElement('div', {
+                    className: "px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-200",
+                    onClick: () => {
+                        setSelectedUsers(filteredUsers);
+                        setShowUserDropdown(false);
+                    }
+                }, 
+                    React.createElement('div', {
+                        className: "flex items-center justify-between"
+                    }, [
+                        React.createElement('span', {
+                            className: "text-sm text-gray-900 font-medium"
+                        }, "Tag All Users"),
+                        React.createElement('i', {
+                            className: "fas fa-users text-gray-400"
+                        })
+                    ])
+                ),
+                
+                filteredUsers.map(user => 
+                    React.createElement('div', {
+                        key: user.id,
+                        className: "px-3 py-2 hover:bg-gray-50 cursor-pointer",
+                        onClick: () => {
+                            setSelectedUsers(prev => {
+                                const isSelected = prev.some(selected => selected.id === user.id);
+                                return isSelected
+                                    ? prev.filter(selected => selected.id !== user.id)
+                                    : [...prev, user];
+                            });
+                            setShowUserDropdown(false);
+                        }
+                    },
+                        React.createElement('div', {
+                            className: "flex items-center gap-2"
+                        }, [
+                            React.createElement('input', {
+                                type: "checkbox",
+                                checked: selectedUsers.some(selected => selected.id === user.id),
+                                onChange: () => {
+                                    setSelectedUsers(prev => {
+                                        const isSelected = prev.some(selected => selected.id === user.id);
+                                        return isSelected
+                                            ? prev.filter(selected => selected.id !== user.id)
+                                            : [...prev, user];
+                                    });
+                                },
+                                className: "rounded border-gray-300 text-blue-600"
+                            }),
+                            user.name
+                        ])
+                    )
+                )
+            ]),
+        ]),
+
+        React.createElement('div', {
+            className: "flex justify-end gap-3"
+        }, [
+            React.createElement('button', {
+                className: "px-4 py-2 text-gray-600 hover:text-gray-800",
+                onClick: onClose
+            }, "Cancel"),
+            React.createElement('button', {
+                className: "px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600",
+                onClick: onSubmit,
+                disabled: !issueInput.trim()
+            }, "Raise Issue")
+        ])
+    ]));
+};
+
+export default IssueModal;

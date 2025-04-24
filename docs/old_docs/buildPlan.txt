@@ -1,0 +1,139 @@
+# Vue 3 Kanban Widget Build Plan (No Build Step)
+
+**1. Goal:** Rebuild the existing React Kanban widget using Vue 3 via CDN, without a build step, interacting with Zoho Creator API v2.
+
+**2. Core Technologies:**
+    *   **Framework:** Vue 3 (Global Build via CDN)
+    *   **State Management:** Vuex (via CDN - chosen due to reliable CDN availability)
+    *   **Styling:** Tailwind CSS (via CDN) + Ported Custom CSS
+    *   **API Interaction:** Zoho Creator JS API v2 (`widgetsdk-min.js` via CDN)
+    *   **Icons:** FontAwesome (already available) or CDN alternative if needed.
+
+**3. HTML Structure (`app/widget.html`):**
+    *   Include CDN links for Vue 3, Vuex, Tailwind CSS, Zoho SDK.
+    *   Define the main app mount point: `<div id="app"></div>`.
+    *   Include `<script type="text/x-template">` tags for major Vue component templates.
+    *   Load custom JavaScript files via `<script>` tags in the correct dependency order (e.g., API service -> Store -> Components -> App Initialization).
+    *   Initialize the Vue app instance (`Vue.createApp(...).use(store).mount('#app')`).
+
+**4. Vue Application Structure:**
+    *   **Initialization:** A main `app.js` (or similar) script to create the Vue app instance, configure the store, register global components, and mount the app.
+    *   **Components:**
+        *   Define components as plain JavaScript objects (Options API likely sufficient, Composition API where beneficial for complex logic).
+        *   Store component definitions in separate `.js` files (e.g., `components/KanbanBoard.js`, `components/ProjectDetailsModal.js`, etc.).
+        *   Load component scripts in `widget.html`.
+        *   Attach components to a global namespace (e.g., `window.AppComponents = {}`) within their respective files.
+        *   Register components globally using `app.component('ComponentName', window.AppComponents.ComponentName)` in the main initialization script.
+    *   **Templates:** Use `<script type="text/x-template" id="component-template-id">...</script>` in `widget.html` and reference them via `template: '#component-template-id'` in component definitions.
+
+**5. State Management (Vuex):**
+    *   Define a central store (`store/index.js` or similar) using `Vuex.createStore({...})`.
+    *   Structure the store with modules if necessary (e.g., `projects`, `lookups`, `uiState`).
+    *   Define state, getters, actions based on the `dataSchema.txt` and component needs identified in `devPlan.txt` (e.g., project list, stages, tags, users, current project details, filters, loading states, modal visibility).
+    *   Load the store definition script in `widget.html` before component/app initialization.
+
+**6. API Service (`services/zohoCreatorAPI.js`):**
+    *   Create a dedicated service object/module (e.g., `window.ZohoAPIService = {...}`).
+    *   Encapsulate all `ZOHO.CREATOR.*` API calls (DATA, FILE, UTIL, META).
+    *   Implement methods for fetching data (projects, lookups, details), creating records (notes, issues, materials), updating records (stage changes, project details, contacts), deleting records (contacts), uploading files (documents, attachments), invoking custom APIs.
+    *   Port necessary data transformation logic from the old `dataFetching.js`.
+    *   Update V1 API calls (like delete) to V2 equivalents (`ZOHO.CREATOR.DATA.deleteRecords`).
+    *   Handle API responses (success/error) and return processed data or promises.
+    *   Load this service script early in `widget.html`.
+
+**7. Key Components (Initial Implementation Focus):**
+    *   `App.js` (Root component orchestrating main views)
+    *   `KanbanBoard.js` (Main board view, fetches/displays projects)
+    *   `KanbanColumn.js` (Displays a single stage column)
+    *   `KanbanCard.js` (Displays a single project card)
+    *   `ProjectDetailsModal.js` (Modal for viewing/editing project details)
+    *   `Toolbar.js` (Filtering, sorting, search controls)
+    *   Various Tab Components (`OverviewTab`, `DocumentsTab`, etc.) for the modal.
+
+**8. Styling:**
+    *   Link Tailwind CSS CDN in `widget.html`.
+    *   Create a `styles/main.css` file (or embed in `<style>` tag in `widget.html`).
+    *   Port necessary custom classes, overrides, and potentially Tailwind `@apply` directives from `docs/old_code/stylescss.txt` into the new CSS structure.
+
+**9. Development Order (High-Level):**
+    *   **Setup:** Create `app/widget.html`, basic `app/App.js`, include CDNs.
+    *   **API Service:** Implement core methods in `app/services/zohoCreatorAPI.js`.
+    *   **State Management:** Set up Vuex store structure (`app/store/store.js`) and basic state/actions for fetching initial data.
+    *   **Core Kanban:** Build components in `app/components/kanban/`. Fetch and display projects.
+    *   **Styling:** Integrate Tailwind and port custom styles.
+    *   **Drag & Drop:** Implement card dragging between columns (stage update).
+    *   **Modal Foundation:** Build `ProjectDetailsModal` structure, basic tabs. Fetch/display details for a selected card.
+    *   **Toolbar:** Implement filtering/sorting/search UI and logic.
+    *   **Feature Implementation:** Build out individual tabs, forms (notes, issues), file uploads, etc., integrating with the store and API service.
+    *   **Refinement:** Address remaining features, edge cases, UI polish, error handling.
+
+**10. Proposed Directory Structure:**
+
+```
+nxgn_kanban_vx/
+├── app/                     # Root directory for deployable widget assets
+│   ├── widget.html          # Main HTML: Loads CDNs, component templates, JS files. Contains <div id="app">.
+│   ├── App.js               # Entry point: Creates Vue app, registers components, injects store, mounts app.
+│   ├── components/          # Vue component definitions (JS Objects)
+│   │   ├── common/          # Highly reusable, generic components (e.g., AppSpinner.js, AppModal.js, AppButton.js, AppBadge.js)
+│   │   ├── kanban/          # Components specific to the Kanban board view
+│   │   │   ├── KanbanBoard.js
+│   │   │   ├── KanbanColumn.js
+│   │   │   ├── KanbanCard.js
+│   │   │   └── KanbanToolbar.js # Filters/Sort/Search specific to Kanban
+│   │   │
+│   │   └── projectModal/    # Components specific to the Project Details Modal
+│   │       ├── ProjectDetailsModal.js # Orchestrator for the modal view
+│   │       ├── ModalHeader.js
+│   │       ├── tabs/            # Components representing each tab's content
+│   │       │   ├── OverviewTab.js
+│   │       │   ├── DocumentsTab.js
+│   │       │   ├── ActivitiesTab.js
+│   │       │   ├── NotesSection.js # Often part of Overview or its own tab
+│   │       │   ├── IssuesSection.js  # Often part of Overview or its own tab
+│   │       │   ├── ContactTab.js
+│   │       │   ├── SurveyTab.js
+│   │       │   ├── SalesRepTab.js
+│   │       │   ├── SystemsTab.js
+│   │       │   ├── PermittingTab.js
+│   │       │   ├── InvestorsTab.js
+│   │       │   └── # ... other tabs/sections derived from old code (CommSection, Milestones, etc.)
+│   │       └── # Other modal-specific sub-components (e.g., NoteItem.js, ContactItem.js, IssueModal.js)
+│   │
+│   ├── services/            # Interaction with external APIs (Zoho)
+│   │   └── zohoCreatorAPI.js # Wraps all ZOHO.CREATOR.* calls. Handles data fetching, updates, creation, deletion, file uploads, etc.
+│   │
+│   ├── store/               # Vuex store configuration
+│   │   ├── store.js         # Creates and exports the Vuex store instance (`Vuex.createStore`)
+│   │   └── modules/         # Store modules for better organization
+│   │       ├── projects.js    # State related to project list, filtering, sorting, kanban view
+│   │       ├── lookups.js     # State for stages, tags, users, equipment, doc types, etc.
+│   │       ├── modal.js       # State for the project detail modal (current project ID, active tab, loading states)
+│   │       ├── user.js        # Current user information
+│   │       └── ui.js          # General UI state (global loading, notifications/toasts)
+│   │
+│   ├── utils/               # General utility functions (non-API, non-store)
+│   │   ├── constants.js     # Application-wide constants (e.g., event names, default values)
+│   │   ├── formatters.js    # Date, currency, text formatting functions
+│   │   └── helpers.js       # Other miscellaneous helper functions
+│   │
+│   └── styles/              # Custom CSS
+│       └── main.css           # Ported custom styles, overrides, potentially Tailwind @apply rules.
+│
+├── docs/                    # Documentation and planning files
+│   ├── buildPlan.txt        # This refined build plan
+│   ├── devPlan.txt          # Initial analysis and review log
+│   ├── dataSchema.txt       # Inferred Zoho data schema
+│   ├── zohoApiDocs.txt      # Zoho API documentation snippets
+│   └── old_code/            # Backup of the original React codebase (.txt files)
+│
+├── server/                  # Standard Zoho local development server
+│   └── index.js             # (Do Not Modify)
+├── node_modules/            # Dependencies for the local server
+├── cert.pem                 # SSL Cert for local dev (Do Not Modify)
+├── key.pem                  # SSL Key for local dev (Do Not Modify)
+├── package-lock.json        # Lockfile for server dependencies (Do Not Modify)
+├── package.json             # Server dependencies (Do Not Modify unless adding server-side tools)
+├── plugin-manifest.json     # **Crucial:** Defines widget properties, parameters, dimensions for Zoho Creator.
+└── README.md                # Project overview, setup instructions, how to load components/scripts in widget.html.
+```

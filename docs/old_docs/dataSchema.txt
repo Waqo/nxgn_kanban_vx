@@ -1,0 +1,512 @@
+# Inferred Data Schema (based on Add_Project form script and otherWidgetCode.txt usage)
+
+## Main Entity: Project (as fetched by fetchProjectDetails or similar)
+
+```javascript
+{
+  // --- Header/Core Info ---
+  id: String, // Record ID (System Generated)
+  contactName: String, // Derived from Owner_Name lookup (zc_display_value)
+  contactID: String, // Owner_Name (Lookup Field ID)
+  contactFirstName: String, // Owner_Name.Name.first_name (Fetched via lookup)
+  contactLastName: String, // Owner_Name.Name.last_name (Fetched via lookup)
+  contactEmail: String, // Owner_Name.Email (Fetched via lookup)
+  contactPhone: String, // Owner_Name.Phone_Number (Fetched via lookup)
+  stageField: { // Derived from New_Stage lookup
+    ID: String, // New_Stage (Lookup Field ID)
+    title: String, // New_Stage.zc_display_value (likely Stage_Name)
+    display_value: String // New_Stage.zc_display_value (likely Stage_Name)
+  },
+  systemSize: Number, // Parsed from kW_STC (Decimal field)
+  paymentOption: String, // Payment_Option (Text field)
+  isCashDeal: Boolean, // Parsed from Is_Cash_Finance (Checkbox field)
+  annualUsage: Number, // Annual_Usage (Decimal field)
+  installDate: String, // Install_Date (Date field)
+  approxInstallDate: String, // Approximate_Installation_Date (Date field)
+  dateSold: String, // Date_Sold (Date field)
+  isCommercial: Boolean, // Parsed from Commercial (Checkbox field)
+  address: String, // Site_Address.zc_display_value
+  addressLine1: String, // Site_Address.address_line_1
+  city: String, // Site_Address.district_city
+  state: String, // Site_Address.state_province
+  zip: String, // Site_Address.postal_Code
+  country: String, // Site_Address.country
+  latitude: Number, // Site_Address.latitude
+  longitude: Number, // Site_Address.longitude
+  aduuPortalID: String, // Aduu_Solar_Portal_ID1 (Text field)
+  trancheField: { // Derived from Tranche lookup
+    ID: String, // Tranche (Lookup Field ID)
+    Tranche_Number: String, // Tranche.Tranche_Number (Fetched via lookup)
+    display_value: String // Tranche.zc_display_value (likely Tranche_Number)
+  },
+  fundedByRedball: Boolean, // Parsed from Funded_By_Redball (Checkbox field)
+  tags: Array, // Raw Tags lookup array from Tags (List field): [{ ID: String, zc_display_value: String }, ...]
+  processedTags: Array, // Derived from raw tags + tagMap: [{ ID: String, name: String, color: String }, ...]
+  os_id: String, // Parsed from OpenSolar_Project_ID (Number field)
+  addedTime: String, // Added_Time (System field - Timestamp string)
+  // Note: 'Stage' (Picklist) seems unused in favor of 'New_Stage' (Lookup)
+
+  // --- Events Info (Specific Date/Time fields for bookings) ---
+  surveyBooking: String, // Survey_Date_Time (Datetime field)
+  surveyStatus: String, // Survey_Status (Picklist field)
+  roofWorkBooking: String, // Roof_Work_Date_Time (Datetime field)
+  roofWorkStatus: String, // Roof_Work_Status (Picklist field)
+  treeWorkBooking: String, // Tree_Work_Date_Time (Datetime field)
+  treeWorkStatus: String, // Tree_Work_Status (Picklist field)
+  puWorkBooking: String, // PU_Work_Date_Time (Datetime field)
+  puWorkStatus: String, // PU_Work_Status (Picklist field)
+  installationBooking: String, // Installation_Date_Time (Datetime field)
+  installationStatus: String, // Installation_Status (Picklist field)
+  finalInspectionBooking: String, // Final_Inspection_Date_Time (Datetime field)
+  finalInspectionStatus: String, // Final_Inspection_Status (Picklist field)
+
+  // --- WorkDrive Info ---
+  project_folder: String, // Project_Folder_ID (Textarea field)
+  investor_folder: String, // Project_Investor_Folder_Id (Textarea field)
+
+  // --- Investor Tab ---
+  isPPA: String, // Is_PPA (Checkbox field, likely stored as "true"/"false")
+  ppaRate: Number, // PPA_Rate (Picklist field, value likely parsed to number)
+  rateYear: Number, // Rate_Year (Picklist field, value likely parsed to number)
+  isDomesticContent: Boolean, // Parsed from Domestic_Content (Checkbox field)
+  applicableRate: Number, // Applicable_Rate (Decimal field)
+  redballSubmissionDate: String, // Submitted_to_Redball (Date field)
+  ptoFunded: Boolean, // Parsed from PTO_Funded (Checkbox field)
+  investorM1Payment: Number, // Investor_M1_Payment (Currency field)
+  investorM1Date: String, // Investor_M1_Date (Date field)
+  investorM2Payment: Number, // Investor_M2_Payment (Currency field)
+  investorM2Date: String, // Investor_M2_Date (Date field)
+  investorM3Payment: Number, // Investor_M3_Payment (Currency field)
+  investorM3Date: String, // Investor_M3_Date (Date field)
+  calcProjectCost: Number, // Calculated_Project_Cost (Formula field)
+  projectCost: Number, // Project_Cost (Currency field)
+
+  // --- Property Info Tab ---
+  propertyInfo: String, // Property_Database_Ownership_Info (Textarea field)
+
+  // --- Overview/Sales Rep Tab ---
+  salesRep: { // Derived from Sales_Rep lookup and related fields
+    id: String, // Sales_Rep (Lookup Field ID)
+    name: String, // Sales_Rep.zc_display_value
+    email: String, // Sales_Rep.Email (Fetched via lookup)
+    phone: String, // Sales_Rep.Phone (Fetched via lookup)
+    organization: String, // Sales_Org.zc_display_value (Fetched via lookup)
+    commercialCommissionRate: Number, // Sales_Rep.Commercial_Commission_Rate (Fetched via lookup)
+    regularCommissionRate: Number, // Sales_Rep.Regular_Commission_Rate (Fetched via lookup)
+    sharedCommissionRate: Number // Sales_Rep.Shared_Commission_Rate (Fetched via lookup)
+  },
+  activeCommissionRate: Number, // Active_Commission_Rate (Picklist field, value likely parsed to number)
+
+  // --- Commission Milestones ---
+  M1_Amount: Number, // M1_Amount (Currency field)
+  M1_Paid_Date: String, // M1_Paid_Date (Date field)
+  M1_Release_Date: String, // M1_Release_Date (Date field)
+  M1_Status: String, // M1_Status (Picklist field)
+  M2_Amount: Number, // M2_Amount (Currency field)
+  M2_Paid_Date: String, // M2_Paid_Date (Date field)
+  M2_Release_Date: String, // M2_Release_Date (Date field)
+  M2_Status: String, // M2_Status (Picklist field)
+  M3_Amount: Number, // M3_Amount (Currency field)
+  M3_Paid_Date: String, // M3_Paid_Date (Date field)
+  M3_Status: String, // M3_Status (Picklist field)
+
+  // --- Commission Advance ---
+  Total_Commission_Advance: Number, // Total_Commission_Advance (Currency field)
+  Comm_Advance_Paid_Date: String, // Comm_Advance_Paid_Date (Date field)
+  Commission_Advance_Status: String, // Commission_Advance_Status (Picklist field)
+
+  // --- System Fields ---
+  kw_STC: Number, // kW_STC (Decimal field)
+  annualOutput: Number, // Parsed from Annual_Output_kWh (Number field)
+  offset: String, // Formatted from Offset (Formula field)
+  yield: String, // Formatted from Yield (Formula field)
+  isApproved: Boolean, // Parsed from Is_Approved (Checkbox field)
+  yieldLessThan1050: Boolean, // Parsed from Yield_Less (Checkbox field)
+
+  // --- Related Lists (Arrays of Objects, defined by separate forms/grids) ---
+  activities: [ /* See Activities Schema */ ],
+  communications: [ /* See Communications Schema */ ],
+  documents: [ /* See Documents Schema */ ],
+  materials: Array, // From Bill_of_Materials grid (detailed schema TBD)
+  notes: [ /* See Notes Schema */ ],
+  permits: Array, // From Permitting grid (detailed schema TBD)
+  surveys: [ /* See Survey Results Schema */ ],
+  issues: [ /* See Issues Schema */ ],
+  contacts: [ /* See Contacts Schema */ ]
+
+  // --- Fields NOT explicitly used in fetchProjectDetails/React Code (Examples from Form Script) ---
+  // Checklist Section Fields (Signed_Contract, Utility_Bill, Proof_of_Ownership, etc.)
+  // Previous_Stage_ID
+  // Stage_Last_Updated
+  // Is_Demo
+  // Need_Help
+  // Weekly_Email_Opt_In, Weekly_Email_Last_Sent
+  // Created_Date
+  // Roof_Material1 (Seems replaced by Roof_Type)
+  // Is_Sold
+  // On_MD_Feeder_Map
+  // NEM_or_CREF
+  // Ready_for_Inves
+  // Installer (Lookup)
+  // Dates Section Fields (NTP_Date, Permit_Approval_Date, etc.)
+  // CO2_Tons_Lifetime
+  // Price_w_Tax, Price_without_Tax
+  // Sales_Rep_2 (Lookup)
+  // Total_Sales_Commission (Formula)
+  // QuickBooks Section Fields
+  // Development Fields (Trello_Card_ID, etc.)
+  // Unused URL Fields (Project_Folder_Link, etc.)
+  // Unused Ownership Check Fields
+  // Other unused fields...
+}
+```
+
+--- 
+
+## Related List Schemas (Based on React Code Usage)
+
+// Note: These schemas are based on the processed data used in the React components.
+// The actual underlying Zoho forms might have more fields.
+
+### Activities Schema (from `activities` array, based on Add_Activities form script)
+```javascript
+{
+  ID: String, // System generated Record ID
+  Activity: String, // From Activity (Text) field
+  Author: String, // From Is_Who (Text) field
+  Platform: String, // From Where (Picklist) field
+  Added_Time: String // System generated Timestamp string
+  // Note: Fields like Details, Is_Complete, Show_to_Customer, User lookup exist in the form but were not observed in use in the React code.
+}
+```
+
+### Communications Schema (from `communications` array, based on Add_Communication form script)
+```javascript
+{
+  ID: String, // System generated Record ID
+  Communication_Type: String, // From Communication_Type (Picklist)
+  Call_Type: String, // From Call_Type (Text) - Note: Call_Type1 (Picklist) also exists
+  Call_Type1: String, // From Call_Type1 (Picklist)
+  Subject: String, // From Subject_field (Text)
+  Description: String, // From Description (Textarea)
+  Call_Start_Time: String, // From Call_Start_Time (Datetime)
+  Call_Duration: String, // From Call_Duration (Number)
+  Agent_Email: String, // From Agent_Email (Text)
+  User: String, // From User lookup (zc_display_value)
+  Contact: String, // From Contact lookup (zc_display_value)
+  SMS_Type: String, // From SMS_Type (Picklist)
+  SMS_Delivery_Status: String, // From SMS_Delivery_Status (Picklist)
+  SMS_Sent_Time: String, // From SMS_Sent_Time (Datetime)
+  SMS_Content: String, // From SMS_Content (Textarea)
+  Email_Type: String, // From Email_Type (Picklist)
+  Email_Subject: String, // From Email_Subject (Text)
+  Email_Sent_Time: String, // From Email_Sent_Time (Datetime)
+  Email_To: String, // From Email_To (Text)
+  Added_Time: String // System generated Timestamp string
+  // Note: Fields like Call_Disposition, Recording URLs, Email_Content, Email_Status exist in the form but were not observed in use in the React code.
+}
+```
+
+### Documents Schema (from `documents` array, based on Add_Document form script)
+```javascript
+{
+  ID: String, // System generated Record ID
+  Document_Name: String, // From Document_Name (Text)
+  Document_Type: String, // From Document_Type (Picklist) - Note: Seems less used than Doc_Type lookup in React code
+  Doc_Type: { // From Doc_Type (Lookup)
+    ID: String, // Lookup ID to Add_Document_Type form
+    Name: String, // Name field from Add_Document_Type form
+    Include_In_Checklist: Boolean // Parsed from Include_In_Checklist checkbox in Add_Document_Type form
+  } | null,
+  File_Upload: String, // From File_Upload (Upload File field) - Zoho file path string
+  Added_Time: String, // System generated Timestamp string
+  Added_User: String, // System generated User
+  Is_Revision: Boolean, // Parsed from Is_Revision (Checkbox)
+  Revision_Number: Number, // From Revision_Number (Number)
+  Sent_To_Investor_Portal: Boolean, // Parsed from Sent_To_Investor_Portal (Checkbox)
+  Trigger_Send_to_Inv: Boolean, // Parsed from Trigger_Send_to_Inv (Checkbox)
+  User: { // Derived from User_Lookup (Lookup to Add_User) or Added_User
+      ID: String | null,
+      Name: String
+  },
+  WorkDrive_Link: String, // From WorkDrive_Link (URL field)
+  Embed_Link: String // From Embed_Link (Textarea field)
+  // Note: Fields like Upload_ID, Upload_Date, WorkDrive_ID, Public_Embed_Link, Download_Link, File_Type, Trello_Attachment_ID, etc. exist in the form but were not observed in use in the React code.
+}
+```
+
+### Notes Schema (processed, from `notes` array, based on Add_Note form script)
+```javascript
+{
+  ID: String, // System generated Record ID
+  content: String, // From Note (Textarea) field
+  author: String, // From Author (Text) field
+  addedTime: String, // System generated Timestamp string
+  user: String, // From User_Lookup (Picklist Lookup to Add_User)
+  department: String, // From Department (Text)
+  notifySales: Boolean, // Parsed from Notify_Sales (Checkbox)
+  teamOnly: Boolean, // Parsed from Team_Only (Checkbox)
+  repliedTo: String | null, // From Replied_To (Picklist Lookup to Add_Note)
+  context: String, // From Context (Picklist)
+  Tagged_Users: Array, // From Tagged_Users (List Lookup to Add_User)
+  attachments: [ // Derived from Attachments grid (linking to Add_Note_Attachment form)
+    { /* See Note Attachments Schema */ }
+  ],
+  replies: Array, // Populated during client-side processing (derived from Replies List lookup?)
+  isReply: Boolean // Derived client-side based on repliedTo
+  // Note: Fields like Assign_to_Teammate, Zoho_Account, Viewed_By, Trello fields exist in the form but were not observed in use in the React code.
+}
+```
+
+### Note Attachments Schema (from `attachments` array within a Note, based on Add_Note_Attachment form script)
+```javascript
+{
+  id: String, // System generated Record ID
+  name: String, // From Name (Text) field
+  type: String, // Derived client-side ('image' or 'file') based on Name extension
+  url: String, // From File_field (Upload File) field - Zoho file path string
+  addedTime: String // System generated Timestamp string
+  // Note: Fields like Image, Added_to_Documents, Note lookup, User1 lookup, Project lookup exist in the form but were not observed in use in the React code.
+}
+```
+
+### Permitting Schema (from `permits` array, based on Add_Permitting form script)
+```javascript
+{
+  ID: String, // System generated Record ID
+  Permit_Status: String, // From Permit_Status (Picklist)
+  Interconnection_Status: String, // From Interconnection_Status (Picklist)
+  Permit_Number: String, // From Permit_Number (Text)
+  Interconnection_Number: String, // From Interconnection_Number (Text)
+  Permit_Submission_Date: String, // From Permit_Submission_Date (Date)
+  Permit_Approval_Date: String, // From Permit_Approval_Date (Date)
+  Permit_Last_Updated: String, // From Permit_Last_Updated (Datetime)
+  Interconnection_Submission_Date: String, // From Interconnection_Submission_Date (Date)
+  Interconnection_Approval_Date: String, // From Interconnection_Approval_Date (Date)
+  IC_Last_Updated: String // From IC_Last_Updated (Date)
+  // Note: Fields like Tags, Problem, Permit_Submitted, Interconnection_Submitted exist in the form but were not observed in use in the React code.
+}
+```
+
+### Survey Results Schema (from `surveys` array, based on Add_Survey_Result form script)
+```javascript
+{
+  ID: String, // System generated Record ID
+  addedTime: String, // System generated Timestamp string
+  assessmentDate: String, // From Assessment_Date (Date)
+  mainServicePanelSize: String, // From Main_Service_Panel_Size (Text)
+  modifiedTime: String, // System generated Timestamp string
+  panelUpgradeRequired: String, // From Panel_Upgrade_Required (Picklist - "Yes"/"No")
+  reportPdfId: String, // From Report_PDF_ID (Textarea)
+  reportUrl: String, // From Report_URL (Inferred, likely constructed or from another source)
+  roofCondition: String, // From Roof_Condition (Text)
+  roofType: String, // From Roof_Type (Text)
+  roofWorkRequired: String, // From Roof_Work_Required (Picklist - "Yes"/"No")
+  sendFinalSummary: Boolean, // Parsed from Send_Final_Summary (Checkbox)
+  summaryNotes: String, // From Summary_Notes (Textarea)
+  summarySent: String | null, // From Summary_Sent (Datetime)
+  treeTrimmingRequired: String, // From Tree_Trimming_Required (Text - "Yes"/"No")
+  treeWorkRequired: String, // From Tree_Work_Required (Picklist - "Yes"/"No")
+  hasReport: Boolean, // Derived client-side based on Report_PDF_ID
+  status: String, // From Status (Inferred, likely calculated or from Project form)
+  requiresWork: Boolean // Derived client-side based on workRequired fields
+  // Note: Fields like OpenSolar_Project_ID, SiteCapture_ID, Homeowner fields, Image_ZIP_ID, Ready, Is_Demo exist in the form but were not observed in use in the React code.
+}
+```
+
+### Issues Schema (from `issues` array, based on Add_Issue form script)
+```javascript
+{
+  id: String, // System generated Record ID
+  issueContent: String, // From Issue (Textarea) field
+  author: String, // From Author (Text) field
+  isResolved: Boolean, // Parsed from Is_Resolved (Checkbox)
+  taggedUsers: Array, // From Tagged_Users (List - Lookup to Add_User)
+  addedTime: String, // System generated Timestamp string
+  notifySales: Boolean, // Parsed from Notify_Sales (Checkbox)
+  displayValue: String // System generated zc_display_value
+  // Note: Fields like Resolved_By, User_Lookup exist in the form but were not observed in use in the React code.
+}
+```
+
+### Contacts Schema (fetched separately, associated via Project lookup, based on Add_Contact form script)
+```javascript
+{
+    ID: String, // System generated Record ID
+    First_Name: String, // From Name.first_name (Name field)
+    Last_Name: String, // From Name.last_name (Name field)
+    Contact_Type: String, // From Primary_Contact_Type1 (Picklist)
+    Email: String, // From Email (Email field)
+    Phone: String, // From Phone_Number (Phone field)
+    Mobile: String, // From Mobile_Phone_Number (Phone field)
+    Is_Business_Contact: String, // From Business_POC (Checkbox, likely "true"/"false" string)
+    Job_Title: String, // From Job_Title (Text field)
+    Business_Name: String, // From Business_Name (Text field)
+    Billing_Address: String, // Billing_Address.zc_display_value
+    Billing_Address_1: String, // Billing_Address.address_line_1
+    Billing_Address_2: String, // Billing_Address.address_line_2
+    Billing_City: String, // Billing_Address.district_city
+    Billing_State: String, // Billing_Address.state_province
+    Billing_Zip: String, // Billing_Address.postal_Code
+    Billing_Country: String, // Billing_Address.country
+    Project_ID: String, // Project Lookup ID (Inferred association, likely not fetched directly with contact)
+    Added_Time: String // System generated Timestamp string
+    // Note: Fields like OpenSolar_ID, Username, Portal_Username, ZohoVoice_ID exist in the form but were not observed in use in the React code.
+}
+```
+
+--- 
+
+## Standalone Lookup Data Structures (Fetched Separately)
+
+// Note: These schemas are based on the processed data used in the React components.
+// The actual underlying Zoho forms might have more fields.
+
+### Stages Schema (from Add_Stage form)
+```javascript
+[
+  {
+    id: String, // System generated Record ID
+    title: String, // From Stage_Name (Text)
+    view: String, // From Stage_View (Picklist)
+    description: String, // From Description (Textarea)
+    order: Number // Parsed from Stage_Order (Number)
+    // Note: Fields like Trello_List_ID, Active_Status, Default_Stage, GTR_Stage_Association exist but were not observed in use in the React code.
+  },
+  // ... more stages
+]
+```
+
+### Tags Schema (Map from Add_Tags form)
+```javascript
+Map<String, { // Key is Tag ID (System generated Record ID)
+  name: String, // From Tag_Name (Text)
+  color: String, // From Tag_Color (Text)
+  category: String, // From Category (Picklist)
+  description: String // From Tag_Description (Textarea)
+  // Note: Fields like Active_Status, Trello_Label_ID exist in the form but were not observed in use in the React code.
+}>
+```
+
+### Tranches Schema (from Add_Tranche form)
+```javascript
+[
+  {
+    id: String, // System generated Record ID
+    number: String, // From Tranche_Number (Number) - Note: React code parses as int
+    date: String, // From Tranche_Date (Date)
+    projects: [ // Derived from Projects (List Lookup to Add_Project)
+      { /* basic project info */ }
+    ]
+  },
+  // ... more tranches
+]
+```
+
+### Users Schema (from Users form, likely report: General_Users_Report or PM_Kanban_Users, based on Add_User form script)
+```javascript
+[
+  {
+    id: String, // System generated Record ID
+    email: String, // From Email (Email)
+    name: String, // From Name.zc_display_value
+    firstName: String, // From Name.first_name
+    lastName: String, // From Name.last_name
+    phone: String, // From Phone_Number (Phone Number)
+    role: String, // From Role (Picklist)
+    salesRepLookup: String, // From Sales_Rep_Lookup (Picklist Lookup to Add_Sales_Rep) - ID
+    activeDetailWindow: String, // From Active_Detail_Window (Text)
+    profilePicture: String, // From Profile_Picture (Image) - URL string
+    isSubcontractor: Boolean, // Derived from Subcontractor (Picklist Lookup to Add_Subcontractor_Member) field presence
+    inCall: Boolean, // Parsed from In_Call (Checkbox)
+    userName: String, // From Name.zc_display_value (alias for name)
+    callingNumber: String, // From Calling_Number (Text)
+    callingName: String, // From Calling_Name (Text)
+    portalAccount: String // From Portal_Account (Picklist - Module Users)
+    // Note: Fields like Zoho_Account, Portal_Access, Customer_Lookup, Trello_ID exist in the form but were not observed in use in the React code.
+  },
+  // ... more users
+]
+// Also note: A 'currentUser' object with the same structure is derived.
+```
+
+### Sales Reps Schema (from Add_Sales_Rep form)
+```javascript
+[
+  {
+      id: String, // System generated Record ID
+      name: String, // From Name.zc_display_value
+      firstName: String, // From Name.first_name
+      lastName: String, // From Name.last_name
+      email: String, // From Email (Email)
+      phone: String, // From Phone (Phone Number)
+      regularCommissionRate: Number, // From Regular_Commission_Rate (Decimal)
+      commercialCommissionRate: Number, // From Commercial_Commission_Rate (Decimal)
+      sharedCommissionRate: Number, // From Shared_Commission_Rate (Decimal)
+      openSolarId: String, // From OpenSolar_ID (Number)
+      salesOrg: String, // From Sales_Org (Lookup to Add_Sales_Org) - zc_display_value
+      salesOrgId: String, // From Sales_Org (Lookup to Add_Sales_Org) - ID
+      userLookupId: String // From User_Lookup (Lookup to Add_User) - ID
+      // Note: Fields like Is_Solo, Managing, Projects, Project_s exist in the form but were not observed in use in the React code.
+  },
+  // ... more sales reps
+]
+```
+
+### Equipment Schema (from Add_Equipment form)
+```javascript
+{
+  'Module': [ { id: String, manufacturer: String, model: String, cost: Number }, /* ... */ ],
+  'Inverter': [ { id: String, manufacturer: String, model: String, cost: Number }, /* ... */ ],
+  'Battery': [ { id: String, manufacturer: String, model: String, cost: Number }, /* ... */ ],
+  'Other Component': [ { id: String, manufacturer: String, model: String, cost: Number }, /* ... */ ]
+  // Individual item structure:
+  // id: String, // System generated Record ID
+  // manufacturer: String, // From Manufacturer (Picklist)
+  // model: String, // From Model (Text)
+  // cost: Number, // Parsed from Cost (USD)
+  // equipmentType: String // Implicitly used as key, from Equipment_Type (Picklist)
+  // Note: Fields like OpenSolar_Equipment_ID, Price Adjustments, Is_Default, and numerous specification fields (Rating_Watts_at_STC, etc.) exist in the form but were not observed in use in the React code.
+}
+```
+
+### Document Types Schema (from Add_Doc_Types form)
+```javascript
+[
+    {
+        ID: String, // System generated Record ID
+        Name: String, // From Name (Text)
+        Include_In_Checklist: Boolean // Parsed from Include_In_Checklist (Checkbox)
+    },
+    // ... more document types
+]
+```
+
+### DC Rates Schema (from Add_DC_Rate form - Usage not confirmed in primary React code)
+```javascript
+[
+  {
+      ID: String, // System generated Record ID
+      Yield_Lower_Limit: Number, // From Yield_Lower_Limit (Number)
+      Yield_Upper_Limit: Number, // From Yield_Upper_Limit (Number)
+      Domestic_Content: Number // From Domestic_Content (USD/Currency)
+  },
+  // ... more DC Rate tiers
+]
+```
+
+### Sales Orgs Schema (from Add_Sales_Org form)
+```javascript
+[
+  {
+      ID: String, // System generated Record ID
+      Org_Name: String, // From Org_Name (Text)
+      Sales_Manager_ID: String, // From Sales_Manager (Lookup to Add_Sales_Rep) - ID
+      Sales_Manager_Name: String, // From Sales_Manager lookup - zc_display_value
+      Member_IDs: Array, // Derived from Members (List Lookup to Add_Sales_Rep) - Array of IDs
+      Project_IDs: Array, // Derived from Projects (List Lookup to Add_Project) - Array of IDs
+      OpenSolar_ID: String // From OpenSolar_ID (Text)
+  },
+  // ... more Sales Orgs
+]
+```

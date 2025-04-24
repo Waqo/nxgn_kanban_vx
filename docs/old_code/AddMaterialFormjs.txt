@@ -1,0 +1,306 @@
+import React, { useState, useEffect } from 'react';
+import { createRecord } from '../utils/recordCreation.js';
+
+const AddMaterialForm = ({ 
+    isOpen, 
+    onClose, 
+    equipmentData, 
+    existingMaterials, 
+    projectId,
+    systemId,
+    onMaterialAdded 
+}) => {
+  
+
+    // Form state
+    const [formData, setFormData] = useState({
+        category: '',
+        manufacturer: '',
+        model: '',
+        quantity: 1,
+        unitPrice: 0,
+        totalPrice: 0
+    });
+
+    // Available options state
+    const [availableCategories, setAvailableCategories] = useState([]);
+    const [availableManufacturers, setAvailableManufacturers] = useState([]);
+    const [availableModels, setAvailableModels] = useState([]);
+
+    // Calculate available categories on mount and when existingMaterials changes
+    useEffect(() => {
+        const existingCategories = new Set(existingMaterials.map(m => m.Category));
+        const allCategories = ['Module', 'Inverter', 'Battery', 'Other Component'];
+        const available = allCategories.filter(cat => 
+            cat === 'Other Component' || !existingCategories.has(cat)
+        );
+        setAvailableCategories(available);
+    }, [existingMaterials]);
+
+    // Update manufacturers when category changes
+    useEffect(() => {
+        if (formData.category && equipmentData && equipmentData[formData.category]) {
+            const manufacturers = [...new Set(
+                equipmentData[formData.category].map(item => item.manufacturer)
+            )];
+            setAvailableManufacturers(manufacturers);
+            setFormData(prev => ({
+                ...prev,
+                manufacturer: '',
+                model: '',
+                unitPrice: 0,
+                totalPrice: 0
+            }));
+        }
+    }, [formData.category, equipmentData]);
+
+    // Update models when manufacturer changes
+    useEffect(() => {
+        if (formData.category && formData.manufacturer && equipmentData && equipmentData[formData.category]) {
+            const models = equipmentData[formData.category]
+                .filter(item => item.manufacturer === formData.manufacturer)
+                .map(item => ({
+                    model: item.model,
+                    cost: item.cost
+                }));
+            setAvailableModels(models);
+            setFormData(prev => ({
+                ...prev,
+                model: '',
+                unitPrice: 0,
+                totalPrice: 0
+            }));
+        }
+    }, [formData.manufacturer, formData.category, equipmentData]);
+
+    // Update prices when model or quantity changes
+    useEffect(() => {
+        if (formData.model && formData.quantity) {
+            const selectedEquipment = availableModels.find(m => m.model === formData.model);
+            if (selectedEquipment) {
+                const unitPrice = selectedEquipment.cost;
+                setFormData(prev => ({
+                    ...prev,
+                    unitPrice,
+                    totalPrice: unitPrice * formData.quantity
+                }));
+            }
+        }
+    }, [formData.model, formData.quantity, availableModels]);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            //console.log('Submitting form with project:', projectId);
+            const response = await createRecord('Add_Bill_of_Material', {
+                Category: formData.category,
+                Manufacturer: formData.manufacturer,
+                Model: formData.model,
+                Quantity: formData.quantity,
+                Unit_Price: formData.unitPrice,
+                Total_Price: formData.totalPrice,
+                Project: projectId
+            });
+
+            if (response.code === 3000) {
+                await onMaterialAdded();
+                onClose();
+            } else {
+                console.error('Error creating material:', response);
+                alert('Failed to add material. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error submitting form:', error);
+            alert('Failed to add material. Please try again.');
+        }
+    };
+
+    return React.createElement('div',
+        {
+            className: 'fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center z-50'
+        },
+        React.createElement('div',
+            {
+                className: 'bg-white rounded-lg p-6 max-w-md w-full'
+            },
+            [
+                React.createElement('h2',
+                    {
+                        className: 'text-xl font-semibold mb-4'
+                    },
+                    'Add Material'
+                ),
+                React.createElement('form',
+                    {
+                        onSubmit: handleSubmit,
+                        className: 'space-y-4'
+                    },
+                    [
+                        // Category Dropdown
+                        React.createElement('div', { className: 'mb-4' }, [
+                            React.createElement('label',
+                                { className: 'block text-sm font-medium text-gray-700 mb-1' },
+                                'Category'
+                            ),
+                            React.createElement('select',
+                                {
+                                    className: 'w-full p-2 border rounded',
+                                    value: formData.category,
+                                    onChange: (e) => setFormData(prev => ({
+                                        ...prev,
+                                        category: e.target.value
+                                    })),
+                                    required: true
+                                },
+                                [
+                                    React.createElement('option', { value: '' }, 'Select Category'),
+                                    ...availableCategories.map(category =>
+                                        React.createElement('option',
+                                            { value: category, key: category },
+                                            category
+                                        )
+                                    )
+                                ]
+                            )
+                        ]),
+
+                        // Manufacturer Dropdown
+                        React.createElement('div', { className: 'mb-4' }, [
+                            React.createElement('label',
+                                { className: 'block text-sm font-medium text-gray-700 mb-1' },
+                                'Manufacturer'
+                            ),
+                            React.createElement('select',
+                                {
+                                    className: 'w-full p-2 border rounded',
+                                    value: formData.manufacturer,
+                                    onChange: (e) => setFormData(prev => ({
+                                        ...prev,
+                                        manufacturer: e.target.value
+                                    })),
+                                    required: true,
+                                    disabled: !formData.category
+                                },
+                                [
+                                    React.createElement('option', { value: '' }, 'Select Manufacturer'),
+                                    ...availableManufacturers.map(manufacturer =>
+                                        React.createElement('option',
+                                            { value: manufacturer, key: manufacturer },
+                                            manufacturer
+                                        )
+                                    )
+                                ]
+                            )
+                        ]),
+
+                        // Model Dropdown
+                        React.createElement('div', { className: 'mb-4' }, [
+                            React.createElement('label',
+                                { className: 'block text-sm font-medium text-gray-700 mb-1' },
+                                'Model'
+                            ),
+                            React.createElement('select',
+                                {
+                                    className: 'w-full p-2 border rounded',
+                                    value: formData.model,
+                                    onChange: (e) => setFormData(prev => ({
+                                        ...prev,
+                                        model: e.target.value
+                                    })),
+                                    required: true,
+                                    disabled: !formData.manufacturer
+                                },
+                                [
+                                    React.createElement('option', { value: '' }, 'Select Model'),
+                                    ...availableModels.map(({ model }) =>
+                                        React.createElement('option',
+                                            { value: model, key: model },
+                                            model
+                                        )
+                                    )
+                                ]
+                            )
+                        ]),
+
+                        // Quantity Input
+                        React.createElement('div', { className: 'mb-4' }, [
+                            React.createElement('label',
+                                { className: 'block text-sm font-medium text-gray-700 mb-1' },
+                                'Quantity'
+                            ),
+                            React.createElement('input',
+                                {
+                                    type: 'number',
+                                    className: 'w-full p-2 border rounded',
+                                    value: formData.quantity,
+                                    onChange: (e) => setFormData(prev => ({
+                                        ...prev,
+                                        quantity: Math.max(1, parseInt(e.target.value) || 0)
+                                    })),
+                                    min: 1,
+                                    required: true
+                                }
+                            )
+                        ]),
+
+                        // Unit Price Display (Read-only)
+                        React.createElement('div', { className: 'mb-4' }, [
+                            React.createElement('label',
+                                { className: 'block text-sm font-medium text-gray-700 mb-1' },
+                                'Cost per Unit'
+                            ),
+                            React.createElement('input',
+                                {
+                                    type: 'text',
+                                    className: 'w-full p-2 border rounded bg-gray-50',
+                                    value: `$${formData.unitPrice.toFixed(2)}`,
+                                    readOnly: true
+                                }
+                            )
+                        ]),
+
+                        // Total Price Display (Read-only)
+                        React.createElement('div', { className: 'mb-4' }, [
+                            React.createElement('label',
+                                { className: 'block text-sm font-medium text-gray-700 mb-1' },
+                                'Total Cost'
+                            ),
+                            React.createElement('input',
+                                {
+                                    type: 'text',
+                                    className: 'w-full p-2 border rounded bg-gray-50',
+                                    value: `$${formData.totalPrice.toFixed(2)}`,
+                                    readOnly: true
+                                }
+                            )
+                        ]),
+
+                        // Action Buttons
+                        React.createElement('div',
+                            { className: 'flex justify-end gap-2 mt-6' },
+                            [
+                                React.createElement('button',
+                                    {
+                                        type: 'button',
+                                        onClick: onClose,
+                                        className: 'px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300'
+                                    },
+                                    'Cancel'
+                                ),
+                                React.createElement('button',
+                                    {
+                                        type: 'submit',
+                                        className: 'px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600'
+                                    },
+                                    'Add Material'
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+    );
+};
+
+export default AddMaterialForm;

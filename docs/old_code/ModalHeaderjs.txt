@@ -1,0 +1,640 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { 
+    Mail, 
+    Phone, 
+    MoreVertical, 
+    RefreshCw, 
+    X, 
+    ExternalLink,
+    Plus,
+    MapPin,
+    ChevronDown,
+    ChevronUp 
+} from 'lucide-react';
+import Counters from './Counters.js';
+
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString('en-US', { 
+        month: '2-digit', 
+        day: '2-digit', 
+        year: '2-digit' 
+    });
+};
+
+const formatInstallDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString('en-US', { 
+        month: '2-digit', 
+        day: '2-digit', 
+        year: '2-digit' 
+    });
+};
+
+const calculateApproxInstallDate = (soldDate) => {
+    if (!soldDate) return '';
+    const date = new Date(soldDate);
+    date.setMonth(date.getMonth() + 2);
+    return date;
+};
+
+const ModalHeader = ({
+    // Project data
+    project,
+    projectData,
+    systemSize,
+    paymentType,
+    installationDate,
+    soldDate,
+    
+    // Stage management
+    stages,
+    stageUpdateError,
+    stageLoadingError,
+    setStageLoadingError,
+    handleStageChange,
+    getStageDisplay,
+    
+    // Tranche management
+    tranchesData,
+    handleTrancheChange,
+    handleFundedByRedballChange,
+    isChangingTranche,
+    setIsChangingTranche,
+    
+    // Actions
+    onClose,
+    handleEmailClick,
+    handlePhoneClick,
+    handleAddressClick,
+    handleAddTag,
+    handleRemoveTag,
+    handleActionMenuClick,
+    handleOpenSolarClick,
+    
+    // Refresh state
+    isRefreshing,
+    setIsRefreshing,
+    fetchModalData,
+    
+    // Tab management
+    activeTab,
+    setActiveTab,
+    
+    // Phone functionality
+    updateUserCallStatus,
+    
+    // Tag management
+    availableTags,
+    isAddingTag,
+    setIsAddingTag,
+    selectedTagToAdd,
+    setSelectedTagToAdd,
+    isTagLoading,
+    
+    // Loading states
+    isLoading,
+    isChangingStage,
+    setIsChangingStage,
+    
+    // New props
+    getTrancheDisplay,
+}) => {
+    // Local state
+    const [showActionsMenu, setShowActionsMenu] = React.useState(false);
+    const [stageSearchTerm, setStageSearchTerm] = React.useState('');
+    const [trancheSearchTerm, setTrancheSearchTerm] = useState('');
+    
+    // Refs for click outside handling
+    const actionMenuRef = useRef(null);
+    const stageDropdownRef = useRef(null);
+
+    // Handle click outside for dropdowns
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (actionMenuRef.current && !actionMenuRef.current.contains(event.target)) {
+                setShowActionsMenu(false);
+            }
+            if (stageDropdownRef.current && !stageDropdownRef.current.contains(event.target)) {
+                setIsChangingStage(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Handle phone call
+    const handleCallClick = async () => {
+        try {
+            if (!project.salesRepPhone || !project.salesRepName) return;
+            const cleanPhone = project.salesRepPhone.replace(/\D/g, '');
+            const cleanName = project.salesRepName.trim();
+            await updateUserCallStatus(cleanPhone, cleanName);
+        } catch (error) {
+            console.error("Error initiating call:", error);
+        }
+    };
+
+    return React.createElement('div',
+        { className: "flex-none" },
+        [
+            // Blue gradient header section
+            React.createElement('div',
+                { className: "flex-none bg-gradient-to-r from-blue-600 to-blue-700 p-7 rounded-t-lg" },
+                [
+                    // Top row: Contact name, buttons, actions
+                    React.createElement('div',
+                        { className: "flex justify-between items-center" },
+                        [
+                            // Left side with contact name and buttons
+                            React.createElement('div',
+                                { className: "flex items-center space-x-4" },
+                                [
+                                    React.createElement('span', 
+                                        { className: "text-2xl font-semibold text-white tracking-tight" }, 
+                                        projectData?.contactName
+                                    ),
+                                    // Email button
+                                    React.createElement('button', 
+                                        { 
+                                            className: "inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:ring-1 hover:ring-white/50 rounded-full transition-all text-sm text-white",
+                                            onClick: () => handleEmailClick(projectData)
+                                        }, 
+                                        [
+                                            React.createElement(Mail, { className: "w-4 h-4" }),
+                                            "Email"
+                                        ]
+                                    ),
+                                    // Call button
+                                    React.createElement('button', 
+                                        { 
+                                            className: "inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:ring-1 hover:ring-white/50 rounded-full transition-all text-sm text-white",
+                                            onClick: async () => {
+                                                try {
+                                                    if (!project.contactPhone || !project.contactName) return;
+                                                    const cleanPhone = project.contactPhone.replace(/\D/g, '');
+                                                    const cleanName = project.contactName.trim();
+                                                    await updateUserCallStatus(cleanPhone, cleanName);
+                                                } catch (error) {
+                                                    console.error("Error initiating call:", error);
+                                                }
+                                            }
+                                        }, 
+                                        [
+                                            React.createElement(Phone, { className: "w-4 h-4" }),
+                                            "Call"
+                                        ]
+                                    )
+                                ]
+                            ),
+                            // Right side with action buttons
+                            React.createElement('div',
+                                { className: "flex items-center space-x-3" },
+                                [
+                                    // More actions button with dropdown
+                                    React.createElement('div',
+                                        {
+                                            ref: actionMenuRef,
+                                            className: "relative"
+                                        },
+                                        [
+                                            React.createElement('button',
+                                                {
+                                                    className: "p-2 text-white hover:bg-white/10 rounded-lg transition-colors",
+                                                    onClick: () => setShowActionsMenu(!showActionsMenu)
+                                                },
+                                                React.createElement(MoreVertical, { className: "w-5 h-5" })
+                                            ),
+                                            showActionsMenu && React.createElement('div',
+                                                {
+                                                    className: "absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
+                                                },
+                                                [
+                                                    // Only render OpenSolar button if os_id exists
+                                                    projectData?.os_id && React.createElement('button',
+                                                        {
+                                                            className: "w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2",
+                                                            onClick: () => {
+                                                                window.open(`https://app.opensolar.com/#/projects/${projectData?.os_id}`, '_blank');
+                                                                setShowActionsMenu(false);
+                                                            }
+                                                        },
+                                                        [
+                                                            React.createElement(ExternalLink, { className: "w-4 h-4" }),
+                                                            "Open in OpenSolar"
+                                                        ]
+                                                    ),
+                                                    // Only render Aduu Solar button if aduuPortalID exists
+                                                    projectData?.aduuPortalID && React.createElement('button',
+                                                        {
+                                                            className: "w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2",
+                                                            onClick: () => {
+                                                                window.open(`https://client.aduusolar.com/portal/orders/${projectData?.aduuPortalID}`, '_blank');
+                                                                setShowActionsMenu(false);
+                                                            }
+                                                        },
+                                                        [
+                                                            React.createElement(ExternalLink, { className: "w-4 h-4" }),
+                                                            "Open in Aduu Solar"
+                                                        ]
+                                                    )
+                                                ].filter(Boolean) // Filter out any null/undefined elements
+                                            ),
+                                            // Refresh button
+                                            React.createElement('button',
+                                                {
+                                                    className: "p-2 text-white hover:bg-white/10 rounded-lg transition-colors",
+                                                    onClick: async () => {
+                                                        try {
+                                                            setIsRefreshing(true);
+                                                            await fetchModalData(projectData?.id);
+                                                        } finally {
+                                                            setIsRefreshing(false);
+                                                        }
+                                                    }
+                                                },
+                                                React.createElement(RefreshCw, { 
+                                                    className: `w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}` 
+                                                })
+                                            ),
+                                            // Close button
+                                            React.createElement('button',
+                                                {
+                                                    className: "p-2 text-white hover:bg-white/10 rounded-lg transition-colors",
+                                                    onClick: onClose
+                                                },
+                                                React.createElement(X, { className: "w-5 h-5" })
+                                            )
+                                        ]
+                                    ),
+                                ]
+                            )
+                        ]
+                    ),
+                    // Stage selection row
+                    React.createElement('div',
+                        { className: "mt-4 flex items-center justify-start space-x-2" },
+                        [
+                            // Stage Field Badge with status dot
+                            React.createElement('div',
+                                { className: "flex items-center space-x-2" },
+                                [
+                                    // Status dot
+                                    React.createElement('div',
+                                        { 
+                                            className: "w-2 h-2 bg-green-400 rounded-full",
+                                            'aria-hidden': "true"
+                                        }
+                                    ),
+                                    // Stage badge with dropdown
+                                    React.createElement('div',
+                                        { 
+                                            className: "relative stage-dropdown",
+                                            onClick: (e) => e.stopPropagation() 
+                                        },
+                                        [
+                                            React.createElement('div',
+                                                { 
+                                                    className: "px-3 py-1 bg-blue-600 text-white rounded-md font-medium cursor-pointer hover:bg-blue-700 flex items-center gap-2",
+                                                    onClick: () => setIsChangingStage(!isChangingStage)
+                                                },
+                                                [
+                                                    React.createElement('span', null, getStageDisplay(projectData, stages)),
+                                                    isChangingStage ? 
+                                                        React.createElement('div', 
+                                                            { className: "absolute inset-0 bg-blue-600 bg-opacity-50 flex items-center justify-center" },
+                                                            React.createElement('div', 
+                                                                { className: "w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" })
+                                                            ) : 
+                                                        React.createElement('i', { 
+                                                            className: `fas fa-chevron-${isChangingStage ? 'up' : 'down'}` 
+                                                        })
+                                                ]
+                                            ),
+                                            // Dropdown menu with search
+                                            isChangingStage && React.createElement('div',
+                                                {
+                                                    className: "absolute top-full left-0 mt-1 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
+                                                },
+                                                [
+                                                    // Search input
+                                                    React.createElement('div',
+                                                        { className: "p-2 border-b" },
+                                                        React.createElement('input',
+                                                            {
+                                                                type: 'text',
+                                                                placeholder: 'Search stages...',
+                                                                value: stageSearchTerm,
+                                                                onChange: (e) => setStageSearchTerm(e.target.value),
+                                                                className: "w-full px-3 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                                                // Prevent clicks from closing the dropdown
+                                                                onClick: (e) => e.stopPropagation()
+                                                            }
+                                                        )
+                                                    ),
+                                                    // Filtered stages list
+                                                    React.createElement('div',
+                                                        { 
+                                                            className: "py-1 max-h-64 overflow-y-auto"
+                                                        },
+                                                        stages
+                                                            .filter(stage => 
+                                                                stage.title.toLowerCase().includes(stageSearchTerm.toLowerCase())
+                                                            )
+                                                            .map(stage => 
+                                                                React.createElement('button',
+                                                                    {
+                                                                        key: stage.id,
+                                                                        className: `w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                                                                            getStageDisplay(projectData, stages) === stage.title 
+                                                                                ? 'bg-gray-50 text-blue-600' 
+                                                                                : 'text-gray-700'
+                                                                        }`,
+                                                                        onClick: () => {
+                                                                            handleStageChange(stage.title);
+                                                                            setIsChangingStage(false);
+                                                                            setStageSearchTerm(''); // Clear search when selecting
+                                                                        }
+                                                                    },
+                                                                    stage.title
+                                                                )
+                                                            )
+                                                    )
+                                                ]
+                                            )
+                                        ]
+                                    ),
+                                    // Error message
+                                    stageUpdateError && React.createElement('span',
+                                        { className: "text-red-500 text-sm ml-2" },
+                                        stageUpdateError
+                                    ),
+                                    // Loading indicator
+                                    isChangingStage && React.createElement('div',
+                                        { className: "ml-2 animate-spin h-4 w-4 border-2 border-blue-500 rounded-full border-t-transparent" }
+                                    )
+                                ]
+                            ),
+                            
+                            // Tranche selector - positioned after stage, before system size
+                            React.createElement('div',
+                                { className: "flex items-center gap-3" },
+                                [
+                                    // Tranche Dropdown
+                                    React.createElement('div',
+                                        { 
+                                            className: "relative tranche-dropdown",
+                                            onClick: (e) => e.stopPropagation() 
+                                        },
+                                        [
+                                            React.createElement('div',
+                                                { 
+                                                    className: "px-3 py-1 bg-blue-600 text-white rounded-md font-medium cursor-pointer hover:bg-blue-700 flex items-center gap-2",
+                                                    onClick: () => setIsChangingTranche(!isChangingTranche)
+                                                },
+                                                [
+                                                    React.createElement('span', null, 
+                                                        projectData?.trancheField ? `Tranche ${projectData?.trancheField.Tranche_Number}` : 'No Tranche'
+                                                    ),
+                                                    React.createElement(isChangingTranche ? ChevronUp : ChevronDown, { 
+                                                        className: "w-4 h-4" 
+                                                    })
+                                                ]
+                                            ),
+                                            // Dropdown menu with search
+                                            isChangingTranche && React.createElement('div',
+                                                {
+                                                    className: "absolute top-full left-0 mt-1 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
+                                                },
+                                                [
+                                                    // Search input
+                                                    React.createElement('div',
+                                                        { className: "p-2 border-b" },
+                                                        React.createElement('input',
+                                                            {
+                                                                type: 'text',
+                                                                placeholder: 'Search tranches...',
+                                                                value: trancheSearchTerm,
+                                                                onChange: (e) => setTrancheSearchTerm(e.target.value),
+                                                                className: "w-full px-3 py-1.5 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                                                                onClick: (e) => e.stopPropagation()
+                                                            }
+                                                        )
+                                                    ),
+                                                    // Filtered tranches list
+                                                    React.createElement('div',
+                                                        { 
+                                                            className: "py-1 max-h-64 overflow-y-auto"
+                                                        },
+                                                        [
+                                                            // Option to remove tranche
+                                                            React.createElement('button',
+                                                                {
+                                                                    className: "w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-gray-700",
+                                                                    onClick: () => {
+                                                                        handleTrancheChange(null);
+                                                                        setIsChangingTranche(false);
+                                                                        setTrancheSearchTerm('');
+                                                                    }
+                                                                },
+                                                                "No Tranche"
+                                                            ),
+                                                            // Tranche options
+                                                            ...tranchesData
+                                                                .filter(tranche => 
+                                                                    `Tranche ${tranche.number}`.toLowerCase().includes(trancheSearchTerm.toLowerCase())
+                                                                )
+                                                                .map(tranche => 
+                                                                    React.createElement('button',
+                                                                        {
+                                                                            key: tranche.id,
+                                                                            className: `w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                                                                                projectData?.trancheID === tranche.id
+                                                                                    ? 'bg-gray-50 text-blue-600' 
+                                                                                    : 'text-gray-700'
+                                                                            }`,
+                                                                            onClick: () => {
+                                                                                handleTrancheChange(tranche.id);
+                                                                                setIsChangingTranche(false);
+                                                                                setTrancheSearchTerm('');
+                                                                            }
+                                                                        },
+                                                                        `Tranche ${tranche.number} (${tranche.date})`
+                                                                    )
+                                                                )
+                                                        ]
+                                                    )
+                                                ]
+                                            ),
+                                        ]
+                                    ),
+                                    // Funded By Redball checkbox
+                                    React.createElement('label',
+                                        {
+                                            className: "px-3 py-1 bg-blue-600 text-white rounded-md text-sm font-medium flex items-center gap-2 cursor-pointer",
+                                            onClick: (e) => e.stopPropagation()
+                                        },
+                                        [
+                                            React.createElement('input',
+                                                {
+                                                    type: "checkbox",
+                                                    checked: projectData?.fundedByRedball === "true",
+                                                    onChange: (e) => handleFundedByRedballChange(e.target.checked),
+                                                    className: "rounded border-white text-white bg-blue-500 focus:ring-offset-blue-600 focus:ring-white h-4 w-4"
+                                                }
+                                            ),
+                                            "Funded By Redball"
+                                        ]
+                                    )
+                                ]
+                            ),
+
+                            // System Size Badge
+                            React.createElement('span',
+                                {
+                                    className: "px-3 py-1 bg-blue-600 text-white rounded-md font-medium"
+                                },
+                                `${projectData?.kw_STC || 0} kW`
+                            ),
+                            
+                            // Payment Option Badge
+                            projectData?.paymentOption && React.createElement('span', 
+                                { className: "px-3 py-1 bg-blue-600 text-white rounded-md text-sm font-medium" }, 
+                                projectData?.paymentOption
+                            ),
+                            
+                            // Install Date Badge
+                            React.createElement('span', 
+                                { 
+                                    className: `px-3 py-1 rounded-md text-sm font-medium ${
+                                        projectData?.installationBooking ? 'bg-green-600 text-white' : 
+                                        projectData?.dateSold ? 'bg-gray-500 text-white' : ''
+                                    }`
+                                }, 
+                                projectData?.installationBooking ? 
+                                    `Install: ${formatInstallDate(projectData?.installationBooking)}` :
+                                    projectData?.dateSold ? 
+                                        `Approx Install: ${formatInstallDate(calculateApproxInstallDate(projectData?.dateSold))}` :
+                                        null
+                            ),
+                            
+                            // Date Sold Badge
+                            projectData?.dateSold && React.createElement('span', 
+                                { className: "px-3 py-1 bg-blue-600 text-white rounded-md text-sm font-medium" }, 
+                                `Sold: ${formatDate(projectData?.dateSold)}`
+                            ),
+                            
+                            // Commercial/Residential Badge
+                            React.createElement('span', 
+                                { className: "px-3 py-1 bg-blue-600 text-white rounded-md text-sm font-medium" }, 
+                                projectData?.isCommercial === "true" || projectData?.isCommercial === true ? 'COM' : 'RES'
+                            )
+                        ]
+                    ),
+                    // Address button - moved inside the gradient container
+                    React.createElement('button',
+                        { 
+                            className: "mt-4 flex items-center text-white hover:text-gray-200",
+                            onClick: () => handleAddressClick(projectData)
+                        },
+                        [
+                            React.createElement(MapPin, { className: "w-4 h-4 mr-2" }),
+                            React.createElement('span', null, projectData?.address)
+                        ]
+                    ),
+                    // Tags section - moved inside gradient container with white border
+                    React.createElement('div',
+                        { className: "mt-4 pt-4 border-t border-white/10" },
+                        [
+                            // Tags header with Add Tag button
+                            React.createElement('div',
+                                { className: "flex justify-between items-center mb-2" },
+                                [
+                                    React.createElement('span',
+                                        { className: "text-white text-xs" },
+                                        "Tags"
+                                    ),
+                                    React.createElement('button',
+                                        {
+                                            className: "text-white hover:text-white/90 flex items-center gap-2 text-sm",
+                                            onClick: () => setIsAddingTag(true)
+                                        },
+                                        [
+                                            React.createElement(Plus, { className: "w-4 h-4" }),
+                                            React.createElement('span', null, "Add Tag")
+                                        ]
+                                    )
+                                ]
+                            ),
+                            // Tags list
+                            React.createElement('div',
+                                { className: "flex flex-wrap gap-1" },
+                                projectData?.processedTags?.map(tag =>
+                                    React.createElement('span',
+                                        {
+                                            key: tag.ID,
+                                            className: "inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm bg-white",
+                                            style: { color: tag.color }
+                                        },
+                                        [
+                                            React.createElement('span', null, tag.name),
+                                            React.createElement('button',
+                                                {
+                                                    className: "ml-1 hover:text-red-500",
+                                                    onClick: () => handleRemoveTag(tag.ID)
+                                                },
+                                                React.createElement(X, { className: "w-3 h-3" })
+                                            )
+                                        ]
+                                    )
+                                )
+                            )
+                        ]
+                    ),
+                ]
+            ),
+
+            // Counters - moved here, before tab menu
+            React.createElement(Counters, {
+                project: project
+            }),
+
+            // Tab menu
+            React.createElement('div',
+                { className: "modal-tab-menu border-b border-gray-200" },
+                React.createElement('nav',
+                    { className: "-mb-px flex space-x-6" },
+                    [
+                        'Overview',
+                        'Contacts',
+                        'Documents',
+                        'Survey',
+                        'System',
+                        'Permitting',
+                        'Sales Rep',
+                        'Property Info',
+                        'Activity',
+                        'Communications',
+                        'Investors'
+                    ].map(tab =>
+                        React.createElement('button',
+                            {
+                                key: tab,
+                                onClick: () => setActiveTab(tab.toLowerCase().replace(' ', '')),
+                                className: `modal-tab-button border-b-2 font-medium ${
+                                    activeTab === tab.toLowerCase().replace(' ', '')
+                                        ? 'border-blue-500 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`
+                            },
+                            tab
+                        )
+                    )
+                )
+            )
+        ]
+    );
+};
+
+export default ModalHeader;

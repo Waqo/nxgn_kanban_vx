@@ -1,0 +1,51 @@
+app/
+├── App.js
+├── components/
+│   ├── common/
+│   │   ├── BaseAlert.js
+│   │   ├── BaseAvatar.js
+│   │   ├── BaseBadge.js
+│   │   ├── BaseButton.js
+│   │   ├── BaseButtonGroup.js
+│   │   ├── BaseCard.js
+│   │   ├── BaseCombobox.js
+│   │   ├── BaseContainer.js
+│   │   ├── BaseDescriptionList.js
+│   │   ├── BaseDropdown.js
+│   │   ├── BaseFeed.js
+│   │   ├── BaseGridList.js
+│   │   ├── BaseListContainer.js
+│   │   ├── BaseModal.js
+│   │   ├── BaseNotification.js
+│   │   ├── BaseSelectMenu.js
+│   │   ├── BaseStackedList.js
+│   │   ├── BaseTable.js
+│   │   ├── BaseTabs.js
+│   │   ├── BaseTextArea.js
+│   │   ├── BaseTextInput.js
+│   │   ├── BaseToggle.js
+│   │   └── DevToolbar.js
+│   └── kanban/
+├── config/
+│   ├── constants.js
+│   └── options.js
+├── services/
+│   └── zohoCreatorAPI.js
+├── store/
+│   ├── modules/
+│   │   ├── lookups.js
+│   │   ├── projects.js
+│   │   ├── ui.js
+│   │   └── user.js
+│   └── store.js
+├── translations/
+│   └── en.json
+├── utils/
+│   ├── helpers.js
+│   └── processors.js
+├── views/
+│   └── WidgetView.js
+└── widget.html
+
+# Note: Specific component files under components/common/ and components/kanban/ 
+# are omitted for brevity but follow the structure shown in App.js registration.

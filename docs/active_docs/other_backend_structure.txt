@@ -1,0 +1,1021 @@
+# Schema Definitions
+
+This section defines the structure of other relevant Zoho Creator forms/reports used in the application.
+
+## Entity: Contact (Source: Add_Contact Form / PM_Kanban_Contacts Report)
+
+Represents contacts associated with a project (owners, business POCs, etc.).
+
+```javascript
+{
+  // Field: ID
+  //   - API Name: ID
+  //   - Zoho Type: Autonumber / Record ID (System Generated)
+  //   - Processed Name: ID
+  //   - Availability: getRecords (Filtered)
+  //   - Raw Example: "4663646000004745033"
+  //   - Notes: Unique identifier for the contact record.
+  ID: String,
+
+  // Field: Name
+  //   - API Name: Name
+  //   - Zoho Type: Name
+  //   - Processed Name: First_Name, Last_Name
+  //   - Availability: getRecords (Filtered)
+  //   - Raw Example: {"prefix": "", "last_name": "- Friendship Court", "suffix": "", "first_name": "Oxford House", "zc_display_value": "Oxford House - Friendship Court"}
+  //   - Notes: Composite field for contact name.
+  Name: {
+    prefix: String,
+    first_name: String,
+    last_name: String,
+    suffix: String,
+    zc_display_value: String
+  },
+
+  // Field: Primary_Contact_Type1
+  //   - API Name: Primary_Contact_Type1
+  //   - Zoho Type: Picklist
+  //   - Processed Name: Contact_Type
+  //   - Availability: getRecords (Filtered)
+  //   - Raw Example: "Owner 1"
+  //   - Notes: Defines the role of the contact relative to the project.
+  Primary_Contact_Type1: String, 
+
+  // Field: Email
+  //   - API Name: Email
+  //   - Zoho Type: Email
+  //   - Processed Name: Email
+  //   - Availability: getRecords (Filtered)
+  //   - Raw Example: "gotbrics@gmail.com"
+  Email: String,
+
+  // Field: Phone_Number
+  //   - API Name: Phone_Number
+  //   - Zoho Type: Phone Number
+  //   - Processed Name: Phone
+  //   - Availability: getRecords (Filtered)
+  //   - Raw Example: "+12026155602"
+  Phone_Number: String,
+
+  // Field: Mobile_Phone_Number
+  //   - API Name: Mobile_Phone_Number
+  //   - Zoho Type: Phone Number
+  //   - Processed Name: Mobile
+  //   - Availability: getRecords (Filtered)
+  //   - Raw Example: ""
+  Mobile_Phone_Number: String,
+
+  // Field: OpenSolar_ID
+  //   - API Name: OpenSolar_ID
+  //   - Zoho Type: Number
+  //   - Processed Name: N/A
+  //   - Availability: form_only (Not observed in examples)
+  OpenSolar_ID: String, // API likely returns as string
+
+  // Field: Business_POC
+  //   - API Name: Business_POC
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: Is_Business_Contact
+  //   - Availability: getRecords (Filtered)
+  //   - Raw Example: "false"
+  //   - Notes: Processed as boolean string.
+  Business_POC: String, 
+
+  // Field: Billing_Address
+  //   - API Name: Billing_Address
+  //   - Zoho Type: Address
+  //   - Processed Name: Billing_Address, Billing_Address_1, Billing_Address_2, Billing_City, Billing_State, Billing_Zip, Billing_Country
+  //   - Availability: getRecords (Filtered)
+  //   - Raw Example: {"country": "United States", "district_city": "", "latitude": "", "address_line_1": "", "state_province": "", "address_line_2": "", "postal_code": "", "zc_display_value": "United States", "longitude": ""}
+  //   - Notes: Composite address field.
+  Billing_Address: Object,
+
+  // Field: Job_Title
+  //   - API Name: Job_Title
+  //   - Zoho Type: Text
+  //   - Processed Name: Job_Title
+  //   - Availability: getRecords (Filtered)
+  //   - Raw Example: ""
+  Job_Title: String,
+
+  // Field: Business_Name
+  //   - API Name: Business_Name
+  //   - Zoho Type: Text
+  //   - Processed Name: Business_Name
+  //   - Availability: getRecords (Filtered)
+  //   - Raw Example: ""
+  Business_Name: String,
+
+  // Field: Project
+  //   - API Name: Project
+  //   - Zoho Type: List (Lookup to Add_Project)
+  //   - Processed Name: Project_ID (Inferred association)
+  //   - Availability: N/A (Typically used in criteria, not returned directly with Contact unless specifically configured)
+  //   - Notes: Links contact to project(s).
+  Project: Array, // Array of Project lookup objects
+
+  // Field: Contact_ID
+  //   - API Name: Contact_ID
+  //   - Zoho Type: Autonumber
+  //   - Processed Name: N/A
+  //   - Availability: form_only
+  Contact_ID: String,
+
+  // Field: Username
+  //   - API Name: Username
+  //   - Zoho Type: Picklist (Users)
+  //   - Processed Name: N/A
+  //   - Availability: form_only
+  Username: Object, // Likely returns lookup structure if fetched
+
+  // Field: Portal_Username
+  //   - API Name: Portal_Username
+  //   - Zoho Type: Text
+  //   - Processed Name: N/A
+  //   - Availability: form_only
+  Portal_Username: String,
+
+  // Field: Added_to_ZohoVoice
+  //   - API Name: Added_to_ZohoVoice
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: N/A
+  //   - Availability: form_only
+  Added_to_ZohoVoice: String,
+
+  // Field: ZohoVoice_ID
+  //   - API Name: ZohoVoice_ID
+  //   - Zoho Type: Text
+  //   - Processed Name: N/A
+  //   - Availability: form_only
+  ZohoVoice_ID: String,
+
+  // Field: Has_Logged_In
+  //   - API Name: Has_Logged_In
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: N/A
+  //   - Availability: form_only
+  Has_Logged_In: String,
+
+  // Field: CrmID
+  //   - API Name: CrmID
+  //   - Zoho Type: Text
+  //   - Processed Name: N/A
+  //   - Availability: form_only
+  CrmID: String,
+
+  // Field: DEMO
+  //   - API Name: DEMO
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: N/A
+  //   - Availability: form_only
+  DEMO: String,
+
+  // --- System Fields ---
+  // Field: Added_Time
+  //   - API Name: Added_Time
+  //   - Zoho Type: System (Timestamp)
+  //   - Processed Name: Added_Time
+  //   - Availability: getRecords (Filtered)
+  //   - Raw Example: "04/23/25 14:32:26"
+  Added_Time: String
+}
+```
+
+## Raw Data Example: Contacts (getRecords)
+
+This example shows the typical structure of the data returned when fetching contacts from the `PM_Kanban_Contacts` report. While this example might show contacts from multiple projects (as if fetched without criteria), in the application, this data will usually be filtered by a specific Project ID.
+
+```json
+{
+  "code": 3000,
+  "data": [
+    {
+      "Primary_Contact_Type1": "Owner 1",
+      "Business_Name": "",
+      "Email": "",
+      "Business_POC": "false",
+      "Billing_Address": {
+        "country": "",
+        "district_city": "",
+        "latitude": "",
+        "address_line_1": "",
+        "state_province": "",
+        "address_line_2": "",
+        "postal_code": "",
+        "zc_display_value": "",
+        "longitude": ""
+      },
+      "Phone_Number": "",
+      "ID": "4663646000004745033",
+      "Mobile_Phone_Number": "",
+      "Job_Title": "",
+      "Name": {
+        "prefix": "",
+        "last_name": "- Friendship Court",
+        "suffix": "",
+        "first_name": "Oxford House",
+        "zc_display_value": "Oxford House - Friendship Court"
+      },
+      "Added_Time": "04/23/25 14:32:26"
+    },
+    // ... (Include the rest of the contact objects from your file here) ...
+    {
+      "Primary_Contact_Type1": "Owner 1",
+      "Business_Name": "",
+      "Email": "IvAnleVO6@gmail.com",
+      "Business_POC": "false",
+      "Billing_Address": {
+        "country": "",
+        "district_city": "",
+        "latitude": "",
+        "address_line_1": "",
+        "state_province": "",
+        "address_line_2": "",
+        "postal_code": "",
+        "zc_display_value": "",
+        "longitude": ""
+      },
+      "Phone_Number": "+12027305615",
+      "ID": "4663646000004216080",
+      "Mobile_Phone_Number": "",
+      "Job_Title": "",
+      "Name": {
+        "prefix": "",
+        "last_name": "VELEV TRUSTEE",
+        "suffix": "",
+        "first_name": "IVAN",
+        "zc_display_value": "IVAN VELEV TRUSTEE"
+      },
+      "Added_Time": "03/14/25 19:28:50"
+    }
+  ],
+  "record_cursor": "9d3b4143b75349d8d391055afd616e7293afa7824051a6715c74c20bb8ea273064208041d3b596a53eb85afb361e4727"
+}
+```
+
+## Entity: Permitting (Source: Add_Permitting Form / Grid in Add_Project)
+
+Represents permitting and interconnection details linked to a project. This data is returned as an array within the Project object.
+
+```javascript
+{
+  // Field: ID
+  //   - API Name: ID
+  //   - Zoho Type: Autonumber / Record ID (System Generated)
+  //   - Processed Name: ID
+  //   - Availability: both (nested)
+  //   - Raw Example: "4663646000003570092"
+  //   - Notes: Unique identifier for the permitting record.
+  ID: String,
+
+  // Field: Permit_Status
+  //   - API Name: Permit_Status
+  //   - Zoho Type: Picklist
+  //   - Processed Name: permitStatus
+  //   - Availability: both (nested)
+  //   - Raw Example: "Approved"
+  Permit_Status: String,
+
+  // Field: Interconnection_Status
+  //   - API Name: Interconnection_Status
+  //   - Zoho Type: Picklist
+  //   - Processed Name: interconnectStatus
+  //   - Availability: both (nested)
+  //   - Raw Example: "Approval to Install"
+  Interconnection_Status: String,
+
+  // Field: Permit_Number
+  //   - API Name: Permit_Number
+  //   - Zoho Type: Text
+  //   - Processed Name: Permit_Number (Likely)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  Permit_Number: String,
+
+  // Field: Interconnection_Number
+  //   - API Name: Interconnection_Number
+  //   - Zoho Type: Text
+  //   - Processed Name: Interconnection_Number (Likely)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  Interconnection_Number: String,
+
+  // Field: Permit_Submission_Date
+  //   - API Name: Permit_Submission_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: Permit_Submission_Date (Likely)
+  //   - Availability: both (nested)
+  //   - Raw Example: "" or "08/15/24"
+  Permit_Submission_Date: String,
+
+  // Field: Permit_Approval_Date
+  //   - API Name: Permit_Approval_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: Permit_Approval_Date (Likely)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  Permit_Approval_Date: String,
+  
+  // Field: Permit_Last_Updated
+  //   - API Name: Permit_Last_Updated
+  //   - Zoho Type: Datetime
+  //   - Processed Name: Permit_Last_Updated (Likely)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  Permit_Last_Updated: String,
+
+  // Field: Interconnection_Submission_Date
+  //   - API Name: Interconnection_Submission_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: Interconnection_Submission_Date (Likely)
+  //   - Availability: both (nested)
+  //   - Raw Example: ""
+  Interconnection_Submission_Date: String,
+
+  // Field: Interconnection_Approval_Date
+  //   - API Name: Interconnection_Approval_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: Interconnection_Approval_Date (Likely)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  Interconnection_Approval_Date: String,
+  
+  // Field: IC_Last_Updated
+  //   - API Name: IC_Last_Updated
+  //   - Zoho Type: Date
+  //   - Processed Name: IC_Last_Updated (Likely)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  IC_Last_Updated: String,
+
+  // Field: zc_display_value
+  //   - API Name: zc_display_value
+  //   - Zoho Type: System Generated
+  //   - Processed Name: N/A
+  //   - Availability: both (nested)
+  //   - Raw Example: "Approved,Approval to Install,,"
+  //   - Notes: Concatenated display value, useful for quick view but individual fields preferred for processing.
+  zc_display_value: String,
+
+  // --- Fields Likely Only in Form/Detail View ---
+  // Project: Lookup (Link back to project, implicit in nested structure)
+  // Tags: List (Picklist)
+  // Problem: Picklist
+  // Permit_Submitted: Picklist
+  // Interconnection_Submitted: Picklist
+}
+```
+
+## Entity: Survey Results (Source: Add_Survey_Result Form / Grid in Add_Project)
+
+Represents the outcome of a site survey linked to a project. This data is returned as an array within the Project object.
+
+```javascript
+{
+  // Field: ID
+  //   - API Name: ID
+  //   - Zoho Type: Autonumber / Record ID (System Generated)
+  //   - Processed Name: ID
+  //   - Availability: both (nested)
+  //   - Raw Example: "4663646000002657098"
+  //   - Notes: Unique identifier for the survey result record.
+  ID: String,
+
+  // Field: Assessment_Date
+  //   - API Name: Assessment_Date
+  //   - Zoho Type: Date
+  //   - Processed Name: assessmentDate
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  Assessment_Date: String,
+
+  // Field: Main_Service_Panel_Size
+  //   - API Name: Main_Service_Panel_Size
+  //   - Zoho Type: Text
+  //   - Processed Name: mainServicePanelSize
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  Main_Service_Panel_Size: String,
+
+  // Field: Panel_Upgrade_Required
+  //   - API Name: Panel_Upgrade_Required
+  //   - Zoho Type: Picklist
+  //   - Processed Name: panelUpgradeRequired (boolean derived from "Yes"/"No")
+  //   - Availability: both (nested)
+  //   - Raw Example: "" or "Yes" or "No"
+  Panel_Upgrade_Required: String,
+
+  // Field: Report_PDF_ID
+  //   - API Name: Report_PDF_ID
+  //   - Zoho Type: Textarea
+  //   - Processed Name: reportPdfId
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  //   - Notes: Used to derive `hasReport`.
+  Report_PDF_ID: String,
+
+  // Field: Report_URL (Inferred)
+  //   - API Name: N/A (Derived)
+  //   - Zoho Type: N/A
+  //   - Processed Name: reportUrl
+  //   - Availability: N/A (Client-side derived)
+  //   - Raw Example: N/A
+  //   - Notes: Likely constructed client-side.
+  // reportUrl: String, // Processed Field
+
+  // Field: Roof_Condition
+  //   - API Name: Roof_Condition
+  //   - Zoho Type: Text
+  //   - Processed Name: roofCondition
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  Roof_Condition: String,
+
+  // Field: Roof_Type
+  //   - API Name: Roof_Type
+  //   - Zoho Type: Text
+  //   - Processed Name: roofType
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  Roof_Type: String,
+
+  // Field: Roof_Work_Required
+  //   - API Name: Roof_Work_Required
+  //   - Zoho Type: Picklist
+  //   - Processed Name: roofWorkRequired (boolean derived from "Yes"/"No")
+  //   - Availability: both (nested)
+  //   - Raw Example: "" or "Yes" or "No"
+  Roof_Work_Required: String,
+
+  // Field: Send_Final_Summary
+  //   - API Name: Send_Final_Summary
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: sendFinalSummary (boolean)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: "false" or "true"
+  Send_Final_Summary: String,
+
+  // Field: Summary_Notes
+  //   - API Name: Summary_Notes
+  //   - Zoho Type: Textarea
+  //   - Processed Name: summaryNotes
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  Summary_Notes: String,
+
+  // Field: Summary_Sent
+  //   - API Name: Summary_Sent
+  //   - Zoho Type: Datetime
+  //   - Processed Name: summarySent
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  Summary_Sent: String,
+
+  // Field: Tree_Trimming_Required (Form Field)
+  //   - API Name: Tree_Trimming_Required
+  //   - Zoho Type: Text
+  //   - Processed Name: treeTrimmingRequired (string "Yes"/"No")
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  //   - Notes: Seems distinct from the picklist below in the form, but likely related in processing.
+  Tree_Trimming_Required: String,
+
+  // Field: Tree_Work_Required
+  //   - API Name: Tree_Work_Required
+  //   - Zoho Type: Picklist
+  //   - Processed Name: treeWorkRequired (boolean derived from "Yes"/"No")
+  //   - Availability: both (nested)
+  //   - Raw Example: "" or "Yes" or "No"
+  Tree_Work_Required: String,
+
+  // Field: zc_display_value
+  //   - API Name: zc_display_value
+  //   - Zoho Type: System Generated
+  //   - Processed Name: N/A
+  //   - Availability: both (nested)
+  //   - Raw Example: ",," or "No,No,Yes"
+  //   - Notes: Concatenated display value, often reflects the Yes/No required fields.
+  zc_display_value: String,
+
+  // --- System Fields (Likely available in Detail View) ---
+  // Field: Added_Time
+  //   - API Name: Added_Time
+  //   - Zoho Type: System (Timestamp)
+  //   - Processed Name: addedTime
+  //   - Availability: getRecordById (nested, likely)
+  Added_Time: String,
+  
+  // Field: Modified_Time
+  //   - API Name: Modified_Time
+  //   - Zoho Type: System (Timestamp)
+  //   - Processed Name: modifiedTime
+  //   - Availability: getRecordById (nested, likely)
+  Modified_Time: String,
+
+  // --- Fields Likely Only in Form/Detail View ---
+  // Projectt: Lookup (Link back to project, implicit in nested structure)
+  // OpenSolar_Project_ID: Text
+  // SiteCapture_ID: Text
+  // Homeowner_Name: Text
+  // Homeowner_Email: Text
+  // Homeowner_Phone: Text
+  // Street_Address: Text
+  // City_State_ZIP: Text
+  // Image_ZIP_ID: Textarea
+  // Ready: Checkbox
+  // Is_Demo: Checkbox
+  // Summary_Edit_Mode: Checkbox
+
+  // --- Derived/Processed Fields (Client-Side) ---
+  // hasReport: Boolean // Derived from Report_PDF_ID
+  // status: String // Inferred from Project form or calculated
+  // requiresWork: Boolean // Derived from workRequired fields
+}
+```
+
+## Entity: Issues (Source: Add_Issue Form / Grid in Add_Project)
+
+Represents issues or problems reported against a project. This data is returned as an array within the Project object.
+
+```javascript
+{
+  // Field: ID
+  //   - API Name: ID
+  //   - Zoho Type: Autonumber / Record ID (System Generated)
+  //   - Processed Name: id
+  //   - Availability: both (nested)
+  //   - Raw Example: "4663646000003182003"
+  //   - Notes: Unique identifier for the issue record.
+  ID: String,
+
+  // Field: Issue
+  //   - API Name: Issue
+  //   - Zoho Type: Textarea
+  //   - Processed Name: issueContent
+  //   - Availability: both (nested)
+  //   - Raw Example: "test"
+  Issue: String,
+
+  // Field: Author
+  //   - API Name: Author
+  //   - Zoho Type: Text
+  //   - Processed Name: author
+  //   - Availability: both (nested)
+  //   - Raw Example: "Tom Lombardo"
+  Author: String,
+
+  // Field: Is_Resolved
+  //   - API Name: Is_Resolved
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: isResolved (boolean)
+  //   - Availability: both (nested)
+  //   - Raw Example: "true"
+  Is_Resolved: String,
+
+  // Field: Tagged_Users
+  //   - API Name: Tagged_Users
+  //   - Zoho Type: List (Lookup to Add_User)
+  //   - Processed Name: taggedUsers
+  //   - Availability: getRecordById (nested, likely - quick view seems to miss it)
+  //   - Raw Example: (Not shown in quick view example, but expected based on form)
+  Tagged_Users: Array, // Array of User lookup objects
+
+  // Field: Notify_Sales
+  //   - API Name: Notify_Sales
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: notifySales (boolean)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: "false"
+  Notify_Sales: String,
+
+  // Field: zc_display_value
+  //   - API Name: zc_display_value
+  //   - Zoho Type: System Generated
+  //   - Processed Name: displayValue (likely)
+  //   - Availability: both (nested)
+  //   - Raw Example: "test,Tom Lombardo,true,01/10/25 10:50:21,4663646000003182003"
+  //   - Notes: Concatenated display value.
+  zc_display_value: String,
+
+  // --- System Fields ---
+  // Field: Added_Time
+  //   - API Name: Added_Time
+  //   - Zoho Type: System (Timestamp)
+  //   - Processed Name: addedTime
+  //   - Availability: both (nested)
+  //   - Raw Example: "01/10/25 10:50:21"
+  Added_Time: String,
+
+  // --- Fields Likely Only in Form/Detail View ---
+  // Project: Lookup (Link back to project, implicit in nested structure)
+  // Resolved_By: Picklist (Lookup to Add_User)
+  // User_Lookup: Picklist (Lookup to Add_User)
+}
+```
+
+## Entity: Notes (Source: Add_Note Form / Grid in Add_Project)
+
+Represents notes added to a project, potentially with replies and attachments. This data is returned as an array within the Project object.
+
+```javascript
+{
+  // Field: ID
+  //   - API Name: ID
+  //   - Zoho Type: Autonumber / Record ID (System Generated)
+  //   - Processed Name: ID
+  //   - Availability: both (nested)
+  //   - Raw Example: "4663646000003412580"
+  //   - Notes: Unique identifier for the note record.
+  ID: String,
+
+  // Field: Note
+  //   - API Name: Note
+  //   - Zoho Type: Textarea
+  //   - Processed Name: content
+  //   - Availability: both (nested)
+  //   - Raw Example: "@tomlombardo10 @roejanmagnaye1 She replied..."
+  Note: String,
+
+  // Field: Author
+  //   - API Name: Author
+  //   - Zoho Type: Text
+  //   - Processed Name: author
+  //   - Availability: both (nested)
+  //   - Raw Example: "Nora Anderson"
+  Author: String,
+
+  // Field: Replied_To
+  //   - API Name: Replied_To
+  //   - Zoho Type: Picklist (Lookup to Add_Note)
+  //   - Processed Name: repliedTo (String ID or null)
+  //   - Availability: both (nested)
+  //   - Raw Example: {} or { "ID": "466364600000XXXXXXX", "zc_display_value": "..." }
+  //   - Notes: Used to derive `isReply` client-side.
+  Replied_To: Object | null,
+
+  // Field: Team_Only
+  //   - API Name: Team_Only
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: teamOnly (boolean)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: "false" or "true"
+  Team_Only: String,
+
+  // Field: Notify_Sales
+  //   - API Name: Notify_Sales
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: notifySales (boolean)
+  //   - Availability: both (nested)
+  //   - Raw Example: "false"
+  Notify_Sales: String,
+
+  // Field: Tagged_Users
+  //   - API Name: Tagged_Users
+  //   - Zoho Type: List (Lookup to Add_User)
+  //   - Processed Name: Tagged_Users (Array of lookups)
+  //   - Availability: both (nested - though example shows empty in quick view)
+  //   - Raw Example: [] or [{ "ID": "...", "zc_display_value": "..." }, ...]
+  Tagged_Users: Array,
+
+  // Field: Department
+  //   - API Name: Department
+  //   - Zoho Type: Text
+  //   - Processed Name: department
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view)
+  Department: String,
+
+  // Field: Context
+  //   - API Name: Context
+  //   - Zoho Type: Picklist
+  //   - Processed Name: context
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: "General"
+  Context: String,
+
+  // Field: Attachments
+  //   - API Name: Attachments
+  //   - Zoho Type: Grid (Lookup to Add_Note_Attachment)
+  //   - Processed Name: attachments (Array of objects, see below)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in provided quick view - would be array of attachment lookups)
+  Attachments: Array, // Requires separate schema for Add_Note_Attachment
+
+  // Field: zc_display_value
+  //   - API Name: zc_display_value
+  //   - Zoho Type: System Generated
+  //   - Processed Name: N/A
+  //   - Availability: both (nested)
+  //   - Raw Example: "@tomlombardo10...Nora Anderson,01/26/25 06:31:19,false,,,4663646000003412580"
+  //   - Notes: Concatenated display value.
+  zc_display_value: String,
+
+  // --- System Fields ---
+  // Field: Added_Time
+  //   - API Name: Added_Time
+  //   - Zoho Type: System (Timestamp)
+  //   - Processed Name: addedTime
+  //   - Availability: both (nested)
+  //   - Raw Example: "01/26/25 06:31:19"
+  Added_Time: String,
+
+  // --- Fields Likely Only in Form/Detail View ---
+  // Project: Lookup (Link back to project, implicit in nested structure)
+  // User_Lookup: Picklist (Lookup to Add_User)
+  // Replies: List (Lookup to Add_Note - used client-side to build `replies` array)
+  // Assign_to_Teammate: List (Lookup to Add_User)
+  // Zoho_Account: Picklist (Users)
+  // Viewed_By: List (Lookup to Add_User)
+  // Last_Viewed_Timestamp: Datetime
+  // Trello_Creation_Date: Datetime
+  // Trello: Checkbox
+  // Trello_ID: Text
+
+  // --- Derived/Processed Fields (Client-Side) ---
+  // user: String // Derived from User_Lookup?
+  // replies: Array // Populated client-side from Replies lookup
+  // isReply: Boolean // Derived client-side based on Replied_To
+}
+```
+
+## Entity: Note Attachments (Source: Add_Note_Attachment Form / Grid in Add_Note)
+
+Represents files attached to a specific Note.
+
+```javascript
+{
+  // Field: ID
+  //   - API Name: ID
+  //   - Zoho Type: Autonumber / Record ID (System Generated)
+  //   - Processed Name: id
+  //   - Availability: N/A (Fetched via Note's Attachments grid)
+  ID: String,
+  
+  // Field: Name
+  //   - API Name: Name
+  //   - Zoho Type: Text
+  //   - Processed Name: name
+  //   - Availability: N/A (Fetched via Note's Attachments grid)
+  Name: String,
+
+  // Field: File_field
+  //   - API Name: File_field
+  //   - Zoho Type: Upload File
+  //   - Processed Name: url (Zoho file path string)
+  //   - Availability: N/A (Fetched via Note's Attachments grid)
+  File_field: String,
+
+  // --- System Fields ---
+  // Field: Added_Time
+  //   - API Name: Added_Time
+  //   - Zoho Type: System (Timestamp)
+  //   - Processed Name: addedTime
+  //   - Availability: N/A (Fetched via Note's Attachments grid)
+  Added_Time: String,
+
+  // --- Client-Side Derived ---
+  // type: String // Derived ('image' or 'file') based on Name extension
+  
+  // --- Fields Likely Only in Form/Detail View ---
+  // Note: Lookup (Link back to Note, implicit in nested structure)
+  // Image: Upload Image (Alternative to File_field?)
+  // Added_to_Documents: Checkbox
+  // User1: Lookup (User who added?)
+  // Project: Lookup 
+}
+```
+
+## Entity: Activities (Source: Add_Activities Form / Grid in Add_Project)
+
+Represents logged activities related to a project, often automated system events or manual entries. This data is returned as an array within the Project object.
+
+```javascript
+{
+  // Field: ID
+  //   - API Name: ID
+  //   - Zoho Type: Autonumber / Record ID (System Generated)
+  //   - Processed Name: ID
+  //   - Availability: both (nested)
+  //   - Raw Example: "4663646000001939038"
+  //   - Notes: Unique identifier for the activity record.
+  ID: String,
+
+  // Field: Activity
+  //   - API Name: Activity
+  //   - Zoho Type: Text
+  //   - Processed Name: Activity (Likely)
+  //   - Availability: both (nested)
+  //   - Raw Example: "Your customer has viewed their contract in Docusign"
+  Activity: String,
+
+  // Field: Is_Who
+  //   - API Name: Is_Who
+  //   - Zoho Type: Text
+  //   - Processed Name: Author (Processed from Is_Who)
+  //   - Availability: both (nested)
+  //   - Raw Example: "Unknown User" or "Roejan Mgnaye"
+  //   - Notes: Represents the user or system performing the activity.
+  Is_Who: String,
+
+  // Field: Where
+  //   - API Name: Where
+  //   - Zoho Type: Picklist
+  //   - Processed Name: Platform (Processed from Where)
+  //   - Availability: both (nested)
+  //   - Raw Example: "OpenSolar" or "Portal"
+  //   - Notes: Indicates the source system of the activity.
+  Where: String,
+
+  // Field: Created_Date
+  //   - API Name: Created_Date
+  //   - Zoho Type: Datetime
+  //   - Processed Name: Added_Time (Processed from Created_Date)
+  //   - Availability: both (nested)
+  //   - Raw Example: "10/12/24 11:11:57"
+  //   - Notes: Timestamp when the activity was recorded.
+  Created_Date: String,
+
+  // Field: zc_display_value
+  //   - API Name: zc_display_value
+  //   - Zoho Type: System Generated
+  //   - Processed Name: N/A
+  //   - Availability: both (nested)
+  //   - Raw Example: "Your customer has viewed their contract in Docusign,Unknown User,10/12/24 11:11:57,OpenSolar"
+  //   - Notes: Concatenated display value.
+  zc_display_value: String,
+
+  // --- System Fields (Processed Name used in backend_structure.mdc) ---
+  // Field: Added_Time
+  //   - API Name: Added_Time
+  //   - Zoho Type: System (Timestamp)
+  //   - Processed Name: N/A (Seems superseded by Created_Date in Activity Schema, but present in Project schema)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Notes: System timestamp, potentially redundant with Created_Date for this specific subform.
+  // Added_Time: String, 
+
+  // --- Fields Likely Only in Form/Detail View ---
+  // Project: Lookup (Link back to project, implicit in nested structure)
+  // Event_ID: Number
+  // Details: Text
+  // Is_Complete: Checkbox
+  // Show_to_Customer: Checkbox
+  // User: Picklist (Lookup to Add_User)
+}
+```
+
+## Entity: Documents (Source: Add_Document Form / Grid in Add_Project)
+
+Represents documents uploaded and associated with a project. This data is returned as an array within the Project object.
+
+```javascript
+{
+  // Field: ID
+  //   - API Name: ID
+  //   - Zoho Type: Autonumber / Record ID (System Generated)
+  //   - Processed Name: ID
+  //   - Availability: both (nested)
+  //   - Raw Example: "4663646000004254740"
+  //   - Notes: Unique identifier for the document record.
+  ID: String,
+
+  // Field: Document_Name
+  //   - API Name: Document_Name
+  //   - Zoho Type: Text
+  //   - Processed Name: Document_Name
+  //   - Availability: both (nested)
+  //   - Raw Example: "IMG_0221.png"
+  Document_Name: String,
+
+  // Field: Document_Type
+  //   - API Name: Document_Type
+  //   - Zoho Type: Picklist
+  //   - Processed Name: Document_Type (String - Simple Picklist)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: "Utility Bill"
+  //   - Notes: Simple picklist, seems less used than Doc_Type lookup.
+  Document_Type: String,
+
+  // Field: Doc_Type
+  //   - API Name: Doc_Type
+  //   - Zoho Type: Picklist (Lookup to Add_Document_Type)
+  //   - Processed Name: Doc_Type (Object: { ID, Name, Include_In_Checklist })
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in quick view) { "ID": "...", "Name": "Utility Bill", ... }
+  //   - Notes: Preferred lookup for document categorization.
+  Doc_Type: Object | null,
+
+  // Field: File_Upload
+  //   - API Name: File_Upload
+  //   - Zoho Type: Upload File
+  //   - Processed Name: File_Upload (Zoho file path string)
+  //   - Availability: both (nested)
+  //   - Raw Example: "/api/v2.1/.../download?filepath=..."
+  File_Upload: String,
+
+  // Field: File_Tags
+  //   - API Name: File_Tags
+  //   - Zoho Type: Text
+  //   - Processed Name: File_Tags (String)
+  //   - Availability: both (nested)
+  //   - Raw Example: "Extra File" or "Sales Proposal, System Contract"
+  File_Tags: String,
+
+  // Field: WorkDrive_Link
+  //   - API Name: WorkDrive_Link
+  //   - Zoho Type: URL
+  //   - Processed Name: WorkDrive_Link (Object: { url, value, ... } or String)
+  //   - Availability: both (nested - though often empty {} in quick view)
+  //   - Raw Example: {} or { "value": "Open File", "url": "https://workdrive..." }
+  WorkDrive_Link: Object | String,
+
+  // Field: Embed_Link
+  //   - API Name: Embed_Link
+  //   - Zoho Type: Textarea
+  //   - Processed Name: Embed_Link
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in quick view)
+  Embed_Link: String,
+
+  // Field: Is_Revision
+  //   - API Name: Is_Revision
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: Is_Revision (boolean)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: "false"
+  Is_Revision: String,
+
+  // Field: Revision_Number
+  //   - API Name: Revision_Number
+  //   - Zoho Type: Number
+  //   - Processed Name: Revision_Number (number)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: (Not in quick view)
+  Revision_Number: String, // API likely returns as string
+
+  // Field: Sent_To_Investor_Portal
+  //   - API Name: Sent_To_Investor_Portal
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: Sent_To_Investor_Portal (boolean)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: "false"
+  Sent_To_Investor_Portal: String,
+
+  // Field: Trigger_Send_to_Inv
+  //   - API Name: Trigger_Send_to_Inv
+  //   - Zoho Type: Checkbox
+  //   - Processed Name: Trigger_Send_to_Inv (boolean)
+  //   - Availability: getRecordById (nested, likely)
+  //   - Raw Example: "false"
+  Trigger_Send_to_Inv: String,
+
+  // Field: zc_display_value
+  //   - API Name: zc_display_value
+  //   - Zoho Type: System Generated
+  //   - Processed Name: N/A
+  //   - Availability: both (nested)
+  //   - Raw Example: "IMG_0221.png /api/v2.1/... Extra File "
+  //   - Notes: Concatenated display value.
+  zc_display_value: String,
+
+  // --- System Fields (Likely available in Detail View) ---
+  // Field: Added_Time
+  //   - API Name: Added_Time
+  //   - Zoho Type: System (Timestamp)
+  //   - Processed Name: Added_Time
+  //   - Availability: getRecordById (nested, likely)
+  Added_Time: String,
+
+  // Field: Added_User
+  //   - API Name: Added_User
+  //   - Zoho Type: System (User)
+  //   - Processed Name: Added_User
+  //   - Availability: getRecordById (nested, likely)
+  Added_User: String,
+
+  // --- Fields Likely Only in Form/Detail View ---
+  // Project: Lookup (Link back to project, implicit in nested structure)
+  // User_Lookup: Picklist (Lookup to Add_User)
+  // Upload_ID: Text
+  // Upload_Date: Datetime
+  // WorkDrive_ID: Text
+  // Public_Embed_Link: Textarea
+  // Download_Link: Text
+  // File_Type: Text
+  // File_Compressed: Checkbox
+  // File_Too_Big: Checkbox
+  // File_Url: Textarea
+  // File_Uploaded: Checkbox
+  // Upload_Attempted: Datetime
+  // Date_Uploaded_to_WorkDrive: Datetime
+  // Existing_OCR: Textarea
+  // Trello_Attachment_ID: Text
+  // Uploaded_By: Text
+  // Uploaded_By_Email: Text
+  // Logs: Textarea
+  // TRIG_Upload_to_WorkDrive: Checkbox
+
+  // --- Derived/Processed Fields (Client-Side) ---
+  // User: { ID: String | null, Name: String } // Derived from User_Lookup or Added_User?
+}
+```
+

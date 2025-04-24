@@ -1,0 +1,782 @@
+/* global React */
+import React, { useState, useRef, useEffect } from 'react';
+import { navigateToURL } from '../utils/navigation.js';
+import { createRecord } from '../utils/recordCreation.js';
+import { updateRecord } from '../utils/recordUpdates.js';
+import { uploadDocumentWithFile } from '../utils/fileUpload.js';
+import DocumentTypeDrawer from './DocumentTypeDrawer.js';
+import DocumentContent from './DocumentContent.js';
+import DocumentChecklist from './DocumentChecklist.js';
+import { createWorkDriveFolders } from '../utils/customAPI.js';
+import { useToast } from '../contexts/ToastContext.js';
+import MultipleFileUploadForm from './MultipleFileUploadForm.js';
+import { getDocTypes } from '../utils/zohoApi.js';
+
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleString('en-US', { 
+        month: '2-digit', 
+        day: '2-digit', 
+        year: '2-digit',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: true
+    });
+};
+
+const DocumentsTab = ({ 
+    project, 
+    onRefresh, 
+    currentUser, 
+    users,
+    previewDoc,
+    setPreviewDoc,
+    docTypes,
+    isLoadingDocTypes
+}) => {
+    const { showToast } = useToast();
+    
+    // Initialize expandedTypes with all document types expanded
+    const [expandedTypes, setExpandedTypes] = useState(() => {
+        // If we have documents, initialize all type groups as expanded
+        if (project?.documents) {
+            const types = {};
+            project.documents.forEach(doc => {
+                if (doc.Doc_Type?.ID) {
+                    types[doc.Doc_Type.ID] = true;
+                }
+            });
+            return types;
+        }
+        return {};
+    });
+
+    const [isUploading, setIsUploading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+    const [editingDocId, setEditingDocId] = useState(null);
+    const [editFormData, setEditFormData] = useState({
+        name: '',
+        type: '',
+        isRevision: false
+    });
+    const [dragActive, setDragActive] = useState(false);
+    const [uploadFile, setUploadFile] = useState(null);
+    const [uploadFormData, setUploadFormData] = useState({
+        name: '',
+        type: '',
+        isRevision: false
+    });
+    const [showUploadForm, setShowUploadForm] = useState(false);
+    const [showMultipleUploadForm, setShowMultipleUploadForm] = React.useState(false);
+    const [selectedFiles, setSelectedFiles] = React.useState([]);
+    const [uploadProgress, setUploadProgress] = React.useState({});
+    const fileInputRef = useRef(null);
+    const [searchQuery, setSearchQuery] = React.useState('');
+    
+    const truncateString = (str, maxLength) => {
+        if (str.length <= maxLength) return str;
+        return str.substring(0, maxLength) + '...';
+    };
+
+    const ErrorAlert = ({ message }) => {
+        if (!message) return null;
+        
+        return React.createElement('div',
+            {
+                className: "fixed bottom-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded",
+                role: "alert"
+            },
+            [
+                React.createElement('span',
+                    { className: "font-bold mr-2" },
+                    "Error:"
+                ),
+                React.createElement('span',
+                    { className: "block sm:inline" },
+                    message
+                ),
+                React.createElement('button',
+                    {
+                        className: "ml-4 font-bold",
+                        onClick: () => setErrorMessage('')
+                    },
+                    "×"
+                )
+            ]
+        );
+    };
+
+    //console.log('Raw project documents:', project.documents);
+    
+    // Process documents to group by type
+    const groupedDocuments = React.useMemo(() => {
+        const typed = {};
+        const untyped = [];
+        
+        if (project.documents) {
+            // Filter documents based on search query
+            const filteredDocs = project.documents.filter(doc => {
+                if (!searchQuery) return true;
+                
+                const name = (doc.Document_Name || '').toLowerCase();
+                const type = (doc.Doc_Type?.Name || '').toLowerCase();
+                const query = searchQuery.toLowerCase();
+                
+                return name.includes(query) || type.includes(query);
+            });
+
+            // Group filtered documents
+            filteredDocs.forEach(doc => {
+                if (doc.Doc_Type?.ID && doc.Doc_Type?.Name) {
+                    const typeKey = doc.Doc_Type.ID;
+                    if (!typed[typeKey]) {
+                        typed[typeKey] = {
+                            type: doc.Doc_Type.Name,
+                            typeId: doc.Doc_Type.ID,
+                            versions: []
+                        };
+                    }
+                    typed[typeKey].versions.push({
+                        ...doc,
+                        docName: doc.Document_Name // Only add the alias field needed for UI
+                    });
+                } else {
+                    untyped.push({
+                        ...doc,
+                        docName: doc.Document_Name // Only add the alias field needed for UI
+                    });
+                }
+            });
+
+            // Sort by Added_Time
+            Object.values(typed).forEach(typeGroup => {
+                typeGroup.versions.sort((a, b) => {
+                    return new Date(b.Added_Time) - new Date(a.Added_Time);
+                });
+            });
+
+            untyped.sort((a, b) => {
+                return new Date(b.Added_Time) - new Date(a.Added_Time);
+            });
+        }
+        
+        return { typed, untyped };
+    }, [project.documents, searchQuery]);
+
+    const toggleTypeDrawer = (typeId) => {
+        setExpandedTypes(prev => ({
+            ...prev,
+            [typeId]: !(prev[typeId] ?? true) // Default to true if not in state
+        }));
+    };
+
+    const handleFileClick = (fileUrl, docId) => {
+        if (!fileUrl) {
+            console.error('File URL is missing for document ID:', docId);
+            return;
+        }
+
+        try {
+            // Handle v2.1 API URL format
+            if (fileUrl.includes('/api/v2.1/')) {
+                const fullUrl = `https://creator.zoho.com${fileUrl}`;
+                navigateToURL(fullUrl, "same");
+                return;
+            }
+
+            // Handle legacy format
+            const cleanPath = fileUrl.replace(/^\/api\/v2/, '').replace('report/', '');
+            const fullUrl = `https://creator.zoho.com/file${cleanPath}`;
+            navigateToURL(fullUrl, "same");
+        } catch (e) {
+            console.error('Error processing file URL:', {
+                error: e,
+                fileUrl: fileUrl,
+                docId: docId
+            });
+        }
+    };
+
+    const handleFileUpload = async (event) => {
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
+
+        // Always use multiple upload form
+        setSelectedFiles(files);
+        setShowMultipleUploadForm(true);
+        
+        // Clear the file input
+        event.target.value = '';
+    };
+
+    // Add drag and drop handlers
+    const handleDrag = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === "dragenter" || e.type === "dragover") {
+            setDragActive(true);
+        } else if (e.type === "dragleave") {
+            setDragActive(false);
+        }
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+
+        const droppedFiles = Array.from(e.dataTransfer.files);
+        if (droppedFiles.length === 0) return;
+
+        // Always use multiple upload form
+        setSelectedFiles(droppedFiles);
+        setShowMultipleUploadForm(true);
+    };
+
+    // Add multiple file upload handler
+    const handleMultipleFileUpload = async (fileConfigs) => {
+        setIsUploading(true);
+        setUploadProgress({});
+        let successCount = 0;
+        let failureCount = 0;
+
+        try {
+            showToast('Starting multiple file upload...', 'loading');
+
+            for (let i = 0; i < fileConfigs.length; i++) {
+                const config = fileConfigs[i];
+                setUploadProgress(prev => ({
+                    ...prev,
+                    [i]: { status: 'uploading', progress: 0 }
+                }));
+
+                try {
+                    // Use uploadDocumentWithFile instead of direct API calls
+                    const uploadResult = await uploadDocumentWithFile({
+                        file: config.file,
+                        documentName: config.processedFile.fileName,
+                        documentType: config.documentType,
+                        isRevision: config.isRevision,
+                        projectId: project.id,
+                        currentUser: currentUser
+                    });
+
+                    if (uploadResult.success) {
+                        setUploadProgress(prev => ({
+                            ...prev,
+                            [i]: { status: 'success', progress: 100 }
+                        }));
+                        successCount++;
+                    } else {
+                        throw new Error('Upload failed');
+                    }
+
+                } catch (error) {
+                    console.error(`Error uploading file ${config.processedFile.fileName}:`, error);
+                    setUploadProgress(prev => ({
+                        ...prev,
+                        [i]: { status: 'error', error: error.message }
+                    }));
+                    failureCount++;
+                }
+            }
+
+            // Show final status
+            if (failureCount === 0) {
+                showToast(`Successfully uploaded all ${successCount} files`, 'success');
+            } else {
+                showToast(`Uploaded ${successCount} files, ${failureCount} failed`, 'warning');
+            }
+
+            // Refresh document list
+            if (onRefresh) {
+                await onRefresh();
+            }
+
+        } catch (error) {
+            console.error('Error in multiple file upload:', error);
+            showToast('Failed to complete multiple file upload', 'error');
+        } finally {
+            setIsUploading(false);
+            setShowMultipleUploadForm(false);
+            setSelectedFiles([]);
+        }
+    };
+
+    // Upload form component
+    const UploadForm = () => {
+        const handleSubmit = async (e) => {
+            e.preventDefault();
+            setIsUploading(true);
+            try {
+                const uploadResult = await uploadDocumentWithFile({
+                    file: uploadFile,
+                    documentName: uploadFormData.name,
+                    documentType: uploadFormData.type,
+                    isRevision: uploadFormData.isRevision,
+                    projectId: project.id,
+                    currentUser: currentUser
+                });
+
+                if (uploadResult.success) {
+                    setShowUploadForm(false);
+                    setUploadFile(null);
+                    setUploadFormData({ name: '', type: '', isRevision: false });
+                    // Clear the file input value
+                    if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                    }
+                    if (onRefresh) await onRefresh();
+                } else {
+                    throw new Error('Failed to upload document');
+                }
+            } catch (error) {
+                console.error('Error uploading document:', error);
+                setErrorMessage(error.message || 'Failed to upload document');
+            } finally {
+                setIsUploading(false);
+            }
+        };
+
+        return React.createElement('div',
+            {
+                className: "fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50"
+            },
+            React.createElement('div',
+                {
+                    className: "bg-white rounded-lg p-6 w-full max-w-md"
+                },
+                [
+                    React.createElement('h3',
+                        { className: "text-lg font-semibold mb-4" },
+                        "Upload Document"
+                    ),
+                    React.createElement('form',
+                        { 
+                            onSubmit: handleSubmit,
+                            className: "space-y-4"
+                        },
+                        [
+                            // File name display
+                            React.createElement('div',
+                                { className: "text-sm text-gray-500 mb-4" },
+                                `Selected file: ${uploadFile?.name}`
+                            ),
+                            // Document Name
+                            React.createElement('input',
+                                {
+                                    type: 'text',
+                                    value: uploadFormData.name,
+                                    onChange: (e) => setUploadFormData(prev => ({ 
+                                        ...prev, 
+                                        name: e.target.value 
+                                    })),
+                                    placeholder: "Document Name",
+                                    className: "block w-full px-3 py-2 text-sm border border-gray-300 rounded-md",
+                                    required: true
+                                }
+                            ),
+                            // Document Type (now optional)
+                            React.createElement('select',
+                                {
+                                    value: uploadFormData.type,
+                                    onChange: (e) => setUploadFormData(prev => ({ 
+                                        ...prev, 
+                                        type: e.target.value 
+                                    })),
+                                    className: "block w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                                },
+                                [
+                                    React.createElement('option', { value: '' }, 'Select Type (Optional)'),
+                                    ...docTypes.map(type =>
+                                        React.createElement('option', 
+                                            { 
+                                                value: type.ID, 
+                                                key: type.ID 
+                                            }, 
+                                            type.Name
+                                        )
+                                    )
+                                ]
+                            ),
+                            // Revision Checkbox
+                            React.createElement('label',
+                                { className: "flex items-center gap-2 text-sm text-gray-700" },
+                                [
+                                    React.createElement('input',
+                                        {
+                                            type: 'checkbox',
+                                            checked: uploadFormData.isRevision,
+                                            onChange: (e) => setUploadFormData(prev => ({ 
+                                                ...prev, 
+                                                isRevision: e.target.checked 
+                                            })),
+                                            className: "rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        }
+                                    ),
+                                    "Mark as Revision"
+                                ]
+                            ),
+                            // Buttons
+                            React.createElement('div',
+                                { className: "flex justify-end gap-2 mt-4" },
+                                [
+                                    React.createElement('button',
+                                        {
+                                            type: 'button',
+                                            onClick: () => {
+                                                setShowUploadForm(false);
+                                                setUploadFile(null);
+                                                setUploadFormData({ name: '', type: '', isRevision: false });
+                                            },
+                                            className: "px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                                        },
+                                        "Cancel"
+                                    ),
+                                    React.createElement('button',
+                                        {
+                                            type: 'submit',
+                                            disabled: isUploading,
+                                            className: "px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+                                        },
+                                        isUploading ? "Uploading..." : "Upload"
+                                    )
+                                ]
+                            )
+                        ]
+                    )
+                ]
+            )
+        );
+    };
+
+    // Add document type options constant
+    const DOCUMENT_TYPES = [
+        "Plan Set with Stamp",
+        "Shade Report",
+        "Yield Report",
+        "Yield Report with Tree Trimming",
+        "Yield Report without Tree Trimming",
+        "Electrical Permit",
+        "Building Permit",
+        "Site Survey Report",
+        "ATI",
+        "Tree Trimming Invoice",
+        "MPU Invoice",
+        "Roofing Invoice",
+        "Utility Bill",
+        "Proposal",
+        "Relationship Letter",
+        "Owner/Property ID",
+        "Signed Contract",
+        "Feeder Image",
+        "Property Ownership",
+        "Permission To Operate",
+        "PEPCO ATO",
+        "Redball ATO",
+        "PEPCO As Built",
+        "Redball As Built",
+        "TES Inspection Report"
+    ];
+
+    // Add these helper functions
+    const handleEditClick = (doc) => {
+        setEditingDocId(doc.ID);
+        setEditFormData({
+            name: doc.docName || doc.Document_Name,
+            type: doc.documentType || doc.Document_Type || '',
+            isRevision: doc.isRevision || false
+        });
+    };
+
+    const handleCancelEdit = () => {
+        setEditingDocId(null);
+        setEditFormData({ name: '', type: '', isRevision: false });
+    };
+
+    const handleSaveEdit = async (docId) => {
+        try {
+            if (!editFormData.name.trim()) {
+                throw new Error('Document name cannot be empty');
+            }
+
+            const updateData = {
+                Document_Name: editFormData.name.trim(),
+                Document_Type: editFormData.type,
+                Is_Revision: editFormData.isRevision ? "true" : "false"
+            };
+
+            if (!editFormData.isRevision) {
+                updateData.Revision_Number = null;
+            }
+
+            const response = await updateRecord(
+                "PM_Kanban_Documents",
+                docId,
+                {
+                    data: updateData
+                }
+            );
+
+            if (response.code === 3000) {
+                setEditingDocId(null);
+                setEditFormData({ name: '', type: '', isRevision: false });
+                if (onRefresh) await onRefresh();
+            } else {
+                throw new Error('Failed to update document');
+            }
+        } catch (error) {
+            console.error('Error updating document:', error);
+            setErrorMessage(error.message || 'Failed to update document');
+        }
+    };
+
+    // Update the header section to include search
+    const renderHeader = () => {
+        const [isCreatingFolders, setIsCreatingFolders] = React.useState(false);
+
+        const handleCreateFolders = async () => {
+            if (isCreatingFolders) return;
+            
+            setIsCreatingFolders(true);
+            showToast('Creating project folders...', 'loading');
+            
+            try {
+                // Update the trigger field to initiate folder creation
+                await updateRecord(
+                    "PM_Kanban_Projects",
+                    project.id,
+                    {
+                        data: {
+                            TRIG_Create_Project_Folders: "true"
+                        }
+                    }
+                );
+
+                await onRefresh(); // Refresh project data to get new folder IDs
+                showToast('Project folders creation initiated', 'success');
+            } catch (error) {
+                console.error('Error initiating folder creation:', error);
+                showToast('Failed to initiate project folders creation', 'error');
+            } finally {
+                setIsCreatingFolders(false);
+            }
+        };
+
+        return React.createElement('div', 
+            { className: "flex flex-col gap-4 mb-4" },
+            [
+                // Top row: Title and document count
+                React.createElement('div',
+                    { className: "flex items-center justify-between" },
+                    [
+                        // Left side: Icon and title with count
+                        React.createElement('div',
+                            { className: "flex items-center gap-3" },
+                            [
+                                React.createElement('i',
+                                    { className: "fas fa-folder-open text-blue-500 text-xl" }
+                                ),
+                                React.createElement('h3',
+                                    { className: "text-xl font-semibold text-gray-900" },
+                                    "Documents"
+                                ),
+                                React.createElement('span',
+                                    { className: "px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-sm font-medium" },
+                                    `${Object.values(groupedDocuments.typed).reduce((total, typeGroup) => total + typeGroup.versions.length, 0) + groupedDocuments.untyped.length} Documents`
+                                )
+                            ]
+                        )
+                    ]
+                ),
+                // Bottom row: WorkDrive folder buttons or Create Folders button
+                React.createElement('div',
+                    { className: "flex gap-3" },
+                    project.project_folder || project.investor_folder ? 
+                        [
+                            // Existing folder buttons code
+                            project.project_folder && React.createElement('button',
+                                {
+                                    onClick: () => {
+                                        const url = `https://workdrive.zoho.com/folder/${project.project_folder}`;
+                                        navigateToURL(url, "new");
+                                    },
+                                    className: "flex items-center gap-2 px-4 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                                },
+                                [
+                                    React.createElement('i', { className: "fas fa-folder text-gray-400" }),
+                                    "Open Project Folder"
+                                ]
+                            ),
+                            project.investor_folder && React.createElement('button',
+                                {
+                                    onClick: () => {
+                                        const url = `https://workdrive.zoho.com/folder/${project.investor_folder}`;
+                                        navigateToURL(url, "new");
+                                    },
+                                    className: "flex items-center gap-2 px-4 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                                },
+                                [
+                                    React.createElement('i', { className: "fas fa-folder text-gray-400" }),
+                                    "Open Investor Folder"
+                                ]
+                            )
+                        ] 
+                        : React.createElement('button',
+                            {
+                                onClick: handleCreateFolders,
+                                disabled: isCreatingFolders,
+                                className: `flex items-center gap-2 px-4 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed ${isCreatingFolders ? 'cursor-wait' : ''}`
+                            },
+                            [
+                                React.createElement('i', { 
+                                    className: isCreatingFolders ? "fas fa-spinner fa-spin" : "fas fa-folder-plus"
+                                }),
+                                isCreatingFolders ? "Creating Folders..." : "Create Project Folders"
+                            ]
+                        ),
+                        React.createElement('div',
+                            { className: "flex-1 max-w-md" },
+                            React.createElement('input',
+                                {
+                                    type: "text",
+                                    placeholder: "Search documents...",
+                                    value: searchQuery,
+                                    onChange: (e) => setSearchQuery(e.target.value),
+                                    className: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                }
+                            )
+                        )
+                )
+            ]
+        );
+    };
+
+    // Main render
+    return React.createElement('div',
+        { className: "p-6 max-w-5xl mx-auto" },
+        [
+            // Header
+            renderHeader(),
+            
+            // Document Checklist
+            React.createElement(DocumentChecklist, { 
+                project,
+                docTypes,
+                className: "mb-6" 
+            }),
+            
+            // Drag and Drop Upload Box
+            React.createElement('div',
+                { className: "mb-6" },
+                [
+                    React.createElement('div',
+                        {
+                            className: `border-2 border-dashed rounded-lg p-8 text-center cursor-pointer ${
+                                dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                            }`,
+                            onDragEnter: handleDrag,
+                            onDragLeave: handleDrag,
+                            onDragOver: handleDrag,
+                            onDrop: handleDrop,
+                            onClick: () => fileInputRef.current?.click()
+                        },
+                        [
+                            React.createElement('i',
+                                { className: "fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2" }
+                            ),
+                            React.createElement('p',
+                                { className: "text-gray-600" },
+                                "Drag and drop files here or click to upload"
+                            ),
+                            React.createElement('input',
+                                {
+                                    ref: fileInputRef,
+                                    type: "file",
+                                    multiple: true,
+                                    className: "hidden",
+                                    onChange: handleFileUpload,
+                                    accept: "application/pdf,image/*,.doc,.docx,.xls,.xlsx,.txt"
+                                }
+                            )
+                        ]
+                    )
+                ]
+            ),
+            
+            // Rest of the components (upload form, documents list, etc.)
+            showUploadForm && UploadForm(),
+            showMultipleUploadForm && React.createElement(MultipleFileUploadForm, {
+                files: selectedFiles,
+                onClose: () => {
+                    setShowMultipleUploadForm(false);
+                    setSelectedFiles([]);
+                },
+                onUpload: handleMultipleFileUpload,
+                documentTypes: docTypes,
+                currentUser: currentUser,
+                isUploading: isUploading,
+                uploadProgress: uploadProgress
+            }),
+            // Typed Documents
+            Object.values(groupedDocuments.typed).map(typeGroup => 
+                typeGroup && React.createElement(DocumentTypeDrawer, {
+                    key: typeGroup.typeId || 'unknown',
+                    doc: {
+                        type: typeGroup.type || '',
+                        typeId: typeGroup.typeId,
+                        versions: typeGroup.versions || []
+                    },
+                    isExpanded: expandedTypes[typeGroup.typeId],
+                    onToggle: () => toggleTypeDrawer(typeGroup.typeId),
+                    onRefresh: onRefresh,
+                    handleFileClick: handleFileClick,
+                    projectId: project.id,
+                    workDriveFolderId: project.project_folder,
+                    currentUser: currentUser,
+                    users: users,
+                    previewDoc: previewDoc,
+                    setPreviewDoc: setPreviewDoc,
+                    docTypes: docTypes
+                })
+            ),
+            // Untyped Documents
+            groupedDocuments.untyped.length > 0 && React.createElement('div',
+                { className: "mt-8" },
+                [
+                    React.createElement('h3',
+                        { className: "text-lg font-semibold text-gray-900 mb-4" },
+                        "Other Documents"
+                    ),
+                    React.createElement('div',
+                        { className: "space-y-4" },
+                        groupedDocuments.untyped.map(doc =>
+                            React.createElement('div',
+                                {
+                                    key: doc.ID,
+                                    className: "bg-white rounded-xl border border-gray-200 p-4"
+                                },
+                                React.createElement(DocumentContent, {
+                                    doc: doc,
+                                    projectId: project.id,
+                                    workDriveFolderId: project.project_folder,
+                                    onRefresh: onRefresh,
+                                    handleFileClick: handleFileClick,
+                                    currentUser: currentUser,
+                                    users: users,
+                                    previewDoc: previewDoc,
+                                    setPreviewDoc: setPreviewDoc,
+                                    docTypes: docTypes
+                                })
+                            )
+                        )
+                    )
+                ]
+            ),
+            // Error alert
+            React.createElement(ErrorAlert, { message: errorMessage })
+        ]
+    );
+};
+
+export default DocumentsTab;

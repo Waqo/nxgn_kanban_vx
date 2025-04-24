@@ -1,0 +1,88 @@
+/* global React */
+import React from 'react';
+
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString('en-US', { 
+        month: '2-digit', 
+        day: '2-digit', 
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+};
+
+const CommSection = ({ communications, setActiveTab }) => {
+    const calls = communications?.filter(comm => 
+        comm.Communication_Type?.toLowerCase() === 'call'
+    ) || [];
+
+    return React.createElement('div',
+        { className: "bg-white rounded-lg shadow-sm p-4 mb-4" },
+        [
+            // Header
+            React.createElement('div',
+                { className: "flex justify-between items-center mb-3" },
+                [
+                    React.createElement('h3',
+                        { className: "text-sm font-medium text-gray-900" },
+                        "Recent Calls"
+                    ),
+                    React.createElement('span',
+                        { className: "text-xs text-gray-500" },
+                        `${calls.length} total`
+                    )
+                ]
+            ),
+            // Recent Calls List
+            React.createElement('div',
+                { className: "space-y-2" },
+                [
+                    // First 4 calls
+                    ...calls.slice(0, 4).map(comm => 
+                        React.createElement('div',
+                            { 
+                                key: comm.ID,
+                                className: "text-sm border-b border-gray-100 last:border-0 pb-2 last:pb-0" 
+                            },
+                            [
+                                React.createElement('p',
+                                    { className: "text-gray-900 font-medium truncate" },
+                                    comm.Subject
+                                ),
+                                React.createElement('div',
+                                    { className: "flex items-center justify-between mt-1" },
+                                    [
+                                        React.createElement('span',
+                                            { className: "text-xs text-gray-500" },
+                                            formatDate(comm.Added_Time)
+                                        ),
+                                        React.createElement('span',
+                                            { className: "text-xs text-gray-600 flex items-center gap-1" },
+                                            [
+                                                React.createElement('i', 
+                                                    { className: "far fa-user text-gray-400" }
+                                                ),
+                                                comm.User
+                                            ]
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ),
+                    // View More button
+                    calls.length > 4 && React.createElement('button',
+                        { 
+                            className: "w-full text-center text-sm text-blue-600 hover:text-blue-700 font-medium mt-2 pt-2 border-t border-gray-100",
+                            onClick: () => setActiveTab('communications')
+                        },
+                        "View All Calls"
+                    )
+                ]
+            )
+        ]
+    );
+};
+
+export default CommSection;

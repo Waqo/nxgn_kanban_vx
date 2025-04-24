@@ -1,0 +1,498 @@
+import React, { useState, useEffect } from 'react';
+import { updateRecord } from '../utils/recordUpdates.js';
+import { createRecord } from '../utils/recordCreation.js';
+import { useToast } from '../contexts/ToastContext.js';
+
+const formatDateForAPI = (dateString) => {
+    if (!dateString) return null;
+    try {
+        // Convert YYYY-MM-DD to MM/DD/YY
+        const [year, month, day] = dateString.split('-');
+        if (!year || !month || !day) return null;
+        
+        // Use last 2 digits of year
+        const shortYear = year.slice(2);
+        return `${month}/${day}/${shortYear}`;
+    } catch (error) {
+        console.error('Error formatting date:', error);
+        return null;
+    }
+};
+
+const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    try {
+        // Convert from MM/DD/YY to YYYY-MM-DD
+        const [month, day, year] = dateString.split('/');
+        if (!month || !day || !year) return '';
+        
+        // Convert 2-digit year to 4-digit year
+        const fullYear = '20' + year;
+        // Pad month and day with leading zeros if needed
+        const paddedMonth = month.padStart(2, '0');
+        const paddedDay = day.padStart(2, '0');
+        
+        return `${fullYear}-${paddedMonth}-${paddedDay}`;
+    } catch (error) {
+        console.error('Error formatting date for input:', error);
+        return '';
+    }
+};
+
+const PermittingTab = ({ project, fetchModalData }) => {
+    const { showToast } = useToast();
+    const [isEditing, setIsEditing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    
+    const defaultFormData = {
+        permitSubmitted: 'No',
+        permitStatus: 'Not Submitted',
+        permitNumber: '',
+        permitSubmissionDate: '',
+        permitApprovalDate: '',
+        interconnectionSubmitted: 'No',
+        interconnectionStatus: 'Not Submitted',
+        interconnectionNumber: '',
+        interconnectionSubmissionDate: '',
+        interconnectionApprovalDate: '',
+        tags: [],
+        problem: ''
+    };
+
+    const [formData, setFormData] = useState(defaultFormData);
+    const permit = project.permits?.[0]; // Get the first permit if it exists
+
+    useEffect(() => {
+        if (permit) {
+            setFormData({
+                permitSubmitted: permit.Permit_Submitted,
+                permitStatus: permit.Permit_Status,
+                permitNumber: permit.Permit_Number,
+                permitSubmissionDate: formatDateForInput(permit.Permit_Submission_Date),
+                permitApprovalDate: formatDateForInput(permit.Permit_Approval_Date),
+                interconnectionSubmitted: permit.Interconnection_Submitted,
+                interconnectionStatus: permit.Interconnection_Status,
+                interconnectionNumber: permit.Interconnection_Number,
+                interconnectionSubmissionDate: formatDateForInput(permit.Interconnection_Submission_Date),
+                interconnectionApprovalDate: formatDateForInput(permit.Interconnection_Approval_Date),
+                tags: permit.Tags || [],
+                problem: permit.Problem
+            });
+        }
+    }, [permit]);
+
+    const handleInputChange = (field, value) => {
+        setFormData(prev => ({
+            ...prev,
+            [field]: value
+        }));
+    };
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            // Format all dates before sending to API
+            const formattedData = {
+                ...formData,
+                permitSubmissionDate: formatDateForAPI(formData.permitSubmissionDate),
+                permitApprovalDate: formatDateForAPI(formData.permitApprovalDate),
+                interconnectionSubmissionDate: formatDateForAPI(formData.interconnectionSubmissionDate),
+                interconnectionApprovalDate: formatDateForAPI(formData.interconnectionApprovalDate)
+            };
+
+            if (permit) {
+                // Update existing permit
+                await updateRecord(
+                    "PM_Kanban_Permits",
+                    permit.ID,
+                    {
+                        data: {
+                            Permit_Submitted: formattedData.permitSubmitted,
+                            Permit_Status: formattedData.permitStatus,
+                            Permit_Number: formattedData.permitNumber,
+                            Permit_Submission_Date: formattedData.permitSubmissionDate,
+                            Permit_Approval_Date: formattedData.permitApprovalDate,
+                            Interconnection_Submitted: formattedData.interconnectionSubmitted,
+                            Interconnection_Status: formattedData.interconnectionStatus,
+                            Interconnection_Number: formattedData.interconnectionNumber,
+                            Interconnection_Submission_Date: formattedData.interconnectionSubmissionDate,
+                            Interconnection_Approval_Date: formattedData.interconnectionApprovalDate,
+                            Tags: formattedData.tags,
+                            Problem: formattedData.problem
+                        }
+                    },
+                    showToast,
+                    {
+                        loadingMessage: "Updating permit information...",
+                        successMessage: "Permit information updated successfully",
+                        errorMessage: "Failed to update permit:"
+                    }
+                );
+            } else {
+                // Create new permit with formatted dates
+                await createRecord(
+                    "Add_Permitting",
+                    {
+                        Project: project.id,
+                        Permit_Submitted: formattedData.permitSubmitted,
+                        Permit_Status: formattedData.permitStatus,
+                        Permit_Number: formattedData.permitNumber,
+                        Permit_Submission_Date: formattedData.permitSubmissionDate,
+                        Permit_Approval_Date: formattedData.permitApprovalDate,
+                        Interconnection_Submitted: formattedData.interconnectionSubmitted,
+                        Interconnection_Status: formattedData.interconnectionStatus,
+                        Interconnection_Number: formattedData.interconnectionNumber,
+                        Interconnection_Submission_Date: formattedData.interconnectionSubmissionDate,
+                        Interconnection_Approval_Date: formattedData.interconnectionApprovalDate,
+                        Tags: formattedData.tags,
+                        Problem: formattedData.problem
+                    },
+                    showToast,
+                    {
+                        loadingMessage: "Creating permit record...",
+                        successMessage: "Permit record created successfully",
+                        errorMessage: "Failed to create permit:"
+                    }
+                );
+            }
+            await fetchModalData(project.id);
+            setIsEditing(false);
+        } catch (error) {
+            console.error("Error saving permit data:", error);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const getStatusBadgeColor = (status) => {
+        const statusColors = {
+            // Permit Status Colors
+            'Not Submitted': 'bg-gray-100 text-gray-800',
+            'Projectdox Accepted': 'bg-blue-100 text-blue-800',
+            'In Review': 'bg-yellow-100 text-yellow-800',
+            'Approved': 'bg-green-100 text-green-800',
+            'Problem': 'bg-red-100 text-red-800',
+            
+            // Interconnection Status Colors
+            'Submitted': 'bg-blue-100 text-blue-800',
+            'Resubmitted': 'bg-purple-100 text-purple-800',
+            'Approval to Install': 'bg-green-100 text-green-800',
+            'Field Verification': 'bg-yellow-100 text-yellow-800',
+            'Technical Review': 'bg-indigo-100 text-indigo-800',
+            'Upgrades Rqd: Approval': 'bg-orange-100 text-orange-800',
+            'Technical Review Completed': 'bg-teal-100 text-teal-800',
+            'More Info Rqd': 'bg-red-100 text-red-800',
+            'Incomplete': 'bg-red-100 text-red-800',
+            'Moved to Revised': 'bg-gray-100 text-gray-800',
+            
+            // Submission Status Colors
+            'Yes': 'bg-green-100 text-green-800',
+            'No': 'bg-red-100 text-red-800',
+            'I Don\'t Know': 'bg-yellow-100 text-yellow-800',
+            
+            // Problem Status Colors
+            'Proceed to Submit': 'bg-green-100 text-green-800',
+            'Cancelled': 'bg-red-100 text-red-800',
+            'No Site Survey': 'bg-yellow-100 text-yellow-800',
+            'No Designs': 'bg-orange-100 text-orange-800',
+            'No Bill': 'bg-red-100 text-red-800',
+            'No Relationship Letter': 'bg-red-100 text-red-800',
+            'Reqd Load Calculator': 'bg-yellow-100 text-yellow-800',
+            'Waiting on Signature': 'bg-yellow-100 text-yellow-800',
+            'Missing Proposal': 'bg-red-100 text-red-800',
+            'Unknown': 'bg-gray-100 text-gray-800'
+        };
+        return statusColors[status] || 'bg-gray-100 text-gray-800';
+    };
+
+    const renderStatusBadge = (status) => {
+        return React.createElement('span', {
+            className: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(status)}`
+        }, status);
+    };
+
+    const renderStatusField = (field, label, options, value) => {
+        return React.createElement('div', { className: "mb-4" }, [
+            React.createElement('label', 
+                { className: "block text-sm font-medium text-gray-700 mb-2" }, 
+                label
+            ),
+            isEditing ? 
+                // Edit mode: show select
+                React.createElement('select',
+                    {
+                        value: value,
+                        onChange: (e) => handleInputChange(field, e.target.value),
+                        className: "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    },
+                    options.map(option => 
+                        React.createElement('option', 
+                            { key: option, value: option }, 
+                            option
+                        )
+                    )
+                )
+                : 
+                // View mode: show badge
+                React.createElement('div', 
+                    { className: "mt-1" },
+                    renderStatusBadge(value)
+                )
+        ]);
+    };
+
+    const renderTag = (tag) => {
+        return React.createElement('span', {
+            key: tag,
+            className: "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2 mb-2"
+        }, tag);
+    };
+
+    const renderTags = () => {
+        return React.createElement('div', { className: "mb-4" }, [
+            React.createElement('label',
+                { className: "block text-sm font-medium text-gray-700 mb-2" },
+                "Tags"
+            ),
+            isEditing ?
+                // Edit mode: show multiselect
+                React.createElement('select',
+                    {
+                        multiple: true,
+                        value: formData.tags,
+                        onChange: (e) => handleInputChange('tags', 
+                            Array.from(e.target.selectedOptions, option => option.value)
+                        ),
+                        className: "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 h-32"
+                    },
+                    ['Canceled Permit', 'Waiting for Bill or Relationship Letter', 
+                     'Completed Contract W/ Updates'].map(tag =>
+                        React.createElement('option',
+                            { key: tag, value: tag },
+                            tag
+                        )
+                    )
+                )
+                :
+                // View mode: show badges
+                React.createElement('div', 
+                    { className: "flex flex-wrap gap-2" },
+                    formData.tags.map(tag => renderTag(tag))
+                )
+        ]);
+    };
+
+    const renderLastUpdated = () => {
+        if (!permit?.modifiedTime) return null;
+        
+        try {
+            const [datePart, timePart] = permit.modifiedTime.split(' ');
+            if (!datePart || !timePart) return null;
+            
+            const [month, day, year] = datePart.split('/');
+            const [hours, minutes, seconds] = timePart.split(':');
+            
+            if (!month || !day || !year || !hours || !minutes || !seconds) return null;
+            
+            const date = new Date(2000 + parseInt(year), parseInt(month) - 1, parseInt(day), 
+                                parseInt(hours), parseInt(minutes), parseInt(seconds));
+            
+            if (isNaN(date.getTime())) return null;
+            
+            const formattedDate = new Intl.DateTimeFormat('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: 'numeric',
+                hour12: true
+            }).format(date);
+            
+            return React.createElement('p',
+                { className: "text-sm text-gray-500" },
+                `Last updated ${formattedDate}`
+            );
+        } catch (error) {
+            return null;
+        }
+    };
+
+    return React.createElement('div', { className: "p-6 bg-white rounded-lg shadow" }, [
+        // Header with Edit/Save buttons
+        React.createElement('div', 
+            { className: "flex justify-between items-center mb-6 pb-2 border-b border-gray-200" },
+            [
+                React.createElement('div', { className: "space-y-1" }, [
+                    React.createElement('h3',
+                        { className: "text-lg font-medium text-gray-900" },
+                        "Permitting Information"
+                    ),
+                    renderLastUpdated()
+                ]),
+                React.createElement('button',
+                    {
+                        onClick: isEditing ? handleSave : () => setIsEditing(true),
+                        disabled: isSaving,
+                        className: `inline-flex items-center px-4 py-2 ${isEditing ? 'bg-green-600' : 'bg-blue-600'} text-white rounded-md hover:${isEditing ? 'bg-green-700' : 'bg-blue-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${isEditing ? 'green' : 'blue'}-500 disabled:opacity-50`
+                    },
+                    [
+                        React.createElement('i', {
+                            className: `fas fa-${isEditing ? 'save' : 'edit'} mr-2`
+                        }),
+                        isEditing ? (isSaving ? "Saving..." : "Save Changes") : "Edit"
+                    ]
+                )
+            ]
+        ),
+
+        // Form content with enhanced styling
+        React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-6" }, [
+            // Permit Section
+            React.createElement('div', { 
+                className: "bg-white p-6 rounded-lg border border-gray-200 space-y-4 shadow-sm" 
+            }, [
+                React.createElement('h4', 
+                    { className: "text-md font-medium text-gray-900 mb-4" },
+                    "Permit Information"
+                ),
+                renderStatusField('permitSubmitted', 'Permit Submitted', 
+                    ['No', 'Yes', 'I Don\'t Know'], 
+                    formData.permitSubmitted
+                ),
+                renderStatusField('permitStatus', 'Permit Status',
+                    ['Not Submitted', 'Projectdox Accepted', 'In Review', 'Approved', 'Problem'],
+                    formData.permitStatus
+                ),
+                React.createElement('div', { className: "mb-4" }, [
+                    React.createElement('label',
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "Permit Number"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "text",
+                            value: formData.permitNumber,
+                            onChange: (e) => handleInputChange('permitNumber', e.target.value),
+                            disabled: !isEditing,
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        }
+                    )
+                ]),
+                React.createElement('div', { className: "mb-4" }, [
+                    React.createElement('label',
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "Submission Date"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "date",
+                            value: formData.permitSubmissionDate,
+                            onChange: (e) => handleInputChange('permitSubmissionDate', e.target.value),
+                            disabled: !isEditing,
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        }
+                    )
+                ]),
+                React.createElement('div', { className: "mb-4" }, [
+                    React.createElement('label',
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "Approval Date"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "date",
+                            value: formData.permitApprovalDate,
+                            onChange: (e) => handleInputChange('permitApprovalDate', e.target.value),
+                            disabled: !isEditing,
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        }
+                    )
+                ])
+            ]),
+
+            // Interconnection Section
+            React.createElement('div', { 
+                className: "bg-white p-6 rounded-lg border border-gray-200 space-y-4 shadow-sm" 
+            }, [
+                React.createElement('h4',
+                    { className: "text-md font-medium text-gray-900 mb-4" },
+                    "Interconnection Information"
+                ),
+                renderStatusField('interconnectionSubmitted', 'Interconnection Submitted',
+                    ['No', 'Yes', 'I Don\'t Know'],
+                    formData.interconnectionSubmitted
+                ),
+                renderStatusField('interconnectionStatus', 'Interconnection Status',
+                    ['Not Submitted', 'Submitted', 'Resubmitted', 'Approval to Install', 
+                     'Field Verification', 'Technical Review', 'Upgrades Rqd: Approval',
+                     'Technical Review Completed', 'More Info Rqd', 'Incomplete', 'Moved to Revised'],
+                    formData.interconnectionStatus
+                ),
+                React.createElement('div', { className: "mb-4" }, [
+                    React.createElement('label',
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "Interconnection Number"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "text",
+                            value: formData.interconnectionNumber,
+                            onChange: (e) => handleInputChange('interconnectionNumber', e.target.value),
+                            disabled: !isEditing,
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        }
+                    )
+                ]),
+                React.createElement('div', { className: "mb-4" }, [
+                    React.createElement('label',
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "Submission Date"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "date",
+                            value: formData.interconnectionSubmissionDate,
+                            onChange: (e) => handleInputChange('interconnectionSubmissionDate', e.target.value),
+                            disabled: !isEditing,
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        }
+                    )
+                ]),
+                React.createElement('div', { className: "mb-4" }, [
+                    React.createElement('label',
+                        { className: "block text-sm font-medium text-gray-700 mb-1" },
+                        "Approval Date"
+                    ),
+                    React.createElement('input',
+                        {
+                            type: "date",
+                            value: formData.interconnectionApprovalDate,
+                            onChange: (e) => handleInputChange('interconnectionApprovalDate', e.target.value),
+                            disabled: !isEditing,
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        }
+                    )
+                ])
+            ]),
+
+            // Additional Fields Section
+            React.createElement('div', { 
+                className: "bg-white p-6 rounded-lg border border-gray-200 space-y-4 shadow-sm md:col-span-2" 
+            }, [
+                React.createElement('h4',
+                    { className: "text-md font-medium text-gray-900 mb-4" },
+                    "Additional Information"
+                ),
+                renderStatusField('problem', 'Problem Status',
+                    ['Proceed to Submit', 'Cancelled', 'No Site Survey', 'No Designs', 
+                     'No Bill', 'No Relationship Letter', 'Reqd Load Calculator',
+                     'Waiting on Signature', 'Missing Proposal', 'Unknown'],
+                    formData.problem
+                ),
+                renderTags()
+            ])
+        ])
+    ]);
+};
+
+export default PermittingTab;

@@ -1,0 +1,109 @@
+import { logError } from './errorHandling.js';
+
+/**
+ * Deletes a record or records from Zoho Creator
+ * @param {string} reportName - The link name of the report
+ * @param {string} id - The ID of the record to delete
+ * @param {string} [appName="nexgen-portal"] - The application name (defaults to "nexgen-portal")
+ * @returns {Promise} - Resolves with the response from the API
+ */
+export const deleteRecord = async (reportName, id, appName = "nexgen-portal") => {
+    try {
+        // Ensure ZOHO is initialized
+        if (!ZOHO?.CREATOR) {
+            console.error('ZOHO.CREATOR is not available');
+            throw new Error('ZOHO.CREATOR is not available');
+        }
+        
+        await ZOHO.CREATOR.init();
+
+        const config = {
+            appName,
+            reportName,
+            criteria: `ID == ${id}`  // Specific record deletion
+        };
+
+        const response = await ZOHO.CREATOR.API.deleteRecord(config);
+
+        if (!response) {
+            throw new Error("No response received from ZOHO API");
+        }
+
+        if (response.code !== 3000) {
+            throw new Error(`Failed to delete record: ${response.message || JSON.stringify(response)}`);
+        }
+
+        return response;
+    } catch (error) {
+        console.error("Error in deleteRecord:", {
+            reportName,
+            id,
+            error: error.message,
+            stack: error.stack
+        });
+        throw error;
+    }
+};
+
+/**
+ * Deletes multiple records based on a criteria
+ * @param {string} reportName - The report name
+ * @param {string} criteria - The deletion criteria (e.g., "Status == \"Invalid\"")
+ * @param {string} [appName="nexgen-portal"] - The application name
+ * @returns {Promise} - Resolves with the API response
+ */
+export const deleteMultipleRecords = async (reportName, criteria, appName = "nexgen-portal") => {
+    try {
+        await ZOHO.CREATOR.init();
+
+        const config = {
+            appName,
+            reportName,
+            criteria
+        };
+
+        const response = await ZOHO.CREATOR.API.deleteRecord(config);
+
+        if (!response) {
+            throw new Error("No response received from ZOHO API");
+        }
+
+        if (response.code !== 3000) {
+            throw new Error(`Failed to delete records: ${response.message || JSON.stringify(response)}`);
+        }
+
+        return response;
+    } catch (error) {
+        console.error("Error in deleteMultipleRecords:", {
+            reportName,
+            criteria,
+            error: error.message,
+            stack: error.stack
+        });
+        throw error;
+    }
+};
+
+// Example usage:
+/*
+import { deleteRecord, deleteMultipleRecords } from '../utils/deleteRecord.js';
+
+// Delete single record
+try {
+    const response = await deleteRecord("PM_Kanban_Contacts", "123456");
+    console.log("Delete successful:", response);
+} catch (error) {
+    console.error("Delete failed:", error);
+}
+
+// Delete multiple records
+try {
+    const response = await deleteMultipleRecords(
+        "PM_Kanban_Contacts",
+        "Status == \"Inactive\" && Created_Date < '2023-01-01'"
+    );
+    console.log("Multiple delete successful:", response);
+} catch (error) {
+    console.error("Multiple delete failed:", error);
+}
+*/

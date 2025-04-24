@@ -1,0 +1,120 @@
+import React from 'react';
+
+const KanbanBoardSkeleton = () => {
+    const columns = [
+        { id: 'new', title: 'New Projects', cardCount: 3 },
+        { id: 'design', title: 'Design', cardCount: 4 },
+        { id: 'permitting', title: 'Permitting', cardCount: 3 },
+        { id: 'installation', title: 'Installation', cardCount: 2 },
+        { id: 'completed', title: 'Completed', cardCount: 3 },
+        { id: 'cancelled', title: 'Cancelled', cardCount: 2 },
+        { id: 'on_hold', title: 'On Hold', cardCount: 3 },
+        { id: 'pending', title: 'Pending', cardCount: 4 },
+        { id: 'review', title: 'Review', cardCount: 2 },
+        { id: 'archive', title: 'Archive', cardCount: 3 }
+    ];
+
+    const SkeletonCard = () => 
+        React.createElement('div',
+            { className: "kanban-card bg-white rounded-lg p-3 mb-3 animate-pulse" },
+            [
+                // Top Row - Contact Name & Need Help
+                React.createElement('div',
+                    { className: "flex justify-between items-start mb-2" },
+                    [
+                        React.createElement('div',
+                            { className: "space-y-1.5 flex-1" },
+                            [
+                                React.createElement('div', { className: "h-4 bg-gray-200 rounded w-3/4" }),
+                                React.createElement('div', { className: "h-3 bg-gray-200 rounded w-1/2" })
+                            ]
+                        ),
+                        React.createElement('div', { className: "h-6 w-6 bg-gray-200 rounded-full" })
+                    ]
+                ),
+
+                // Project Type & Survey Status
+                React.createElement('div',
+                    { className: "flex items-center gap-2 mb-2" },
+                    [
+                        React.createElement('div', { className: "h-5 w-14 bg-gray-200 rounded" }),
+                        React.createElement('div', { className: "h-5 w-14 bg-gray-200 rounded" })
+                    ]
+                ),
+
+                // Permit & Interconnect Badges
+                React.createElement('div',
+                    { className: "flex flex-wrap gap-1 mb-2" },
+                    [
+                        React.createElement('div', { className: "h-5 w-20 bg-gray-200 rounded" }),
+                        React.createElement('div', { className: "h-5 w-20 bg-gray-200 rounded" })
+                    ]
+                ),
+
+                // System Size & Status
+                React.createElement('div',
+                    { className: "flex items-center justify-between mb-2" },
+                    [
+                        React.createElement('div', { className: "h-4 w-24 bg-gray-200 rounded" }),
+                        React.createElement('div', { className: "h-4 w-16 bg-gray-200 rounded" })
+                    ]
+                ),
+
+                // Bottom Row - Dates & Sales Rep
+                React.createElement('div',
+                    { className: "flex items-center justify-between" },
+                    [
+                        React.createElement('div', { className: "h-4 w-20 bg-gray-200 rounded" }),
+                        React.createElement('div',
+                            { className: "flex items-center gap-1" },
+                            [
+                                React.createElement('div', { className: "h-3 w-3 bg-gray-200 rounded" }),
+                                React.createElement('div', { className: "h-3 w-16 bg-gray-200 rounded" })
+                            ]
+                        )
+                    ]
+                )
+            ]
+        );
+
+    return React.createElement('div',
+        { className: "kanban-container overflow-x-auto" },
+        React.createElement('div',
+            { className: "flex gap-4 p-4" },
+            columns.map(column => 
+                React.createElement('div',
+                    {
+                        key: column.id,
+                        className: "kanban-column flex-shrink-0 w-[294px] bg-gray-50 rounded-lg"
+                    },
+                    [
+                        // Column Header
+                        React.createElement('div',
+                            { className: "px-3 py-2 flex items-center justify-between animate-pulse" },
+                            [
+                                React.createElement('div',
+                                    { className: "flex items-center gap-2" },
+                                    [
+                                        React.createElement('div', { className: "h-5 w-32 bg-gray-200 rounded" }),
+                                        React.createElement('div', { className: "h-5 w-8 bg-gray-200 rounded" })
+                                    ]
+                                ),
+                                React.createElement('div', { className: "h-6 w-6 bg-gray-200 rounded" })
+                            ]
+                        ),
+
+                        // Column Content
+                        React.createElement('div',
+                            { className: "p-2" },
+                            Array.from({ length: column.cardCount }).map((_, idx) =>
+                                React.createElement(SkeletonCard, { key: idx })
+                            )
+                        )
+                    ]
+                )
+            )
+        )
+    );
+};
+
+export default KanbanBoardSkeleton;

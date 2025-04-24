@@ -1,0 +1,885 @@
+import { logError } from './errorHandling.js';
+import { getQueryParams } from './queryParams.js';
+
+// Fetch multiple projects for Kanban board
+export const fetchKanbanProjects = async () => {
+    
+    try {
+        let allRecords = [];
+        let hasMoreRecords = true;
+        let recordCursor = null;
+        
+        //console.log('Initializing ZOHO.CREATOR...');
+        // Add ZOHO initialization
+       // await ZOHO.CREATOR.init();
+        
+        while (hasMoreRecords) {
+          
+            const pageConfig = {
+                app_name: "nexgen-portal",
+                report_name: "PM_Kanban_Projects",
+                criteria: `(Is_Demo == true && New_Stage.ID != 4663646000002634108)`,
+                field_config: 'quick_view',
+                max_records: 1000
+            };
+
+            // Add record cursor if we have one from previous response
+            if (recordCursor) {
+                pageConfig.record_cursor = recordCursor;
+            }
+
+            const response = await ZOHO.CREATOR.DATA.getRecords(pageConfig);
+           // console.log("Response:", response);
+            
+       
+            
+            if (response.code === 3000) {
+                // Add records from this batch
+                allRecords = [...allRecords, ...response.data];
+                
+                // Check if we have more records to fetch
+                if (response.record_cursor) {
+                    recordCursor = response.record_cursor;
+                    hasMoreRecords = true;
+                } else {
+                    hasMoreRecords = false;
+                }
+            } else {
+                console.error("Error in response:", response);
+                hasMoreRecords = false;
+            }
+        }
+console.log("All Raw Data:", allRecords);
+        // Process records
+        const processedRecords = allRecords.map(record => {
+            // Default values
+            let permitStatus = "No Record";
+            let interconnectStatus = "No Record";
+            let systemSize = parseFloat(record.kW_STC) || 0;
+            let surveyStatus = false; 
+            let roofWork = "No";
+            let treeWork = "No";
+            let panelUpgrade = "No";
+
+            // Check if Permitting data is available
+            if (record.Permitting?.length > 0) {
+                const permitRecord = record.Permitting[0];
+                permitStatus = permitRecord.Permit_Status || "No Record";
+                interconnectStatus = permitRecord.Interconnection_Status || "No Record";
+            }
+
+            // Parse Survey Results
+            if (record.Survey_Results?.length > 0) {
+                const surveyRecord = record.Survey_Results[0];
+                treeWork = surveyRecord.Tree_Work_Required === "Yes" ? "Yes" : "No";
+                roofWork = surveyRecord.Roof_Work_Required === "Yes" ? "Yes" : "No";
+                panelUpgrade = surveyRecord.Panel_Upgrade_Required === "Yes" ? "Yes" : "No";
+                surveyStatus = true;
+            }
+
+            return {
+                // Info Fields
+                id: record.ID,
+                tranche: record.Tranche || {},
+                contactName: record.Owner_Name?.zc_display_value || "No Contact Information",
+                contactEmail: record["Owner_Name.Email"] || "",
+                contactPhone: record["Owner_Name.Phone_Number"] || "",
+                address: record.Site_Address?.zc_display_value || "",
+                addressLine1: record.Site_Address?.address_line_1 || "",
+                city: record.Site_Address?.district_city || "",
+                state: record.Site_Address?.state_province || "",
+                zip: record.Site_Address?.postal_code || "",
+                country: record.Site_Address?.country || "USA",  
+                latitude: record.Site_Address?.latitude || "",
+                longitude: record.Site_Address?.longitude || "",
+                installDate: record.Install_Date || "",
+                installationBooking: record.Installation_Date_Time || "",
+                approxInstallDate: record.Approximate_Installation_Date || "",
+                systemSize: systemSize,
+                isCashDeal: record.Is_Cash_Finance === "true",
+                dateSold: record.Date_Sold || "",
+                addedTime: record.Added_Time || "",
+                modifiedTime: record.Modified_Time || "",
+                addedUser: record.Added_User || "",
+                modifiedUser: record.Modified_User || "",
+
+                // Sales Rep Fields
+                salesRepName: record.Sales_Rep?.zc_display_value?.trim() || "",
+                salesRepEmail: record["Sales_Rep.Email"]?.trim() || "",
+                salesRepPhone: record["Sales_Rep.Phone"]?.trim() || "",
+                salesRepOrg: record.Sales_Org?.zc_display_value?.trim() || "",
+                salesRepId: record.Sales_Rep?.ID || "",
+                
+                // Status Fields
+                roofType: record.Roof_Type || "",
+                yield: record.Yield || "",
+                stageField: {
+                    ID: record.New_Stage?.ID || '',
+                    title: record.New_Stage?.zc_display_value || '',
+                    display_value: record.New_Stage?.zc_display_value || ''
+                },
+                osStage: record.OpenSolar_Stage || "",
+                needHelp: record.Need_Help === "true",
+                isCommercial: record.Commercial === "true",
+                isDemo: record.Is_Demo,
+                permitStatus,
+                interconnectStatus,
+                surveyStatus,
+                roofWork,
+                treeWork,
+                roofWorkStatus: record.Roof_Work_Status || "",
+                treeWorkStatus: record.Tree_Work_Status || "",
+                puWorkStatus: record.PU_Work_Status || "",
+                panelUpgrade,
+                
+                // Tags handling
+                Tags: Array.isArray(record.Tags) ? record.Tags.map(tag => ({
+                    ID: tag.ID,
+                    name: tag.zc_display_value?.trim() || "",
+                    color: '#9CA3AF' // Default color if not specified
+                })) : [],
+                
+                isApproved: record.Is_Approved === "true",
+
+
+
+                
+
+                permits: record.Permitting || [],
+
+                surveys: record.Survey_Results || [],
+
+
+                // System Fields
+                kw_STC: parseFloat(record.kW_STC) || 0,
+                yield: Number(record.Yield || 0).toFixed(2),
+                isApproved: record.Is_Approved === "true",
+                yieldLessThan1050: record.Yield_Less === "true",
+            };
+            
+
+        });
+
+        /*
+  ID: activity.ID,
+                    Activity: activityName || '',
+                    Author: author || '',
+                    Added_Time: addedTime || '',
+                    Platform: platform || '',
+        */
+        //console.log("Processed Records:", processedRecords);
+
+        // Also log a sample of processed records to compare
+        //console.log("Sample processed records:", processedRecords);
+console.log("Processed Records:", processedRecords);
+        return processedRecords;
+
+    } catch (error) {
+        console.error("Error fetching records:", error);
+    }
+};
+
+// Add this function after fetchKanbanProjects
+export const organizeProjectsByStage = (projects, stages) => {
+    // Initialize columns with empty card arrays and preserve stage metadata
+    const columns = stages.map(stage => ({
+        ...stage, // Preserve all stage metadata
+        cards: [] // Initialize empty cards array
+    }));
+
+    // Sort projects into appropriate columns
+    projects.forEach(project => {
+        const projectStage = project.stageField?.display_value;
+        const targetColumn = columns.find(column => 
+            column.title === projectStage
+        );
+
+        if (targetColumn) {
+            targetColumn.cards.push(project);
+        }
+    });
+
+    return columns;
+};
+
+
+// Fetch single project with associated records for modal
+export const fetchProjectDetails = async (projectId) => {
+    try {
+        // Fetch main project details
+        const projectResponse = await ZOHO.CREATOR.DATA.getRecordById({
+            app_name: "nexgen-portal",
+            report_name: "Kanban_Projects",
+            field_config: "detail_view",
+            id: projectId
+        });
+
+        if (projectResponse.code !== 3000) {
+            throw new Error('Failed to fetch project details');
+        }
+
+        const record = projectResponse.data;
+        console.log("Raw Project Record:", record);
+        console.log("Contact Name Fields:", {
+            displayValue: record.Owner_Name?.zc_display_value,
+            firstName: record["Owner_Name.Name.first_name"],
+            lastName: record["Owner_Name.Name.last_name"],
+            rawOwnerName: record.Owner_Name
+        });
+        const projectData = {
+            // Header Fields
+            id: record.ID,
+            contactName: record.Owner_Name?.zc_display_value?.trim() || "No Contact Information",
+            contactID: record.Owner_Name?.ID || '',
+            contactFirstName: record.Owner_Name?.["Name.first_name"] || '',
+            contactLastName: record.Owner_Name?.["Name.last_name"] || '',
+            contactEmail: record["Owner_Name.Email"] || "",
+            contactPhone: record["Owner_Name.Phone_Number"] || "",
+            stageField: {
+                ID: record.New_Stage?.ID || '',
+                title: record.New_Stage?.zc_display_value || '',
+                display_value: record.New_Stage?.zc_display_value || ''
+            },
+            systemSize: parseFloat(record.kW_STC) || 0,
+            paymentOption: record.Payment_Option,
+            isCashDeal: record.Is_Cash_Finance === "true",
+            annualUsage: record.Annual_Usage,
+            installDate: record.Install_Date,
+            approxInstallDate: record.Approximate_Installation_Date,  
+            dateSold: record.Date_Sold,
+            isCommercial: record.Commercial === "true",
+            address: record.Site_Address?.zc_display_value || "",
+            addressLine1: record.Site_Address?.address_line_1 || "",
+            city: record.Site_Address?.district_city || "",
+            state: record.Site_Address?.state_province || "",
+            zip: record.Site_Address?.postal_code || "",
+            country: record.Site_Address?.country || "USA",  
+            latitude: record.Site_Address?.latitude || "",
+            longitude: record.Site_Address?.longitude || "",
+            aduuPortalID: record.Aduu_Portal_ID1,
+            trancheField: {
+                ID: record.Tranche?.ID || '',
+                Tranche_Number: record.Tranche?.Tranche_Number || '',
+                display_value: record.Tranche?.zc_display_value || ''
+            },
+            fundedByRedball: record.Funded_By_Redball === "true",
+            tags: record.Tags || [],
+
+            // Events Info
+            surveyBooking: record.Survey_Date_Time || '',
+            surveyStatus: record.Survey_Status || 'Needs Scheduling',
+            roofWorkBooking: record.Roof_Work_Date_Time || '',
+            roofWorkStatus: record.Roof_Work_Status || '',
+            treeWorkBooking: record.Tree_Work_Date_Time || '',
+            treeWorkStatus: record.Tree_Work_Status || '',
+            puWorkBooking: record.PU_Work_Date_Time || '',
+            puWorkStatus: record.PU_Work_Status || '',
+            installationBooking: record.Installation_Date_Time || '',
+            installationStatus: record.Installation_Status || 'Needs Scheduling',
+            finalInspectionBooking: record.Final_Inspection_Date_Time || '',
+            finalInspectionStatus: record.Final_Inspection_Status || 'Needs Scheduling',
+
+            // WorkDrive Info
+            project_folder: record.Project_Folder_ID,
+            investor_folder: record.Project_Investor_Folder_Id,
+
+            // Investor Tab
+            isPPA: record.Is_PPA || "false",
+            ppaRate: record.PPA_Rate,
+            rateYear: record.Rate_Year,
+            isDomesticContent: record.Domestic_Content === "true",
+            applicableRate: record.Applicable_Rate,
+            redballSubmissionDate: record.Submitted_to_Redball,
+            ptoFunded: record.PTO_Funded === "true",
+            investorM1Payment: record.Investor_M1_Payment,
+            investorM1Date: record.Investor_M1_Date,
+            investorM2Payment: record.Investor_M2_Payment,
+            investorM2Date: record.Investor_M2_Date,
+            investorM3Payment: record.Investor_M3_Payment,
+            investorM3Date: record.Investor_M3_Date,
+            calcProjectCost: record.Calculated_Project_Cost,
+            projectCost: record.Project_Cost,
+
+            os_id: record.OpenSolar_Project_ID,
+
+            // Property Info Tab
+            propertyInfo: record.Property_Database_Ownership_Info,
+
+            // Overview Tab 
+            salesRep: {
+                id: record.Sales_Rep?.ID || '',
+                name: record.Sales_Rep?.zc_display_value?.trim() || '',
+                email: record["Sales_Rep.Email"]?.trim() || '',
+                phone: record["Sales_Rep.Phone"]?.trim() || '',
+                organization: record.Sales_Org?.zc_display_value?.trim() || '',
+                commercialCommissionRate: record["Sales_Rep.Commercial_Commission_Rate"] || '',
+                regularCommissionRate: record["Sales_Rep.Regular_Commission_Rate"] || '',
+                sharedCommissionRate: record["Sales_Rep.Shared_Commission_Rate"] || ''
+            },
+            activeCommissionRate: record.Active_Commission_Rate || '',
+            
+            addedTime: record.Added_Time,
+            
+            // Associated Data from v2 API
+            // Activities
+            activities: Array.isArray(record.Activities) ? record.Activities.map(activity => ({
+                ID: activity.ID,
+                Activity: activity.Activity || '',
+                Author: activity.Is_Who || '',
+                Platform: activity.Where || '',
+                Added_Time: activity.Added_Time || ''
+            })).sort((a, b) => new Date(b.Added_Time) - new Date(a.Added_Time)) : [],
+
+            // Communications
+            communications: Array.isArray(record.Communications) ? record.Communications.map(communication => ({
+                ID: communication.ID,
+                Communication_Type: communication.Communication_Type || '',
+                Call_Type: communication.Call_Type || '',
+                Call_Type1: communication.Call_Type1 || '',
+                Subject: communication.Subject_field || '',
+                Description: communication.Description || '',
+                Call_Start_Time: communication.Call_Start_Time || '',
+                Call_Duration: communication.Call_Duration || '',
+                Agent_Email: communication.Agent_Email || '',
+                User: communication.User?.zc_display_value || '',
+                Contact: communication.Contact?.zc_display_value || '',
+                SMS_Type: communication.SMS_Type || '',
+                SMS_Delivery_Status: communication.SMS_Delivery_Status || '',
+                SMS_Sent_Time: communication.SMS_Sent_Time || '',
+                SMS_Content: communication.SMS_Content || '',
+                Email_Type: communication.Email_Type || '',
+                Email_Subject: communication.Email_Subject || '',
+                Email_Sent_Time: communication.Email_Sent_Time || '',
+                Email_To: communication.Email_To || '',
+                Added_Time: communication.Added_Time || ''
+            })).sort((a, b) => new Date(b.Added_Time) - new Date(a.Added_Time)) : [],
+
+            documents: Array.isArray(record.Documents) ? record.Documents.map(doc => ({
+                ID: doc.ID,
+                Document_Name: doc.Document_Name,
+                Document_Type: doc.Document_Type,
+                Doc_Type: doc.Doc_Type ? {
+                    ID: doc.Doc_Type.ID,
+                    Name: doc.Doc_Type.Name,
+                    Include_In_Checklist: doc.Doc_Type.Include_In_Checklist == "true"
+                } : null,
+                File_Upload: doc.File_Upload,
+                Added_Time: doc.Added_Time,
+                Added_User: doc.Added_User,
+                Is_Revision: doc.Is_Revision,
+                Revision_Number: doc.Revision_Number,
+                Sent_To_Investor_Portal: doc.Sent_To_Investor_Portal === "true",
+                Trigger_Send_to_Inv: doc.Trigger_Send_to_Inv === "true",
+                User: doc.User_Lookup ? {
+                    ID: doc.User_Lookup.ID,
+                    Name: doc.User_Lookup.zc_display_value?.trim() || doc.Added_User || 'Unknown User'
+                } : {
+                    ID: null,
+                    Name: doc.Added_User || 'Unknown User'
+                },
+                WorkDrive_Link: doc.WorkDrive_Link?.url || doc.WorkDrive_Link || '',
+                Embed_Link: doc.Embed_Link || ''
+            })).sort((a, b) => new Date(b.Added_Time) - new Date(a.Added_Time)) : [],
+
+    
+            materials: record.Bill_of_Materials || [],
+
+            // Process notes with attachments in a single definition
+            notes: Array.isArray(record.Notes) ? record.Notes.map(note => {
+                // Get attachments for this note
+                const noteAttachments = Array.isArray(record.Note_Attachments) 
+                    ? record.Note_Attachments
+                        .filter(attachment => attachment.Note?.ID === note.ID)
+                        .map(attachment => ({
+                            id: attachment.ID,
+                            name: attachment.Name || '',
+                            type: attachment.Name?.toLowerCase().match(/\.(jpg|jpeg|png|gif|bmp|webp)$/) ? 'image' : 'file',
+                            url: attachment.File_field || '',
+                            addedTime: attachment.Added_Time
+                        }))
+                    : [];
+
+                return {
+                    ID: note.ID,
+                    content: note.Note || '',
+                    author: note.Author || '',
+                    addedTime: note.Added_Time || '',
+                    user: note.User_Lookup?.ID || '',
+                    department: note.Department || '',
+                    notifySales: note.Notify_Sales === "true",
+                    teamOnly: note.Team_Only === "true",
+                    repliedTo: note.Replied_To?.ID || null,
+                    context: note.Context || 'General',
+                    Tagged_Users: Array.isArray(note.Tagged_Users) 
+                        ? note.Tagged_Users.map(user => user.ID)
+                        : [],
+                    attachments: noteAttachments,
+                    // Add these fields to help with reply functionality
+                    replies: [], // Will be populated when organizing threads
+                    isReply: !!note.Replied_To?.ID
+                };
+            }).sort((a, b) => new Date(b.addedTime) - new Date(a.addedTime)) : [],
+
+            permits: record.Permitting || [],
+            surveys: Array.isArray(record.Survey_Results) ? record.Survey_Results.map(survey => ({
+                ID: survey.ID,
+                addedTime: survey.Added_Time || '',
+                assessmentDate: survey.Assessment_Date || '',
+                mainServicePanelSize: survey.Main_Service_Panel_Size || '',
+                modifiedTime: survey.Modified_Time || '',
+                panelUpgradeRequired: survey.Panel_Upgrade_Required || 'No',
+                reportPdfId: survey.Report_PDF_ID || '',
+                reportUrl: survey.Report_URL || '',
+                roofCondition: survey.Roof_Condition || '',
+                roofType: survey.Roof_Type || '',
+                roofWorkRequired: survey.Roof_Work_Required || 'No',
+                sendFinalSummary: survey.Send_Final_Summary === "true",
+                summaryNotes: survey.Summary_Notes || '',
+                summarySent: survey.Summary_Sent || null,
+                treeTrimmingRequired: survey.Tree_Trimming_Required || 'No',
+                treeWorkRequired: survey.Tree_Work_Required || 'No',
+                hasReport: !!survey.Report_PDF_ID,
+                status: survey.Status || 'Pending',
+                requiresWork: survey.Tree_Work_Required === 'Yes' || 
+                            survey.Roof_Work_Required === 'Yes' || 
+                            survey.Panel_Upgrade_Required === 'Yes'
+            })).sort((a, b) => new Date(b.addedTime) - new Date(a.addedTime)) : [],
+
+            issues: Array.isArray(record.Issues) ? record.Issues.map(issue => ({
+                id: issue.ID,
+                issueContent: issue.Issue || '',
+                author: issue.Author || '',
+                isResolved: issue.Is_Resolved === 'true',
+                taggedUsers: issue.Tagged_Users || [],
+                addedTime: issue.Added_Time || '',
+                notifySales: issue.Notify_Sales === 'true',
+                displayValue: issue.zc_display_value || ''
+            })) : [],
+
+            // System Fields
+            kw_STC: parseFloat(record.kW_STC) || 0,
+            annualOutput: parseFloat(record.Annual_Output_kWh) || 0,
+            offset: Number(record.Offset || 0).toFixed(2),
+            yield: Number(record.Yield || 0).toFixed(2),
+            isApproved: record.Is_Approved === "true",
+            yieldLessThan1050: record.Yield_Less === "true",
+
+            // Add commission milestone fields
+            M1_Amount: record.M1_Amount || '',
+            M1_Paid_Date: record.M1_Paid_Date || '',
+            M1_Release_Date: record.M1_Release_Date || '',
+            M1_Status: record.M1_Status || 'Pending',
+            
+            M2_Amount: record.M2_Amount || '',
+            M2_Paid_Date: record.M2_Paid_Date || '',
+            M2_Release_Date: record.M2_Release_Date || '',
+            M2_Status: record.M2_Status || 'Pending',
+            
+            M3_Amount: record.M3_Amount || '',
+            M3_Paid_Date: record.M3_Paid_Date || '',
+            M3_Status: record.M3_Status || 'Pending',
+
+            // Add commission advance fields
+            Total_Commission_Advance: record.Total_Commission_Advance || '',
+            Comm_Advance_Paid_Date: record.Comm_Advance_Paid_Date || '',
+            Commission_Advance_Status: record.Commission_Advance_Status || 'Pending',
+        };
+
+        try {
+            const contactsResponse = await ZOHO.CREATOR.DATA.getRecords({
+                app_name: "nexgen-portal",
+                report_name: "PM_Kanban_Contacts",
+                criteria: `(Project == ${projectId})`
+            });
+            
+            // Process contacts with error handling
+            projectData.contacts = contactsResponse.code === 3000 
+                ? contactsResponse.data.map(contact => ({
+                    ID: contact.ID,
+                    First_Name: contact.Name.first_name,
+                    Last_Name: contact.Name.last_name,
+                    Contact_Type: contact.Primary_Contact_Type1,
+                    Email: contact.Email,
+                    Phone: contact.Phone_Number,
+                    Mobile: contact.Mobile_Phone_Number,
+                    Is_Business_Contact: contact.Business_POC,
+                    Job_Title: contact.Job_Title,
+                    Business_Name: contact.Business_Name,
+                    Billing_Address: contact.Billing_Address.zc_display_value,
+                    Billing_Address_1: contact.Billing_Address.address_line_1,
+                    Billing_Address_2: contact.Billing_Address.address_line_2,
+                    Billing_City: contact.Billing_Address.district_city,
+                    Billing_State: contact.Billing_Address.state_province,
+                    Billing_Zip: contact.Billing_Address.postal_code,
+                    Billing_Country: contact.Billing_Address.country,
+                    Project_ID: projectId,
+                    Added_Time: contact.Added_Time,
+                }))
+                .sort((a, b) => {
+                    // Put "Owner 1" contacts first
+                    if (a.Contact_Type === "Owner 1" && b.Contact_Type !== "Owner 1") return -1;
+                    if (b.Contact_Type === "Owner 1" && a.Contact_Type !== "Owner 1") return 1;
+                    
+                    // For contacts of the same type, sort by Added_Time (newest first)
+                    return new Date(b.Added_Time) - new Date(a.Added_Time);
+                })
+                : [];
+                
+        } catch (error) {
+            console.warn("No contacts found for project:", error);
+            projectData.contacts = [];
+        }
+console.log("ProcessedProject Data:", projectData);
+        return projectData;
+        
+    } catch (error) {
+        console.error("Error in fetchProjectDetails:", error);
+        throw error;
+    }
+};
+
+const fetchModalData = async (projectId) => {
+    try {
+        const projectDetails = await fetchProjectDetails(projectId);
+        return projectDetails;
+    } catch (error) {
+        logError(error);
+        throw error;
+    }
+};
+
+export const fetchEquipmentData = async () => {
+    try {
+        const response = await ZOHO.CREATOR.DATA.getRecords({
+            app_name: "nexgen-portal",
+            report_name: "PM_Kanban_Equipment"
+        });
+
+        // Log the entire raw response
+       // console.log('Raw Equipment Response:', response);
+
+        return response;
+    } catch (error) {
+        console.error('Error fetching equipment data:', error);
+        throw error;
+    }
+};
+
+export const processEquipmentData = (equipmentResponse) => {
+    if (equipmentResponse.code !== 3000 || !equipmentResponse.data) {
+        return {
+            'Module': [],
+            'Inverter': [],
+            'Battery': [],
+            'Other Component': []
+        };
+    }
+
+    return equipmentResponse.data.reduce((acc, item) => {
+        const category = item.Equipment_Type;
+        if (!acc[category]) {
+            acc[category] = [];
+        }
+
+        acc[category].push({
+            id: item.ID,
+            manufacturer: item.Manufacturer,
+            model: item.Model,
+            cost: parseFloat(item.Cost) || 0
+        });
+
+        return acc;
+    }, {
+        'Module': [],
+        'Inverter': [],
+        'Battery': [],
+        'Other Component': []
+    });
+};
+
+export const fetchTagsData = async () => {
+    try {
+        const response = await ZOHO.CREATOR.DATA.getRecords({
+            app_name: "nexgen-portal",
+            report_name: "PM_Kanban_Tags"
+        });
+
+        // Log the entire raw response
+        //console.log('Raw Tags Response:', response);
+
+        return response;
+    } catch (error) {
+        console.error('Error fetching tags data:', error);
+        throw error;
+    }
+};
+
+export const fetchStagesData = async () => {
+    try {
+        const response = await ZOHO.CREATOR.DATA.getRecords({
+            app_name: "nexgen-portal",
+            report_name: "PM_Kanban_Stages"
+        });
+
+        // Log the entire raw response
+        //console.log('Raw Stages Response:', response);
+
+        return response;
+    } catch (error) {
+        console.error('Error fetching stages data:', error);
+        throw error;
+    }
+};
+
+export const fetchTranchesData = async () => {
+    try {
+        const response = await ZOHO.CREATOR.DATA.getRecords({
+            app_name: "nexgen-portal",
+            report_name: "PM_Tranches_Report"
+        });
+
+        // Add debug logging
+        console.log('Raw Tranches Response:', response);
+    
+
+        return response;
+    } catch (error) {
+        console.error('Error fetching tranches data:', error);
+        throw error;
+    }
+};
+
+export const fetchUsersData = async () => {
+    try {
+        const response = await ZOHO.CREATOR.DATA.getRecords({
+            app_name: "nexgen-portal",
+            report_name: "PM_Kanban_Users",
+            pageSize: 200  // Maximum allowed pageSize
+        });
+
+        // Log the entire raw response
+        //console.log('Raw Users Response:', response);
+        //console.log('Total Users:', response?.data?.length || 0);
+
+        return response;
+    } catch (error) {
+        console.error('Error fetching users data:', error);
+        throw error;
+    }
+};
+
+export const fetchSalesRepsData = async () => {
+    try {
+        const response = await ZOHO.CREATOR.DATA.getRecords({
+            app_name: "nexgen-portal",
+            report_name: "PM_Kanban_Sales_Reps",
+            pageSize: 200
+        });
+
+        // Log the entire raw response
+        //console.log('Raw Sales Reps Response:', response);
+       // console.log('Total Sales Reps:', response?.data?.length || 0);
+
+        return response;
+    } catch (error) {
+        console.error('Error fetching sales reps data:', error);
+        throw error;
+    }
+};
+
+export const processSalesRepsData = (salesRepsResponse) => {
+    if (salesRepsResponse.code !== 3000 || !salesRepsResponse.data) {
+        return [];
+    }
+
+    return salesRepsResponse.data
+        .filter(rep => rep.Email) // Filter out reps without email
+        .map(rep => ({
+            id: rep.ID,
+            name: rep.Name?.zc_display_value || '',
+            firstName: rep.Name?.first_name || '',
+            lastName: rep.Name?.last_name || '',
+            email: rep.Email,
+            phone: rep.Phone || '',
+            regularCommissionRate: rep.Regular_Commission_Rate || '',
+            commercialCommissionRate: rep.Commercial_Commission_Rate || '',
+            sharedCommissionRate: rep.Shared_Commission_Rate || '',
+            openSolarId: rep.OpenSolar_ID || '',
+            salesOrg: rep.Sales_Org?.zc_display_value || '',
+            salesOrgId: rep.Sales_Org?.ID || '',
+            userLookupId: rep.User_Lookup?.ID || ''
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+};
+
+// Helper to fetch both equipment and tags data
+export const fetchInitialData = async () => {
+    try {
+        const [tagsResponse, stagesResponse, tranchesResponse, usersResponse, salesRepsResponse] = await Promise.all([
+            fetchTagsData(),
+            fetchStagesData(),
+            fetchTranchesData(),
+            fetchUsersData(),
+            fetchSalesRepsData()
+        ]);
+
+        return {
+            tags: tagsResponse,
+            stages: stagesResponse,
+            tranches: tranchesResponse,
+            users: usersResponse,
+            salesReps: salesRepsResponse
+        };
+    } catch (error) {
+        console.error('Error fetching initial data:', error);
+        throw error;
+    }
+};
+
+export const processTagsData = (tagsResponse) => {
+    if (tagsResponse.code !== 3000 || !tagsResponse.data) {
+        return new Map();
+    }
+
+    return new Map(
+        tagsResponse.data
+            .filter(tag => tag.Active_Status === "true")
+            .map(tag => [
+                tag.ID,
+                {
+                    name: tag.Tag_Name,
+                    color: tag.Tag_Color,
+                    category: tag.Category,
+                    description: tag.Tag_Description || ""
+                }
+            ])
+    );
+};
+
+export const processStagesData = (stagesResponse) => {
+    if (stagesResponse.code !== 3000 || !stagesResponse.data) {
+        return [];
+    }
+
+    return stagesResponse.data
+        .filter(stage => stage.Active_Status === "true")
+        .map(stage => ({
+            id: stage.ID,
+            title: stage.Stage_Name,
+            view: stage.Stage_View,
+            description: stage.Description || "",
+            order: parseInt(stage.Stage_Order) || 0
+        }))
+        .sort((a, b) => a.order - b.order);
+};
+
+export const processTranchesData = (tranchesResponse) => {
+    if (tranchesResponse.code !== 3000 || !tranchesResponse.data) {
+        console.warn('No tranches data available or invalid response');
+        return [];
+    }
+
+    try {
+        return tranchesResponse.data
+            .map(tranche => ({
+                id: tranche.ID,
+                number: tranche.Tranche_Number,
+                date: tranche.Tranche_Date,
+                projects: Array.isArray(tranche.Projects) ? tranche.Projects.map(project => ({
+                    id: project.ID,
+                    address: project.zc_display_value?.trim() || '',
+                    addressLine1: project['Site_Address.address_line_1'] || '',
+                    addressLine2: project['Site_Address.address_line_2'] || '',
+                    city: project['Site_Address.district_city'] || '',
+                    state: project['Site_Address.state_province'] || ''
+                })) : []
+            }))
+            // Sort by tranche number in ascending order (smallest first)
+            .sort((a, b) => parseInt(a.number) - parseInt(b.number));
+    } catch (error) {
+        console.error('Error processing tranches data:', error);
+        return [];
+    }
+};
+
+export const processUsersData = async (usersResponse) => {
+    if (usersResponse.code !== 3000 || !usersResponse.data) {
+        return { currentUser: null, users: [] };
+    }
+
+    try {
+        const initParams = await ZOHO.CREATOR.UTIL.getInitParams();
+        const loggedInEmail = initParams.loginUser;
+
+        const allUsers = usersResponse.data
+            .filter(user => user.Email)
+            .map(user => ({
+                id: user.ID,
+                email: user.Email,
+                name: user.Name?.zc_display_value || '',
+                firstName: user.Name?.first_name || '',
+                lastName: user.Name?.last_name || '',
+                phone: user.Phone_Number || '',
+                role: user.Role || '',
+                salesRepLookup: user.Sales_Rep_Lookup?.ID || '',
+                activeDetailWindow: user.Active_Detail_Window || '',
+                profilePicture: user.Profile_Picture || '',  // Store the full URL
+                isSubcontractor: !!user.Subcontractor,
+                inCall: user.In_Call === 'true',
+                userName: user.Name?.zc_display_value || '',
+                callingNumber: user.Calling_Number || '',
+                callingName: user.Calling_Name || '',
+                portalAccount: user.Portal_Account || ''
+            }));
+
+        // Find current user but don't remove them from the array
+        const currentUser = allUsers.find(user => 
+            user.email.toLowerCase() === loggedInEmail.toLowerCase()
+        ) || null;
+
+        return {
+            currentUser,
+            users: allUsers.sort((a, b) => a.name.localeCompare(b.name))
+        };
+    } catch (error) {
+        console.error('Error processing users:', error);
+        return { currentUser: null, users: [] };
+    }
+};
+
+export const getInstallerSlots = async () => {
+    try {
+        const response = await ZOHO.CREATOR.API.getAllRecords({
+            appName: "nexgen-portal",
+            reportName: "All_Subcontractor_Availabilities",
+            criteria: "(Status == \"Available\" && Type_field == \"Installer\")"
+        });
+        
+        // Process only future dates starting tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+
+        const slotsByDate = response.data.reduce((acc, slot) => {
+            const [month, day, year] = slot.Date_field.split('/');
+            const dateWith8AM = `${month}/${day}/${year} 08:00:00`;
+            const slotDate = new Date(dateWith8AM);
+            
+            if (slotDate >= tomorrow && !acc[dateWith8AM]) {
+                acc[dateWith8AM] = {
+                    id: slot.ID,
+                    date: dateWith8AM,
+                    subcontractor: slot.Subcontractor?.zc_display_value || ''
+                };
+            }
+            return acc;
+        }, {});
+        
+        return Object.values(slotsByDate)
+            .sort((a, b) => new Date(a.date) - new Date(b.date));
+    } catch (error) {
+        console.error('Error fetching installer slots:', error);
+        return [];
+    }
+};
+

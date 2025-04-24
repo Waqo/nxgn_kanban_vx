@@ -1,0 +1,1304 @@
+Zoho Creator JS API v2
+Zoho Creator provides JS API v2 that allows you to perform CRUD operations from within a widget in your Zoho Creator applications. These JS API tasks are based on REST APIs v2.1.
+The JS API v2 tasks you can write into your widget's JS file are:
+		Data APIs - Add, fetch, update, delete, or get a count of the records in Zoho Creator.
+		Publish APIs - Add or fetch records within published components in Zoho Creator.
+		File APIs - Upload files into the records of a Zoho Creator application.
+		Meta APIs - Fetch required meta information from Zoho Creator.
+		Util APIs - Fetch query parameters of the page in which a widget is inserted, navigate to open URLs, and more. 
+JS API Configuration
+To use the JS API tasks within your widget, you need to perform the following configurations in the HTML and JS file of the widget ZIP, respectively.
+To Be Done in Widget ZIP's HTML FileInclude the CDN URL given below by linking it in the script tag of the widget's HTML file.
+<script src="CDN URL"></script>
+CDN URL for v2 - https://js.zohostatic.com/creator/widgets/version/2.0/widgetsdk-min.js
+Note: Navigate to the Points to Note section of this page to learn more about the version-wise limitations.
+STEP 2 : To be Done in Widget ZIP's JS File
+You will have created a JS file inside your widget ZIP to include interactive elements. Use block to write the logic for the JS API tasks in the same file.
+Points to Note
+Version-Wise Limitations
+		The tasks that can be performed from within the widget are limited to the ones pertaining to JS API v2. For example, say you want to execute the JS API v1 Get Records task from within a widget. The records will be fetched only if you've provided the CDN URL pertaining to v1 in the widget's HTML file.
+		If you need to change the current JS API version to v1, the following changes have to be done:
+		Change the CDN URL in the widget ZIP's HTML file to v1.
+		Add the initialization method required for v1 in the widget ZIP's JS file.
+		Update the syntax and configuration parameters of the JS API tasks to match those of v1, in the widget ZIP's JS file.
+		The widget file needs to be re-uploaded afterwards. Keep in mind that after the CDN URL is updated, any tasks from the version used before will stop working.
+General
+		Make sure to provide the mandatory parameters necessary for a task in the configuration for the execution to be successful.
+		The success of the API call to perform a task in an application depends on the permissions provided for the users who access the widget in the target application.
+		Only Publish API tasks will work in published pages that can be accessed by people who do not hold a Creator account.
+		Any direct changes to the JS script present in a widget's file will require re-uploading the modified file for the widget to work as required.
+
+
+
+Get Reports
+Table of Contents
+		Overview
+		Request Details
+		Possible Errors
+Overview
+This JS API task fetches the meta information of all the reports that are accessible for the requesting user in a Creator application, including the report's link name, display name, and type.
+This V2 task is based on the Get Reports REST API V2.1. Learn more about the report's type value in the response
+Request Details
+Syntax
+ZOHO.CREATOR.META.getReports(<config>).then(function(response){//callback block});
+Syntax Details
+The syntax holds:
+		<config> (object) - The configuration required to fetch the meta information of the reports in a Creator application. This configuration includes the following parameters.
+Name
+Type
+Description
+app_name
+string
+Link name of the application whose meta data needs to be fetched. Retrieve the link name using the specific Creator application's URL: https://creatorapp.zoho.com/<account_name>/<app_name>
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+Sample Input
+
+var config = {
+  app_name: "zylker"
+};
+ZOHO.CREATOR.META.getReports(config).then(function (response) {
+  console.log(response.reports);
+});
+Sample Response
+
+response = {
+   "code": 3000,
+   "reports": [
+       {
+         "display_name": "All Timesheet",
+         "link_name": "All-Timesheet",
+         "type": 1
+       },
+       {
+         "display_name": "All Products",
+         "link_name": "All-Products",
+         "type": 1
+       }
+   ]
+}
+
+
+
+Get Forms
+Table of Contents
+		Overview
+		Request Details
+		Possible Errors
+Overview
+This JS API task fetches the meta information of all the forms that are accessible for the requesting user in a Creator application, that is, the form's link name, display name, and type.
+This V2 task is based on the Get Forms REST API V2.1. Learn more about the form's type value in the response
+Request Details
+Syntax
+ZOHO.CREATOR.META.getForms(<config>).then(function(response){//callback block});
+Syntax Details
+The syntax holds:
+		<config> (object) - The configuration required to fetch the meta information of the forms in a Creator application. This configuration includes the following parameters.
+Name
+Type
+Description
+app_name
+(Optional)
+string
+Link name of the application whose meta data needs to be fetched. Retrieve the link name using the specific Creator application's URL: https://creatorapp.zoho.com/<account_name>/<app_name>
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+Sample Input
+
+var config = {
+  app_name: "zylker"
+};
+ZOHO.CREATOR.META.getForms(config).then(function (response) {
+  console.log(response.forms);
+});
+Sample Response
+
+response = {
+   "code": 3000,
+   "forms": [
+       {
+         "display_name": "timesheet",
+         "link_name": "timesheet",
+         "type": 1
+       },
+       {
+         "display_name": "products",
+         "link_name": "products",
+         "type": 1
+       }
+   ]
+}
+
+
+Get Fields
+Table of Contents
+		Overview
+		Request Details
+		Possible Errors
+Overview
+This JS API task fetches the meta information of all the fields present in a Creator form, such as the field's link name, display name, type, character limit, and so on.
+This V2 task is based on the Get Fields REST API V2.1. Learn more about the field's type value in the response
+Request Details
+Syntax
+ZOHO.CREATOR.META.getFields(<config>).then(function(response){//callback block});
+Syntax Details
+The syntax holds:
+		<config> (object) - The configuration required to fetch the meta information of the fields in a form. This configuration includes the following parameters.
+Name
+Type
+Description
+app_name
+(Optional)
+string
+Link name of the application whose meta data needs to be fetched. Retrieve the link name using the Creator form's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Form:<form_name>
+Note: This parameter has to be passed only when you need to pull data from other applications of the same Creator account. When not specified, data will be pulled from the current application.
+form_name
+string
+Link name of the form whose fields' meta information needs to be pulled. Retrieve the link name using the Creator form's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Form:<form_name>
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+Sample Input
+
+var config = {
+  app_name: "zylker",
+  form_name: "timesheet"
+};
+ZOHO.CREATOR.META.getFields(config).then(function (response) {
+  console.log(response.fields);
+});
+Sample Response
+
+response = {
+   "code": 3000,
+   "fields": [
+       {
+         "unique": false,
+         "display_name": "Phone",
+         "link_name": "Phone_Number",
+         "type": 27,
+         "mandatory": false
+       },
+       {
+         "unique": false,
+         "display_name": "File Upload",
+         "link_name": "File_upload",
+         "type": 19,
+         "mandatory": false
+       }
+   ]
+}
+
+Get Record by ID
+Table of Contents
+		Overview
+		Request Details
+		Possible Errors
+Overview
+This JS API task fetches the data of a specific record from a report. This record will be identified by the record ID that you supply in the request. Its response will contain the data of all the visible fields present in the record.
+This V2 task is based on the Get Record by ID REST API V2.1.
+Request Details
+Syntax
+ZOHO.CREATOR.DATA.getRecordById(config).then(function(response){ //callback block });
+Syntax Details
+The syntax holds:
+		<config> (object) - The configuration required to get a specific record from a report. This configuration includes the following parameters.
+Name
+Type
+Description
+app_name
+(Optional)
+string
+Link name of the application from which data needs to be pulled. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+Note: This parameter only needs to be passed when you need to pull data from other applications in the same Creator account. When not specified, data will be pulled from the current application.
+report_name
+string
+Link name of the report from which the record has to be fetched. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+id
+string
+Record ID of the record that needs to be retrieved.
+field_config
+(Optional)
+string
+Fetches fields of a record based on the input value.Possible values:
+		detail_view - Fields included in the detailed view layout
+		quick_view (default value) - Fields included in the quick view layout
+		custom - Fields specified in the fields parameter
+		all - Fields included both in the detailed view and quick view layout
+Note: This API will not fetch the record displayed in the related data blocks of the detail view.
+fields
+(Optional)
+string
+If the value of field_config parameter is given as custom, this parameter should also be included. The required fields' link names need to be mentioned as individual comma-separated strings.
+Note:
+		The field link names can be found in the field properties pane of each field in the form builder.
+		Hidden fields will not be fetched. Admin Only fields will be fetched only when the requesting user is an admin in that application.
+		When a subform field's link name is specified, all visible fields within will be fetched.
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+Sample Input
+
+var config = {
+  app_name: "zylker",
+  report_name: "All-Timesheet",
+  id : "2000000193171"
+};
+ZOHO.CREATOR.DATA.getRecordById(config).then(function (response) {
+  console.log(response);
+});
+Sample Response
+
+response  = {
+   "code": 3000,
+   "data": {
+       "ID": "2000000193171",
+       "Name": {
+         "first_name": "James",
+         "last_name": "Kyle",
+         "display_value": "James Kyle"
+         }
+     }
+ }
+
+Get Records
+Table of Contents
+		Overview
+		Request Details
+		Possible Errors
+Overview
+This JS API task fetches all records displayed in a report. Its response will contain the data of all the visible fields present in the records. A maximum of 1000 records can be fetched per request.
+This V2 task is based on the Get Records REST API V2.1.
+Request Details
+Syntax
+ZOHO.CREATOR.DATA.getRecords(config).then(function(response){   //callback block});
+Syntax Details
+The syntax holds:
+		<config> (object) - The configuration required to get records from a report. This configuration includes the following parameters.
+Name
+Type
+Description
+app_name
+(Optional)
+string
+Link name of the application from which data needs to be pulled. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+Note: This parameter only needs to be passed when you need to pull data from other applications in the same Creator account. When not specified, data will be pulled from the current application.
+report_name
+string
+Link name of the report from which the records have to be fetched. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+criteria
+(Optional)
+string
+The criteria using which you want the API request to filter the target report. If not specified, the request will fetch the first 200 records from the report (as per its predefined sorting order).
+Refer to the Defining the search criteria section to learn more.
+field_config
+(Optional)
+string
+Fetches fields of the records based on the input value.Possible values:
+		detail_view - Fields included in the detailed view layout
+		quick_view (default value) - Fields included in the quick view layout
+		custom - Fields specified in the fields parameter
+		all - Fields included both in the detailed view and quick view layout
+Note: This API will not fetch the record displayed in the related data blocks of the detail view.
+fields
+(Optional)
+string
+If the value of field_config parameter is given as custom, this parameter should also be included. The required fields' link names need to be mentioned as individual comma-separated strings.
+Note:
+		The field link names can be found in the field properties pane of each field in the form builder.
+		Hidden fields will not be fetched. Admin Only fields will be fetched only when the requesting user is an admin in that application.
+		When a subform field's link name is specified, all visible fields within will be fetched.
+max_records 
+(Optional)
+int
+The number of maximum records that will be fetched upon one request.Possible values: 200, 500, 1000 (default value)
+If the criteria parameter is mentioned, the maximum count will apply only for the records that match the criteria.
+record_cursor
+(Optional)
+string
+Every time records exist beyond the maximum fetch count (1000), a unique key will be received in the response. This can be added in the next API call's <config> parameter as a key-value pair to fetch the consecutive batch of 1000 records, if they exist.
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+Sample Input
+
+var config = {
+  app_name: "zylker",
+  report_name: "All-Timesheet"
+};
+ZOHO.CREATOR.DATA.getRecords(config).then(function (response) {
+  console.log(response);
+});
+Sample Response
+
+response  = {
+   "code": 3000,
+   "data": [{
+       "ID": "2000000193171",
+       "Name": {
+         "first_name": "Lily",
+         "last_name": "Kyle",
+         "display_value": "Lily Kyle"
+         }
+     },
+     {
+       "ID": "2000000193173",
+       "Name": {
+         "first_name": "Peter",
+         "last_name": "James",
+         "display_value": "Peter James"
+         }
+     }]
+ }
+
+Get Record Count
+Table of Contents
+		Overview
+		Request Details
+		Possible Errors
+Overview
+This JS API task fetches the count of records displayed by a report.
+Request Details
+Syntax
+ZOHO.CREATOR.DATA.getRecordCount(config).then(function (response) {   //your code goes here.});
+Syntax Details
+The syntax holds:
+		<config> (object) - The configuration required to get the record count from a report. This configuration includes the following parameters.
+Name
+Type
+Description
+app_name
+(Optional)
+string
+Link name of the application from which data needs to be pulled. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+Note: This parameter only needs to be passed when you need to pull data from other applications in the same Creator account. When not specified, data will be pulled from the current application.
+report_name
+string
+Link name of the report from which the record count has to be fetched. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+criteria
+(Optional)
+string
+Condition to filter the record, which is applied along with the condition specified in the report filter. The criteria must follow the format specified for the search criteria in REST API V2.1.
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+Sample Input
+
+var config = {
+app_name: "zylker",
+report_name: "All-Timesheet",
+criteria: "(Single_Line = \"High\")"
+}; 
+ZOHO.CREATOR.API.getRecordCount(config).then(function (response) {
+console.log(reponse.result.records_count);
+});
+Sample Response
+
+response = {
+"code": 3000,
+"result": { "records_count": "4" }
+}
+
+
+Get Init Params
+Table of Contents
+		Overview
+		Request Details
+		Possible Errors
+Overview
+This JS API task fetches the login user's email address.
+Request Details
+Syntax
+ZOHO.CREATOR.UTIL.getInitParams().then(function(response){//callback block});
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+Sample Input
+
+ZOHO.CREATOR.UTIL.getInitParams().then((response) => {
+   console(response);
+})
+Sample Response
+
+ {
+    "scope": "zylkercorp",
+    "envUrlFragment": "/environment/development",
+    "appLinkName": "widgetapp",
+    "loginUser": "john@zylker.com"
+}
+
+
+
+Get Query Params
+Table of Contents
+		Overview
+		Request Details
+		Possible Errors
+Overview
+This JS API task fetches the query parameters and their values configured in the page that holds the widget.
+Request Details
+Syntax
+ZOHO.CREATOR.UTIL.getQueryParams().then(function(response){//callback block});
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+Sample Input
+
+ZOHO.CREATOR.UTIL.getQueryParams().then((response) => {
+   console(response);
+})
+Sample Response
+
+{
+"Name": "Zylker",
+"Position": "Lead"
+}
+
+Get Widget Params
+Table of Contents
+		Overview
+		Request Details
+		Possible Errors
+Overview
+This JS API task fetches the declared widget parameters and their respective values of a widget inserted in the page.
+Request Details
+Syntax
+ZOHO.CREATOR.UTIL.getWidgetParams().then(function(response){//callback block});
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+Sample Input
+
+ZOHO.CREATOR.UTIL.getWidgetParams().then((response) => {
+console(response);
+})
+Sample Response
+
+{
+"App_Name": "Zylker",
+"Details_Report": "Reporting_To_Details",
+"Title": "Tracker"
+}
+
+
+
+Add Records
+Table of Contents
+Overview
+Request Details
+Possible Errors
+Overview
+This JS API task adds one or more records to a form in your Zoho Creator application. Subject to data validations, each JSON object in the payload will be added as a record. A maximum of 200 records can be created per request.
+
+This V2 task is based on the Add Records REST API V2.1. Learn more about understanding the response
+
+Request Details
+Syntax
+ZOHO.CREATOR.DATA.addRecords(<config>).then(function(response){
+//callback block
+});
+
+Syntax Details
+The syntax holds:
+
+<config> (object) - The configuration required to add a record. This configuration includes the following parameters.
+Name	Type	Description
+app_name
+(Optional)	string	
+Link name of the application to which data needs to be pushed. Retrieve the link name using the Creator form's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Form:<form_name>
+
+Note: This parameter has to be passed only when you need to push data into other applications of the same Creator account. When not specified, data will be pushed to current application.
+form_name	string	Link name of the form to which the records need to be added. Retrieve the link name using the Creator form's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Form:<form_name>
+payload	object	
+Form data supplied in JSON format, to include records in the form. The field link names necessary for the key-value pairs can be obtained from the field properties in form builder.
+
+Refer to the Setting Field Values section to learn more about the format.
+
+Payload Parameter
+
+skip_workflow (Optional)
+list
+Prevents the associated workflows from being executed on the creation of a record.
+Possible values: form_workflow, schedules, all
+
+Note: By default:
+
+When more than one type of workflow is mentioned, supply them as comma-separated values in a list. For example,
+"skip_workflow" : ["schedules","form_workflow"]
+If this parameter is not supplied, all associated workflows will be triggered.
+Blueprints and approvals will be triggered on the creation of records and cannot be skipped.
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+
+Sample input to add one record
+var config = {
+  app_name: "zylker",
+  form_name: "timesheet",
+  payload: {
+    "data": {
+      "Name": {
+        "first_name": "James",
+        "last_name": "Kyle"
+     }
+   }
+  }
+};
+ZOHO.CREATOR.DATA.addRecords(config).then(function (response) {
+  if (response.code == 3000) {
+    console.log(response);
+  }
+});
+Sample response upon adding one record
+response = {
+	"code": 3000,
+	"data": {
+		"ID": "2000000245119"
+	},
+	"message": "success"
+}
+
+Get Record by ID
+Table of Contents
+Overview
+Request Details
+Possible Errors
+Overview
+This JS API task fetches the data of a specific record from a report. This record will be identified by the record ID that you supply in the request. Its response will contain the data of all the visible fields present in the record.
+
+This V2 task is based on the Get Record by ID REST API V2.1.
+
+Request Details
+Syntax
+ZOHO.CREATOR.DATA.getRecordById(config).then(function(response){ //callback block });
+
+Syntax Details
+The syntax holds:
+
+<config> (object) - The configuration required to get a specific record from a report. This configuration includes the following parameters.
+Name	Type	Description
+app_name
+(Optional)	string	
+Link name of the application from which data needs to be pulled. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+
+Note: This parameter only needs to be passed when you need to pull data from other applications in the same Creator account. When not specified, data will be pulled from the current application.
+report_name	string	Link name of the report from which the record has to be fetched. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+id	string	Record ID of the record that needs to be retrieved.
+field_config
+(Optional)	string	
+Fetches fields of a record based on the input value.
+Possible values:
+
+detail_view - Fields included in the detailed view layout
+quick_view (default value) - Fields included in the quick view layout
+custom - Fields specified in the fields parameter
+all - Fields included both in the detailed view and quick view layout
+Note: This API will not fetch the record displayed in the related data blocks of the detail view.
+
+fields
+(Optional)	string	
+If the value of field_config parameter is given as custom, this parameter should also be included. The required fields' link names need to be mentioned as individual comma-separated strings.
+
+Note:
+
+The field link names can be found in the field properties pane of each field in the form builder.
+Hidden fields will not be fetched. Admin Only fields will be fetched only when the requesting user is an admin in that application.
+When a subform field's link name is specified, all visible fields within will be fetched.
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+
+Sample Input
+var config = {
+  app_name: "zylker",
+  report_name: "All-Timesheet",
+  id : "2000000193171"
+};
+ZOHO.CREATOR.DATA.getRecordById(config).then(function (response) {
+  console.log(response);
+});
+Sample Response
+response  = {
+   "code": 3000,
+   "data": {
+       "ID": "2000000193171",
+       "Name": {
+         "first_name": "James",
+         "last_name": "Kyle",
+         "display_value": "James Kyle"
+         }
+     }
+ }
+
+
+ Get Records
+Table of Contents
+Overview
+Request Details
+Possible Errors
+Overview
+This JS API task fetches all records displayed in a report. Its response will contain the data of all the visible fields present in the records. A maximum of 1000 records can be fetched per request.
+
+This V2 task is based on the Get Records REST API V2.1.
+
+Request Details
+Syntax
+ZOHO.CREATOR.DATA.getRecords(config).then(function(response){
+   //callback block
+});
+
+Syntax Details
+The syntax holds:
+
+<config> (object) - The configuration required to get records from a report. This configuration includes the following parameters.
+Name	Type	Description
+app_name
+(Optional)	string	
+Link name of the application from which data needs to be pulled. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+
+Note: This parameter only needs to be passed when you need to pull data from other applications in the same Creator account. When not specified, data will be pulled from the current application.
+report_name	string	Link name of the report from which the records have to be fetched. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+criteria
+(Optional)	string	
+The criteria using which you want the API request to filter the target report. If not specified, the request will fetch the first 200 records from the report (as per its predefined sorting order).
+
+Refer to the Defining the search criteria section to learn more.
+
+field_config
+(Optional)	string	
+Fetches fields of the records based on the input value.
+Possible values:
+
+detail_view - Fields included in the detailed view layout
+quick_view (default value) - Fields included in the quick view layout
+custom - Fields specified in the fields parameter
+all - Fields included both in the detailed view and quick view layout
+Note: This API will not fetch the record displayed in the related data blocks of the detail view.
+
+fields
+(Optional)	string	
+If the value of field_config parameter is given as custom, this parameter should also be included. The required fields' link names need to be mentioned as individual comma-separated strings.
+
+Note:
+
+The field link names can be found in the field properties pane of each field in the form builder.
+Hidden fields will not be fetched. Admin Only fields will be fetched only when the requesting user is an admin in that application.
+When a subform field's link name is specified, all visible fields within will be fetched.
+max_records 
+(Optional)	int	
+The number of maximum records that will be fetched upon one request.
+Possible values: 200, 500, 1000 (default value)
+
+If the criteria parameter is mentioned, the maximum count will apply only for the records that match the criteria.
+
+record_cursor
+(Optional)	string	Every time records exist beyond the maximum fetch count (1000), a unique key will be received in the response. This can be added in the next API call's <config> parameter as a key-value pair to fetch the consecutive batch of 1000 records, if they exist.
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+
+Sample Input
+var config = {
+  app_name: "zylker",
+  report_name: "All-Timesheet"
+};
+ZOHO.CREATOR.DATA.getRecords(config).then(function (response) {
+  console.log(response);
+});
+Sample Response
+response  = {
+   "code": 3000,
+   "data": [{
+       "ID": "2000000193171",
+       "Name": {
+         "first_name": "Lily",
+         "last_name": "Kyle",
+         "display_value": "Lily Kyle"
+         }
+     },
+     {
+       "ID": "2000000193173",
+       "Name": {
+         "first_name": "Peter",
+         "last_name": "James",
+         "display_value": "Peter James"
+         }
+     }]
+ }
+
+Get Record Count
+Table of Contents
+Overview
+Request Details
+Possible Errors
+Overview
+This JS API task fetches the count of records displayed by a report.
+
+Request Details
+Syntax
+ZOHO.CREATOR.DATA.getRecordCount(config).then(function (response) {
+   //your code goes here.
+});
+
+Syntax Details
+The syntax holds:
+
+<config> (object) - The configuration required to get the record count from a report. This configuration includes the following parameters.
+Name	Type	Description
+app_name
+(Optional)	string	
+Link name of the application from which data needs to be pulled. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+
+Note: This parameter only needs to be passed when you need to pull data from other applications in the same Creator account. When not specified, data will be pulled from the current application.
+report_name	string	Link name of the report from which the record count has to be fetched. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+criteria
+(Optional)	string	Condition to filter the record, which is applied along with the condition specified in the report filter. The criteria must follow the format specified for the search criteria in REST API V2.1.
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+
+Sample Input
+var config = {
+app_name: "zylker",
+report_name: "All-Timesheet",
+criteria: "(Single_Line = \"High\")"
+}; 
+ZOHO.CREATOR.API.getRecordCount(config).then(function (response) {
+console.log(reponse.result.records_count);
+});
+Sample Response
+response = {
+"code": 3000,
+"result": { "records_count": "4" }
+}
+
+
+Update Record by ID
+Table of Contents
+Overview
+Request Details
+Possible Errors
+Overview
+This JS API task updates a specific record displayed in a report of a Zoho Creator application. The record is identified by its ID value. The update operation is subject to data validations configured for the corresponding form.
+
+This task is based on the Update Record by ID REST API V2.1. Learn more about understanding the response
+
+Request Details
+Syntax
+ZOHO.CREATOR.DATA.updateRecordById(config).then(function(response){
+//callback block
+});
+
+Syntax Details
+The syntax holds:
+
+<config> (object) - The configuration required to update a record in a report. This configuration includes the following parameters.
+Name	Type	Description
+app_name
+(Optional)	string	
+Link name of the application that data needs to be pushed to. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+
+Note: This parameter only needs to be passed when you need to push data in other applications of the same Creator account. When not specified, data will be pushed to the current application.
+report_name	string	Link name of the report in which record needs to be updated. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+payload	object	
+Form data supplied in JSON format to update the record with the field values within, in the form. The field link names necessary for the key-value pairs can be obtained from the field properties in form builder.
+
+Refer to the Setting Field Values section to learn more about the format.
+
+Payload Parameter
+
+skip_workflow list
+(Optional)
+Prevents the associated workflows from being executed on the update of a record.
+Possible values: form_workflow, schedules, all
+Note: By default:
+
+When more than one type of workflow is mentioned, supply them as comma-separated values in a list. For example,
+"skip_workflow" : ["schedules","form_workflow"]
+If this parameter is not supplied, all associated workflows will be triggered.
+Blueprints and approvals will be triggered on the update of a record and cannot be skipped. 
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+
+Sample Input
+var config = {
+  app_name: "zylker",
+  report_name: "All-Timesheet",
+  id: "2000000245119",
+  payload: {
+    "data": {
+      "Name": {
+        "first_name": "James",
+        "last_name": "Kyle"
+     }
+} }
+};
+ZOHO.CREATOR.DATA.updateRecordById(config).then(function (response) {
+  if (response.code == 3000) {
+    console.log(response);
+} });
+Sample Response
+response = {
+        "code": 3000,
+        "data": {
+ "ID": "2000000245119"
+},   
+"message": "success"
+}
+
+
+Update Records
+Table of Contents
+Overview
+Request Details
+Possible Errors
+Overview
+This JS API task updates records displayed in a report of a Zoho Creator application. A maximum of 200 records can be updated per request. The update operation is subject to data validations configured for the corresponding form. 
+
+This task is based on the Update Records REST API V2.1. Learn more about understanding the response
+
+Request Details
+Syntax
+ZOHO.CREATOR.DATA.updateRecords(config).then(function(response){
+//callback block
+});
+
+Syntax Details
+The syntax holds:
+
+<config> (object) - The configuration required to update records in a report. This configuration includes the following parameters.
+Name	Type	Description
+app_name
+(Optional)	string	
+Link name of the application that data needs to be pushed to. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+
+Note: This parameter only needs to be passed when you need to push data in other applications of the same Creator account. When not specified, data will be pushed to the current application.
+report_name	string	Link name of the report in which records need to be updated. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+payload	object	
+Form data supplied in JSON format to update the records with the field values within, in the form. The field link names necessary for the key-value pairs can be obtained from the field properties in form builder.
+
+Refer to the Setting Field Values section to learn more about the format.
+
+Payload Parameter
+
+criteria string
+The criteria using which you want to filter the target report.
+If all matching records need to be updated, include "criteria": "ID!=0" or "criteria": "ID!=null" in the request. Refer to the Defining the search criteria to learn more.
+Criteria is mandated to prevent accidentally updating all matching records.
+skip_workflow list
+(Optional)
+Prevents the associated workflows from being executed on the update of records.
+Possible values: form_workflow, schedules, all
+Note: By default:
+
+When more than one type of workflow is mentioned, supply them as comma-separated values in a list. For example,
+"skip_workflow" : ["schedules","form_workflow"]
+If this parameter is not supplied, all associated workflows will be triggered.
+Blueprints and approvals will be triggered on the update of records and cannot be skipped. 
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+
+Sample Input
+var config = {
+  app_name: "zylker",
+  report_name: "All-Timesheet",
+  payload: {
+    "criteria": "(Single_Line.contains(\"Single Line of Text\"))"
+    "data": {
+      "Name": {
+        "first_name": "James",
+        "last_name": "Kyle"
+     }
+   }
+  }
+};
+ZOHO.CREATOR.DATA.updateRecords(config).then(function (response) {
+  if (response.code == 3000) {
+    console.log(response);
+  }
+});
+Sample Response
+{
+    "result": [
+        {
+            "code": 3000,
+            "data": {
+                "Number": "12345",
+                "Single_Line": "Single Line of Text",
+                "ID": "3888833000000114023"
+            },
+            "message": "Data Updated Successfully!",
+            "tasks": {
+                "openurl": {
+                    "type": "Same window",
+                    "url": "http://www.zylker.com"
+                }
+            }
+        },
+        {
+            "code": 3000,
+            "data": {
+                "Number": "12345",
+                "Single_Line": "Single Line of Text",
+                "ID": "3888833000000114047"
+            },
+            "message": "Data Updated Successfully!",
+            "tasks": {
+                "openurl": {
+                    "type": "Same window",
+                    "url": "http://www.zylker.com"
+                }
+            }
+        },
+        {
+            "code": 3000,
+            "data": {
+                "Number": "12345",
+                "Single_Line": "Single Line of Text",
+                "ID": "3888833000000118019"
+            },
+            "message": "Data Updated Successfully!",
+            "tasks": {
+                "openurl": {
+                    "type": "Same window",
+                    "url": "http://www.zylker.com"
+                }
+            }
+        }
+    ],
+    "code": 3000
+}
+
+Delete Record by ID
+Table of Contents
+Overview
+Request Details
+Possible Errors
+Overview
+This JS API task deletes a specific record displayed by a report of your Zoho Creator application. It is deleted from the stored form and hence will not be available anywhere in the application. The delete request is subject to custom validations configured for the target form.
+
+This task is based on the Delete Record by ID  REST API V2.1. Learn more about understanding the response
+
+Request Details
+Syntax
+ZOHO.CREATOR.DATA.deleteRecordById(config).then(function(response){
+   //callback block
+});
+
+Syntax Details
+The syntax holds:
+
+<config> (object) - The configuration required to delete a specific record in a report. This configuration includes the following parameters.
+Name	Type	Description
+app_name
+(Optional)	string	
+Link name of the application in which the record needs to be deleted. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+
+Note: This parameter only needs to be passed when you need to a delete record in other applications of the same Creator account. When not specified, the record will be deleted from the current application.
+report_name	string	Link name of the report in which the record needs to be deleted. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+id	string	Record ID of the record that needs to be deleted.
+payload	object	Specific parameters supplied in JSON format perform actions upon successful deletion of  the record.
+Payload Parameter
+
+skip_workflow (Optional)
+list
+Prevents the associated workflows from being executed when the record is deleted.
+Possible values: form_workflow, schedules, all
+
+Note: By default:
+
+When more than one type of workflow is mentioned, supply them as comma-separated values in a list. For example,
+"skip_workflow" : ["schedules","form_workflow"]
+If this parameter is not supplied, all associated workflows will be triggered.
+Blueprints and approvals will be triggered when the record is deleted and cannot be skipped. 
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+
+Sample Input
+var config = {
+  app_name: "zylker",
+  report_name: "All-Timesheet",
+  id: "2000000245119",
+  payload : {
+    skip_workflow: ["form_workflow"],
+  }
+};
+ZOHO.CREATOR.DATA.deleteRecordById(config).then(function (response) {
+  if (response.code == 3000) {
+    console.log(response);
+  }
+});
+Sample Response
+response = {
+   "result": [{
+       "code": 3000,
+       "data": {
+         "ID": "2000000245119"
+       },
+       "message": "success"
+     }
+   ],
+ "code": 3000
+}
+
+Delete Records
+Table of Contents
+Overview
+Request Details
+Possible Errors
+Overview
+This JS API task deletes the records displayed by a report of your Zoho Creator application. It is deleted from the stored form and hence will not be available anywhere in the application. The delete request is subject to custom validations configured for the target form. The maximum of 200 records can be deleted for every API call. If exceeded, and you will receive an error.
+
+This task is based on the Delete Records  REST API V2.1. Learn more about understanding the response
+
+Request Details
+Syntax
+ZOHO.CREATOR.DATA.deleteRecords(config).then(function(response){
+   //callback block
+});
+
+Syntax Details
+The syntax holds:
+
+<config> (object) - The configuration required to delete records in a report. This configuration includes the following parameters.
+Name	Type	Description
+app_name
+(Optional)	string	
+Link name of the application in which records need to be deleted. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+
+Note: This parameter only needs to be passed when you need to delete records in other applications of the same Creator account. When not specified, records will be deleted from the current application.
+report_name	string	Link name of the report in which the records need to be deleted. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+process_until_limit
+(Optional)	string	
+When the number of matching records exceeds the maximum count of 200, your request will fail. 
+
+To avoid this, include this parameter in your request which deletes the first 200 records and returns the more_records key in the response. 
+Eg. process_until_limit=true provides the more_records key if deemed necessary.
+
+more_records
+(Optional)	string	Every time records exist beyond the maximum delete count (200), a unique key will be received in the response. This can be added in the next API call to delete the consecutive batch of 200 records if they exist.
+payload	object	Specific parameters supplied in JSON format perform actions upon successful deletion of records.
+Payload Parameter
+
+criteria string
+The criteria using which you want to filter the target report. Criteria is mandated to prevent you from accidentally deleting all matching records.
+
+If you're looking to delete all matching records, you'll have to include "criteria": "ID!=0" or "criteria": "ID!=null" in your request. Refer to the Defining the search criteria section to learn more.
+
+skip_workflow (Optional)
+list
+Prevents the associated workflows from being executed when the records are deleted.
+Possible values: form_workflow, schedules, all
+
+Note: By default:
+
+When more than one type of workflow is mentioned, supply them as comma-separated values in a list. For example,
+"skip_workflow" : ["schedules","form_workflow"]
+If this parameter is not supplied, all associated workflows will be triggered.
+Blueprints and approvals will be triggered when the records are deleted and cannot be skipped.
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+
+Sample Input
+var config = {
+  app_name: "zylker",
+  report_name: "All-Timesheet",
+  criteria : "(Status == \"Invalid\" && Date '01-01-2019')"
+};
+ZOHO.CREATOR.DATA.deleteRecords(config).then(function (response) {
+  if (response.code == 3000) {
+    console.log(response);
+  }
+});
+Sample Response
+response = {
+   "result": [{
+       "code": 3000,
+       "data": {
+         "ID": "66359000000021016"
+       },
+       "message": "success"
+     },
+     {
+       "code": 3000,
+       "data": {
+         "ID": "66359000000024309"
+       },
+       "message": "success"
+     }
+   ],
+ "code": 3000
+}
+
+Upload File
+Table of Contents
+Overview
+Request Details
+File Size Limits
+Possible Errors
+Overview
+This JS API task updates a file to a File upload, Image, Audio, Video, or Signature field of a specific record, in a Zoho Creator application. The upload operation will be subject to the custom data validations configured for the corresponding form.
+
+This V2 task is based on the Upload File REST API V2.1.
+
+Request Details
+Syntax
+ZOHO.CREATOR.FILE.uploadFile(config).then(function(response){
+   //callback block
+});
+
+Syntax Details
+The syntax holds:
+
+<config> (object) - The configuration required to upload a file to a specific record of a report. This configuration includes the following parameters.
+Name	Type	Description
+app_name
+(Optional)	string	
+Link name of the application to which a file has to be uploaded. Retrieve the link name using the Creator form's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Form:<form_name>
+
+Note: This parameter has to be passed only when you need to push data into other applications of the same Creator account. When not specified, data will be pushed to current application.
+report_name	string	Link name of the report whose record needs to be updated. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+id	string	The ID of the target record that you want to upload the file to.
+field_name	string	
+The link name of the target field to which the file needs to be uploaded. The field link names can be found in the field properties pane of each field in the form builder.
+Supported target fields: File upload, Image, Audio, Video, or Signature field
+
+Note: If the target field (field inside subform) is situated inside a subform field (field in main form), the field_name will be <targetfield_link_name.subformfield_link_name>.
+
+parent_id
+(Optional)	string	If the target field is situated inside a subform, then the parent_id is the ID value of the parent record. This means the main form's record in which the subform has been embedded.
+file	object	It is a javascript file object to be uploaded.
+skip_workflow
+(Optional)	list	
+Prevents the associated workflows from being executed when the file is uploaded to a record.
+Possible values: form_workflow, schedules, all
+
+Note: By default:
+
+When more than one type of workflow is mentioned, supply them as comma-separated values in a list. For example,
+"skip_workflow" : ["schedules","form_workflow"]
+If this parameter is not supplied, all associated workflows will be triggered.
+Blueprints and approvals will be triggered when the file is uploaded and cannot be skipped.
+File Size Limits
+The Image and Signature fields can accept an image that doesn't exceed 10 MB.
+The File upload, Audio, and Video fields can accept a file that doesn't exceed 50 MB.
+The file you upload will be counted towards the file storage limit of the account in which the target application exists. Visit the account's Billing page to view its current storage details.
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+
+Sample Input
+var fileObject = document.getElementById("fileInput").files[0];
+var config = {
+  app_name: "zylker",
+  report_name: "All-Timesheet",
+  id : "2000000193171",
+  field_name : "Attachments",
+  file : fileObject
+};
+ZOHO.CREATOR.FILE.uploadFile(config).then(function (response) {
+  console.log(response);
+});
+Sample Response
+response  = {
+   "code": 3000,
+   "data": {
+       "filename": "Rental Agreement-March.pdf",
+       "filepath": "1587402896598_Rental_Agreement-March.pdf",
+       "message": "success"
+    }
+ }
+
+ Read File
+Table of Contents
+Overview
+Request Details
+Possible Errors
+Overview
+This JS API task downloads the content of a file from a File upload, Image, Audio, Video, or Signature field of a specific record, in a Zoho Creator application.
+
+Request Details
+Syntax
+ZOHO.CREATOR.FILE.readFile(config).then(function(response){
+   //callback block
+});
+
+Syntax Details
+The syntax holds:
+
+<config> (object) - The configuration required to download a file from a specific record of a report. This configuration includes the following parameters.
+Name	Type	Description
+app_name
+(Optional)	string	
+Link name of the application from which a file needs to be downloaded. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+
+Note: This parameter only needs to be passed when you need to read data from other applications in the same Creator account. When not specified, data will be pulled from the current application.
+report_name	string	Link name of the report from which the file has to be downloaded. Retrieve the link name using the Creator report's URL: https://creatorapp.zoho.com/<account_name>/<app_name>/#Report:<report_name>
+id	string	The ID of the target record that you want to read the file from.
+field_name	string	
+The link name of the target field from which the file needs to be downloaded. The field link names can be found in the field properties pane of each field in the form builder.
+Supported target fields: File upload, Image, Audio, Video, or Signature field
+
+Note: If the target field (field inside subform) is situated inside a subform field (field in main form), the field_name will be <subformfield_link_name.targetfield_link_name>.
+
+parent_id
+(Optional)	string	If the target field is situated inside a subform, then the parent_id is the ID value of the parent record. This means the main form's record in which the subform has been embedded.
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+
+Sample Input
+var config = {
+  app_name: "zylker",
+  report_name: "All-Timesheet",
+  id : "2000000193171",
+  field_name : "Attachments"
+};
+ZOHO.CREATOR.FILE.readFile(config).then(function (response) {
+  console.log(response);
+});
+Sample Response
+response="filecontent"
+
+Navigate Parent URL
+Table of Contents
+Overview
+Request Details
+Possible Errors
+Overview
+This JS API task allows you to perform cross-domain navigation, which is the navigation that needs to be done to another domain from within a widget embedded in a page.
+
+Request Details
+Syntax
+ZOHO.CREATOR.UTIL.navigateParentURL(config);
+
+Syntax Details
+The syntax holds:
+
+<config> (object) - The configuration required for URL navigation. This configuration includes the following parameters.
+Name	Type	Description
+action	string	
+Performs an action based on the input value.
+Possible Values:
+
+open loads the specified URL in a new/parent window.
+reload opens the previously visited page.
+back reloads the parent window.
+close shuts the last opened parent container.
+close all shuts all open dialog parent containers in the parent window.
+Note: If the key value is given as open, the url and window parameters should also be included.
+
+url
+(Optional)	string	
+You can specify any URL link here.
+
+Example: 
+
+https://creatorapp.zoho.com/megan/zylker-online-tutorials/#Form:User_Details
+https://www.google.co.in/?client=safari&channel=mac_bm
+window	string	
+Decides where the URL is opened depending on the input value.
+Possible Values:
+
+new (default value) opens the URL in a separate window.
+same opens the URL in the existing current window.
+Possible Errors
+Refer to this page for the complete list of error codes and messages.
+
+Sample Input
+var config = {
+  action: "close"
+};
+ZOHO.CREATOR.UTIL.navigateParentURL(config);
+
+
+
+
+

@@ -1,0 +1,94 @@
+/* global React */
+import React from 'react';
+
+const calculateDaysSince = (dateString) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+};
+
+const CounterBadge = ({ value, label, type = 'default' }) => {
+    const colorClasses = {
+        default: 'bg-blue-100 text-blue-800',
+        warning: 'bg-yellow-100 text-yellow-800',
+        success: 'bg-green-100 text-green-800',
+        danger: 'bg-red-100 text-red-800'
+    };
+
+    return React.createElement('div',
+        {
+            className: `counter-badge ${colorClasses[type]} rounded-md font-medium`
+        },
+        `${value} Days Since ${label}`
+    );
+};
+
+const Counters = ({ project }) => {
+    const daysSinceSold = calculateDaysSince(project?.dateSold);
+    const permitSubmissionDate = project?.permitting?.[0]?.Permit_Submission_Date;
+    const daysSincePermitSubmission = calculateDaysSince(permitSubmissionDate);
+    const daysSincePTOSubmission = calculateDaysSince(project?.ptoSubmissionDate);
+    const daysSinceSystemTurnedOn = calculateDaysSince(project?.systemTurnedOnDate);
+
+    const getCounterType = (days, isSystemTurnedOn = false) => {
+        if (isSystemTurnedOn) {
+            return days >= 30 ? 'success' : 'default';  // Green at 30+ days for system turned on
+        }
+        // Standard counter colors for other types
+        if (days <= 30) return 'default';      // 0-30 days: blue
+        if (days <= 60) return 'warning';      // 31-60 days: yellow
+        return 'danger';                       // 60+ days: red
+    };
+
+    return React.createElement('div',
+        { 
+            className: "modal-header-section border-b border-gray-200 bg-white"
+        },
+        React.createElement('div',
+            { className: "flex items-center gap-4" },
+            [
+                // Days Since Sold Counter
+                daysSinceSold && React.createElement(CounterBadge, {
+                    value: daysSinceSold,
+                    label: "Sold",
+                    type: getCounterType(daysSinceSold)
+                }),
+                // Divider after Sold
+                daysSinceSold && (daysSincePermitSubmission || daysSincePTOSubmission || daysSinceSystemTurnedOn) && 
+                    React.createElement('div', { className: "h-8 border-l border-gray-300" }),
+                
+                // Days Since Permit Submission Counter
+                daysSincePermitSubmission && React.createElement(CounterBadge, {
+                    value: daysSincePermitSubmission,
+                    label: "Permit Submission",
+                    type: getCounterType(daysSincePermitSubmission)
+                }),
+                // Divider after Permit
+                daysSincePermitSubmission && (daysSincePTOSubmission || daysSinceSystemTurnedOn) && 
+                    React.createElement('div', { className: "h-8 border-l border-gray-300" }),
+                
+                // Days Since PTO Submission Counter
+                project?.ptoSubmitted && daysSincePTOSubmission && React.createElement(CounterBadge, {
+                    value: daysSincePTOSubmission,
+                    label: "PTO Submission",
+                    type: getCounterType(daysSincePTOSubmission)
+                }),
+                // Divider after PTO
+                daysSincePTOSubmission && daysSinceSystemTurnedOn && 
+                    React.createElement('div', { className: "h-8 border-l border-gray-300" }),
+                
+                // Days Since System Turned On Counter
+                project?.systemTurnedOn && daysSinceSystemTurnedOn && React.createElement(CounterBadge, {
+                    value: daysSinceSystemTurnedOn,
+                    label: "System Turned On",
+                    type: getCounterType(daysSinceSystemTurnedOn, true)  // Pass true for system turned on counter
+                })
+            ]
+        )
+    );
+};
+
+export default Counters;
