@@ -1,0 +1,130 @@
+# Kanban Widget Rebuild - Phase 3: Project Details Modal (current_detail_modal_build_plan.txt)
+
+## 1. Overall Goal
+
+Implement the Project Details Modal, providing a comprehensive view of a selected project and allowing users to interact with related data (notes, documents, issues, etc.). Replicate key functionality from the old modal while integrating with the new Vue/Vuex architecture.
+
+## 2. Key Areas of Focus
+
+*   **Modal Structure & Display:** Create a reusable modal component that can be triggered from the Kanban card.
+*   **Data Fetching & State Management:** Implement logic to fetch detailed project data (including related lists and contacts) upon modal opening and manage this data within the Vuex store.
+*   **Tab Implementation:** Recreate the various tabs from the old modal as separate Vue components.
+*   **Functionality Replication:** Implement core actions within tabs (e.g., adding notes, resolving issues, uploading documents).
+*   **UI/UX:** Ensure the modal is responsive, user-friendly, and visually consistent with the board.
+
+## 3. Detailed Task Breakdown
+
+### 3.1. Modal Shell & Triggering
+
+*   **Goal:** Create the main modal component structure and the mechanism to open it.
+*   **Tasks:**
+    *   Create `app/components/modal/ProjectDetailModal.vue` (or `.js`).
+        *   Use `BaseModal` as the foundation.
+        *   Implement basic structure: Header (potentially a separate `ModalHeader` component later), Tab Navigation, Content Area.
+        *   Manage visibility using Vuex state (e.g., `modal/isVisible`, `modal/currentProjectId`).
+    *   Modify `app/components/kanban/KanbanCard.js`:
+        *   Implement the `@click` handler (`onCardClick`) to dispatch a Vuex action (e.g., `modal/openModal`) passing the `project.ID`.
+    *   Modify `app/views/WidgetView.js`:
+        *   Conditionally render `<project-detail-modal>` based on store state.
+    *   Create `app/store/modules/modal.js`:
+        *   Define state: `isVisible`, `currentProjectId`, `isLoading`, `error`, `projectData` (to hold detailed data), `activeTab`.
+        *   Define mutations: `SET_VISIBILITY`, `SET_PROJECT_ID`, `SET_LOADING`, `SET_ERROR`, `SET_PROJECT_DATA`, `SET_ACTIVE_TAB`.
+        *   Define actions: `openModal(projectId)`, `closeModal()`.
+
+### 3.2. Detailed Data Fetching
+
+*   **Goal:** Fetch all necessary detailed data when the modal opens.
+*   **Tasks:**
+    *   Create new Vuex action in `projects.js` (e.g., `fetchProjectDetails(projectId)`).
+        *   This action will orchestrate fetching the detailed data.
+        *   Call `ZohoAPIService.getRecordById` using the `projectId`, `REPORT_PROJECTS` constant, and `field_config: 'detail_view'` (or 'all').
+        *   Call `ZohoAPIService.getRecords` to fetch associated contacts from `REPORT_CONTACTS` (define constant) using criteria `(Project == ${projectId})`.
+        *   Potentially call API to fetch `REPORT_DOC_TYPES` if not already fetched with other lookups (or add to `lookups.js`).
+    *   Modify `modal/openModal` action:
+        *   Commit `SET_VISIBILITY(true)`, `SET_PROJECT_ID(projectId)`.
+        *   Commit `SET_LOADING(true)`, `SET_ERROR(null)`.
+        *   Dispatch `projects/fetchProjectDetails(projectId)`.
+        *   On success: Commit fetched project details (combined result) to `modal/SET_PROJECT_DATA`, commit `SET_LOADING(false)`.
+        *   On error: Commit error to `modal/SET_ERROR`, commit `SET_LOADING(false)`.
+    *   Update `DataProcessors.js` (or create `processProjectDetailsData`):
+        *   Add logic to process the combined response from `getRecordById` (main project + related lists) and the separate Contacts fetch into the desired structure for the modal state. Ensure related lists like notes, documents, activities are processed and sorted correctly.
+
+### 3.3. Modal Header Implementation
+
+*   **Goal:** Recreate the dynamic header section of the modal.
+*   **Tasks:**
+    *   Create `app/components/modal/ModalHeader.vue` (or `.js`).
+    *   Display core project info (Name, Address, Icons).
+    *   Implement Stage dropdown/selector (using `BaseSelectMenu`?) bound to modal project data, dispatching `projects/updateProjectStage` on change.
+    *   Implement Tranche dropdown/selector bound to modal project data, dispatching `projects/updateProjectTranche` on change.
+    *   Implement Tag display and Add/Remove functionality (potentially using `TagModal`).
+    *   Add action buttons (e.g., Refresh, Help, maybe Folder Creation trigger).
+    *   Handle loading/error states related to stage/tranche changes.
+
+### 3.4. Tab Implementation (Iterative)
+
+*   **Goal:** Create individual components for each tab's content area.
+*   **Tasks (Repeat for each key tab):**
+    *   **Identify Old Component:** e.g., `OverviewTabjs.txt`, `DocumentsTabjs.txt`.
+    *   **Create New Component:** e.g., `app/components/modal/tabs/OverviewTab.vue`.
+    *   **Props/Store Access:** Determine data needed (likely from `modal/projectData` getter).
+    *   **Replicate Layout:** Rebuild the UI structure using Base components.
+    *   **Implement Functionality:**
+        *   **Overview:** Display events, notes (with threading/replies), issues. Implement Add Note/Reply form, Raise Issue button (linking to `IssueModal`).
+        *   **Documents:** Display documents list/grid. Implement upload functionality (requires `ZohoAPIService.uploadFile`). Implement document type filtering (needs fetched DocTypes). Handle preview logic.
+        *   **Contacts:** Display associated contacts. Implement Add/Edit Contact functionality (requires `ZohoAPIService.addRecord`, `updateRecordById`).
+        *   **Survey:** Display survey results.
+        *   **System:** Display system details, equipment (needs `equipmentData` lookup). Potentially add editing later.
+        *   **Permitting:** Display permitting details.
+        *   **Sales Rep:** Display Sales Rep/Org info, commission milestones/advance. Potentially add editing later.
+        *   **Property Info:** Display text area content.
+        *   **Activity:** Display activity log.
+        *   **Communications:** Display communication log.
+        *   **Investors:** Display investor details.
+    *   **Modal Integration:** Render the active tab component within `ProjectDetailModal.vue` based on `modal/activeTab` state.
+
+### 3.5. Interaction Implementation
+
+*   **Goal:** Implement specific actions like adding notes, issues, uploading files.
+*   **Tasks:**
+    *   **Add Note/Reply:**
+        *   Create form in `OverviewTab`.
+        *   Create Vuex action `notes/addNote` (or similar, perhaps `projects/addNoteToProject`).
+        *   Action calls `ZohoAPIService.addRecord` targeting the `Add_Note` form.
+        *   Refresh modal data (`projects/fetchProjectDetails`) on success.
+    *   **Add Issue:**
+        *   Create `app/components/modal/IssueModal.vue`.
+        *   Trigger from `OverviewTab`.
+        *   Create Vuex action `issues/addIssue` (or `projects/addIssueToProject`).
+        *   Action calls `ZohoAPIService.addRecord` targeting `Add_Issue` form.
+        *   Refresh modal data on success.
+    *   **Resolve Issue:**
+        *   Add button in `OverviewTab`'s issue list.
+        *   Create Vuex action `issues/resolveIssue`.
+        *   Action calls `ZohoAPIService.updateRecordById` on `REPORT_ISSUES` (define constant).
+        *   Refresh modal data on success.
+    *   **Upload Document:**
+        *   Add upload button/input in `DocumentsTab`.
+        *   Handle file selection.
+        *   Create Vuex action `documents/uploadDocument`.
+        *   Action calls `ZohoAPIService.uploadFile`. Requires Report Name (`REPORT_DOCUMENTS`?), Record ID (Project ID), Field Name (`File_Upload`?), and File object. *Need clarification on where documents are linked - directly to Project or via `Add_Document` form? Build plan suggests `Add_Document` form.* If `Add_Document`, need `addRecord` first, then `uploadFile` using the new document record ID.
+        *   Refresh modal data on success.
+
+## 4. Data Schema Considerations
+
+*   Verify report/form names used in API calls (`Kanban_Projects` vs `PM_Kanban_Projects`, `PM_Kanban_Contacts`, `Add_Note`, `Add_Issue`, `Add_Document`, `PM_Kanban_Issues`, `PM_Kanban_Documents`). Use constants.
+*   Verify field API names used in payloads (`New_Stage`, `Tranche`, `Tags`, `In_Call`, `File_Upload`, etc.).
+*   Confirm structure of related lists returned by `getRecordById` with `detail_view`.
+
+## 5. Next Steps (Initial)
+
+1.  Create `app/store/modules/modal.js` with basic state, mutations, actions (`openModal`, `closeModal`).
+2.  Create `app/components/modal/ProjectDetailModal.vue` shell using `BaseModal`.
+3.  Modify `KanbanCard.js` click handler to dispatch `modal/openModal`.
+4.  Modify `WidgetView.js` to render the modal conditionally.
+5.  Implement `projects/fetchProjectDetails` action (fetching main record and contacts).
+6.  Implement `DataProcessors` logic for detailed project data.
+7.  Connect `modal/openModal` to dispatch `projects/fetchProjectDetails` and update modal state.
+
+## 6. Development Notes
+*(Empty)* 

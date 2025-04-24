@@ -6,10 +6,13 @@ import BaseSelectMenu from '../common/BaseSelectMenu.js'; // Import SelectMenu
 import BaseBadge from '../common/BaseBadge.js'; // Import Badge
 import BaseToggle from '../common/BaseToggle.js'; // Ensure BaseToggle is imported
 
-// Ensure Vuex is available for mapState/mapGetters
-if (typeof Vuex === 'undefined') {
-  console.warn('Vuex might not be loaded yet for mapState/mapGetters helper in DevToolbar.');
-}
+// Import Pinia stores and helpers
+import { useUserStore } from '../../store/userStore.js'; // Import user store
+import { useLookupsStore } from '../../store/lookupsStore.js';
+import { useProjectsStore } from '../../store/projectsStore.js'; // Import projects store
+const { mapState, mapActions } = Pinia;
+
+// Vuex no longer needed here unless modal module is used directly
 
 const DevToolbar = {
   name: 'DevToolbar',
@@ -20,39 +23,45 @@ const DevToolbar = {
     BaseToggle, // Register BaseToggle
   },
   computed: {
-    ...(typeof Vuex !== 'undefined' ? Vuex.mapGetters({
-      // Lookups for dropdown
-      _usersForDropdown: 'lookups/usersForImpersonationDropdown',
-      // User state for impersonation
-      currentUser: 'user/currentUser',
-      originalUser: 'user/originalUser',
-      isImpersonating: 'user/isImpersonating',
-      // Keep existing getters if any
-      isAdmin: 'user/isAdmin', // Should still check original user
-      filterModeIsDemosOnly: 'projects/filterModeIsDemosOnly' // Map the RENAMED getter
-    }) : {
-        // Fallbacks
-        _usersForDropdown: () => [],
-        currentUser: () => null,
-        originalUser: () => null,
-        isImpersonating: () => false,
-        isAdmin: () => false,
-        filterModeIsDemosOnly: () => false, // Fallback should match new default
-    }),
+    // --- Map Pinia State/Getters ---
+    // Map user store state/getters
+    ...mapState(useUserStore, ['currentUser', 'isImpersonating', 'originalUser']), 
+    // Map from lookups store:
+    ...mapState(useLookupsStore, ['usersForImpersonationDropdown']),
+    // Map projects store state
+    ...mapState(useProjectsStore, ['filterModeIsDemosOnly']),
 
-    // Computed property for the dropdown options
+    // --- Map Remaining Vuex State/Getters --- (None needed anymore)
+    // ...(typeof Vuex !== 'undefined' ? Vuex.mapGetters({ ... }) : { ... }),
+
+    // Local computed properties
+    impersonationTarget: {
+        get() {
+            // Uses Pinia state
+            return this.isImpersonating ? this.currentUser?.id : '';
+        },
+        set(newUserId) {
+            // Calls Pinia actions mapped below
+            if (newUserId) {
+                this.impersonateUser(newUserId);
+            } else {
+                this.revertImpersonation();
+            }
+        }
+    },
     impersonationOptions() {
-        if (!this.originalUser) return []; // Wait for original user
-        // Add the 'Default User' option using the original user's ID
+        // Uses Pinia state/getters
         const options = [
-            {
-                value: this.originalUser.id, // Use original user ID to trigger revert
-                label: `Default User (${this.originalUser.name || this.originalUser.email})`
-            },
-            ...this._usersForDropdown // Spread the rest of the users
+            { value: '', label: 'Select User to Impersonate...' },
+            ...(this.usersForImpersonationDropdown || [])
         ];
-        // Filter out the current original user from the main list to avoid duplication
-        return options.filter(opt => opt.value !== this.originalUser.id || opt.label.startsWith('Default User'));
+        if (this.isImpersonating && this.originalUser) {
+            options.push({
+                 value: this.originalUser.id,
+                 label: `<- Revert to ${this.originalUser.name}`
+            });
+        }
+        return options.filter(opt => opt.value !== this.currentUser?.id || opt.value === ''); 
     },
 
     // Computed property to bind v-model for the select menu
@@ -61,89 +70,83 @@ const DevToolbar = {
         return this.currentUser?.id || null;
     },
 
-    // Computed property with getter/setter for the checkbox
+    // Computed property with getter/setter for the demo toggle checkbox
     filterModeIsDemosOnlyModel: {
         get() {
+            // Use Pinia mapped state
             return this.filterModeIsDemosOnly;
         },
         set(value) {
-            // When checkbox changes, dispatch the action to toggle and refetch
+            // When checkbox changes, call the Pinia action directly
             console.log(`DevToolbar: Toggling filter mode (Show ONLY Demos: ${value})`);
-            this.$store.dispatch('projects/toggleDemoFilterMode'); // Dispatch RENAMED action
+            // Get instance and call action
+            const projectsStore = useProjectsStore();
+            projectsStore.toggleDemoFilterMode(); 
         }
     }
   },
   methods: {
-    // Use mapActions for dispatching
-    ...(typeof Vuex !== 'undefined' ? Vuex.mapActions({
-        _impersonateUser: 'user/impersonateUser', // Map action
-        _revertImpersonation: 'user/revertImpersonation' // Map action (optional, handled by impersonateUser)
-    }) : {
-        // Fallback methods
-        _impersonateUser(userId) { console.error('Vuex not available, cannot impersonate user', userId); },
-        _revertImpersonation() { console.error('Vuex not available, cannot revert impersonation'); }
-    }),
+    // --- Map Pinia Actions ---
+    // Map user store actions
+    ...mapActions(useUserStore, ['impersonateUser', 'revertImpersonation']),
+    // We don't need to map toggleDemoFilterMode as the setter calls it directly
 
-    // Handler for when the select menu value changes
-    handleImpersonationChange(selectedOption) {
-        // Check if selectedOption is the object { value, label } or just the value
-        const selectedUserId = (typeof selectedOption === 'object' && selectedOption !== null) 
-                                ? selectedOption.value 
-                                : selectedOption;
-                                
-        console.log("DevToolbar: Impersonation selection changed. Extracted ID:", selectedUserId);
-        
-        if (selectedUserId !== undefined && selectedUserId !== null) {
-            this._impersonateUser(selectedUserId); // Dispatch action with the extracted ID
-        } else {
-            console.error("DevToolbar: Invalid selected user ID from dropdown:", selectedOption);
-        }
+    // --- Map Remaining Vuex Actions --- (None needed anymore)
+    // ...(typeof Vuex !== 'undefined' ? { ... } : {}),
+
+    // Method to clear local storage
+    clearLocalStorage() {
+      if (confirm('Are you sure you want to clear all local storage for this widget?')) {
+        localStorage.clear();
+        alert('Local storage cleared. Please refresh the widget.');
+        // Consider adding location.reload(); if appropriate
+      }
     },
-
-    // Example method for other dev actions
-    refreshData() {
-      console.log('DevToolbar: Refresh Data button clicked.');
-      // Dispatch the root action to refetch everything
-      // Add confirmation later if needed
-      this.$store.dispatch('fetchInitialData');
-    }
+    // Method to trigger hard refresh
+    hardRefresh() {
+      location.reload(true); 
+    },
   },
   // Template now defined inline
   template: `
-    <div class="dev-toolbar bg-yellow-100 text-yellow-800 p-2 text-xs flex items-center space-x-4 border-b border-yellow-300">
-      <span class="font-bold">DEV TOOLS</span>
-      
-      <!-- REMOVED Refresh Data Button -->
-      <!-- <base-button @click="refreshData" size="xs" variant="warning">Refresh Data</base-button> -->
-      
-      <!-- Re-add Demo Filter Toggle -->
-      <label class="flex items-center space-x-1 cursor-pointer">
-          <base-toggle v-model="filterModeIsDemosOnlyModel"></base-toggle>
-          <span>Show ONLY Demos</span>
-      </label>
+    <div class="dev-toolbar p-2 bg-yellow-100 border-b-2 border-yellow-300 text-xs text-yellow-800 flex items-center gap-4 justify-end">
+        <span class="font-bold">DEV TOOLS:</span>
+        
+        <!-- Demo Filter Toggle -->
+        <label class="flex items-center gap-1 cursor-pointer">
+            <base-toggle v-model="filterModeIsDemosOnlyModel"></base-toggle>
+            <span class="text-xs">Show ONLY Demos</span>
+        </label>
+        
+        <!-- Impersonation Dropdown -->
+        <div class="flex items-center gap-1">
+            <label for="impersonate-select" class="sr-only">Impersonate User:</label>
+            <select 
+                id="impersonate-select" 
+                v-model="impersonationTarget" 
+                class="px-2 py-1 border border-yellow-400 rounded bg-white text-xs w-48"
+            >
+                <option 
+                    v-for="option in impersonationOptions" 
+                    :key="option.value || 'placeholder'" 
+                    :value="option.value"
+                >
+                    {{ option.label }}
+                </option>
+            </select>
+            <span v-if="isImpersonating" class="text-yellow-600 font-medium">(Impersonating: {{ currentUser?.name }})</span>
+        </div>
 
-      <!-- Impersonation Section -->
-      <div class="flex items-center space-x-1">
-          <label for="impersonate-select" class="font-medium">Impersonate:</label>
-          <base-select-menu 
-              id="impersonate-select"
-              :options="impersonationOptions"
-              :modelValue="selectedImpersonationId" 
-              @update:modelValue="handleImpersonationChange"
-              class="w-48" 
-          />
-      </div>
-
-      <!-- Impersonation Status Indicator -->
-      <div v-if="isImpersonating && originalUser" class="flex items-center space-x-1">
-          <base-badge color="warning">Impersonating: {{ currentUser?.name || currentUser?.email }}</base-badge>
-          <span>(Original: {{ originalUser.name || originalUser.email }})</span>
-          <!-- Revert button is implicit by selecting 'Default User' -->
-      </div>
-
-      <!-- Add other dev buttons/info here -->
-      <!-- Example: <span class="ml-auto">Current User ID: {{ currentUser?.id }}</span> -->
-      
+        <!-- Hard Refresh Button -->
+        <button @click="hardRefresh" title="Hard Refresh (Ctrl+Shift+R)" class="px-2 py-1 bg-yellow-200 hover:bg-yellow-300 rounded border border-yellow-400">
+            <i class="fas fa-sync-alt mr-1"></i> Hard Refresh
+        </button>
+        
+        <!-- Clear Local Storage Button -->
+        <button @click="clearLocalStorage" title="Clear Widget Local Storage" class="px-2 py-1 bg-red-200 hover:bg-red-300 rounded border border-red-400 text-red-800">
+             <i class="fas fa-trash-alt mr-1"></i> Clear Storage
+        </button>
+        
     </div>
   `
 };

@@ -1,75 +1,47 @@
-// app/components/common/BaseAvatar.js
-
 export default {
   name: 'BaseAvatar',
   props: {
-    src: {
-      type: String,
-      default: ''
-    },
-    name: {
+    // Initials to display
+    initials: {
       type: String,
       default: ''
     },
     size: {
-        type: String,
-        default: 'md' // xs, sm, md, lg, xl
+      type: String,
+      default: 'md', // xs, sm, md, lg, xl
+      validator: (value) => ['xs', 'sm', 'md', 'lg', 'xl'].includes(value)
     },
-    bgColorClass: { // Allow overriding background color
-        type: String,
-        default: 'bg-gray-500' 
+    // Optional background color class for initials fallback
+    bgColorClass: {
+      type: String,
+      default: 'bg-gray-500' // Default grey, can be overridden
     }
-  },
-  data() {
-    return {
-        imageError: false
-    };
   },
   computed: {
-    initials() {
-      if (!this.name) return '?';
-      const nameParts = this.name.trim().split(' ');
-      if (nameParts.length >= 2) {
-        return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
-      } else if (this.name.length) {
-        return this.name.substring(0, 2).toUpperCase();
+    sizeClasses() {
+      switch (this.size) {
+        case 'xs': return 'h-6 w-6 text-xs';
+        case 'sm': return 'h-8 w-8 text-sm';
+        case 'md': return 'h-10 w-10 text-base';
+        case 'lg': return 'h-12 w-12 text-lg';
+        case 'xl': return 'h-14 w-14 text-xl';
+        default: return 'h-10 w-10 text-base';
       }
-      return '?';
     },
-    showImage() {
-        return this.src && !this.imageError;
-    },
-    avatarClasses() {
-        let sizeClasses = '';
-        switch(this.size) {
-            case 'xs': sizeClasses = 'h-6 w-6'; break;
-            case 'sm': sizeClasses = 'h-8 w-8'; break;
-            case 'lg': sizeClasses = 'h-12 w-12'; break;
-            case 'xl': sizeClasses = 'h-14 w-14'; break;
-            case 'md':
-            default: sizeClasses = 'h-10 w-10'; break;
+    // Calculate display initials (e.g., first letter of first/last name)
+    initialsDisplay() {
+        const nameParts = this.initials?.trim().split(' ') || [];
+        if (nameParts.length >= 2) {
+            return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+        } else if (this.initials?.length) {
+            return this.initials.substring(0, 2).toUpperCase();
         }
-        return `inline-flex items-center justify-center rounded-full ${this.bgColorClass} ${sizeClasses}`;
-    },
-    initialsClasses() {
-        let sizeClasses = '';
-        switch(this.size) {
-            case 'xs': sizeClasses = 'text-xs'; break;
-            case 'sm': sizeClasses = 'text-sm'; break;
-            case 'lg': sizeClasses = 'text-lg'; break;
-            case 'xl': sizeClasses = 'text-xl'; break;
-            case 'md':
-            default: sizeClasses = 'text-base'; break; // text-base is default font-size
-        }
-        return `font-medium leading-none text-white ${sizeClasses}`;
+        return '??'; // Fallback if no initials provided
     }
   },
-  methods: {
-    handleImageError() {
-      this.imageError = true;
-    }
-  },
-  // Template defined in widget.html
-  template: '#base-avatar-template'
-};
-
+  template: `
+    <span :class="['inline-flex items-center justify-center overflow-hidden rounded-full', sizeClasses, bgColorClass]">
+        <span class="font-medium leading-none text-white">{{ initialsDisplay }}</span>
+    </span>
+  `
+}; 

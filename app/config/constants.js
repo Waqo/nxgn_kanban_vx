@@ -16,6 +16,7 @@ export const REPORT_SALES_ORGS = "All_Sales_Organizations";
 export const REPORT_TRANCHES = "PM_Tranches_Report";
 export const REPORT_EQUIPMENT = "PM_Kanban_Equipment";
 export const REPORT_DOC_TYPES = "All_Document_Types"; // Assuming report name
+export const REPORT_CONTACTS = "PM_Kanban_Contacts"; // Assuming report name
 // Add other report names as needed
 
 // --- Form Link Names ---

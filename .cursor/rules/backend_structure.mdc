@@ -13,10 +13,10 @@ When user gives differing information, changes can be made to this text after as
 
     **Refer to the following files when you need details about specific Zoho entities, including field API names, processed names, data types, availability (quick view vs. detail view), or raw data examples:**
 
-    *   **`docs/active_docs/project_backend_structure.txt`:** 
+    *   **`docs/active_docs/project_backend_structure.txt` [project_backend_structure.txt](mdc:docs/active_docs/project_backend_structure.txt):** 
         *   Defines the main **Project** entity (`Add_Project` form).
         *   Includes raw data examples for `getRecords` (quick view) and `getRecordById` (detail view).
-    *   **`docs/active_docs/other_backend_structure.txt`:**
+    *   **`docs/active_docs/other_backend_structure.txt` [lookup_backend_structure.txt](mdc:docs/active_docs/lookup_backend_structure.txt):**
         *   Defines related entities often nested within the Project or fetched separately:
             *   **Contact** (`Add_Contact` form)
             *   **Permitting** (`Add_Permitting` form - nested)
@@ -27,7 +27,7 @@ When user gives differing information, changes can be made to this text after as
             *   **Activities** (`Add_Activities` form - nested)
             *   **Documents** (`Add_Document` form - nested)
         *   Includes raw data examples where available (e.g., Contacts).
-    *   **`docs/active_docs/lookup_backend_structure.txt`:**
+    *   **`docs/active_docs/lookup_backend_structure.txt` [lookup_backend_structure.txt](mdc:docs/active_docs/lookup_backend_structure.txt):**
         *   Defines standalone lookup data structures fetched separately:
             *   **Stages** (`Add_Stage` form / `PM_Kanban_Stages` report)
             *   **Tags** (`Add_Tags` form / `PM_Kanban_Tags` report)
@@ -42,171 +42,6 @@ When user gives differing information, changes can be made to this text after as
 
     **Key Instruction:** When asked about specific fields or data structures for these Zoho entities, consult the relevant `.txt` file for the definitive schema and examples. Prioritize the API names listed in these files as per `general_rules.mdc`.
 
-# Processed Frontend Data Structures (React/Vuex State)
-
-## Main Entity: Project  @
-
-
-```javascript
-{
-  // --- Header/Core Info ---
-  id: String, // Record ID (System Generated)
-  contactName: String, // Derived from Owner_Name lookup (zc_display_value)
-  contactID: String, // Owner_Name (Lookup Field ID)
-  contactFirstName: String, // Owner_Name.Name.first_name (Fetched via lookup)
-  contactLastName: String, // Owner_Name.Name.last_name (Fetched via lookup)
-  contactEmail: String, // Owner_Name.Email (Fetched via lookup)
-  contactPhone: String, // Owner_Name.Phone_Number (Fetched via lookup)
-  stageField: { // Derived from New_Stage lookup
-    ID: String, // New_Stage (Lookup Field ID)
-    title: String, // New_Stage.zc_display_value (likely Stage_Name)
-    display_value: String // New_Stage.zc_display_value (likely Stage_Name)
-  },
-  systemSize: Number, // Parsed from kW_STC (Decimal field)
-  paymentOption: String, // Payment_Option (Text field)
-  isCashDeal: Boolean, // Parsed from Is_Cash_Finance (Checkbox field)
-  annualUsage: Number, // Annual_Usage (Decimal field)
-  installDate: String, // Install_Date (Date field)
-  approxInstallDate: String, // Approximate_Installation_Date (Date field)
-  dateSold: String, // Date_Sold (Date field)
-  isCommercial: Boolean, // Parsed from Commercial (Checkbox field)
-  address: String, // Site_Address.zc_display_value
-  addressLine1: String, // Site_Address.address_line_1
-  city: String, // Site_Address.district_city
-  state: String, // Site_Address.state_province
-  zip: String, // Site_Address.postal_Code
-  country: String, // Site_Address.country
-  latitude: Number, // Site_Address.latitude
-  longitude: Number, // Site_Address.longitude
-  aduuPortalID: String, // Aduu_Solar_Portal_ID1 (Text field)
-  trancheField: { // Derived from Tranche lookup
-    ID: String, // Tranche (Lookup Field ID)
-    Tranche_Number: String, // Tranche.Tranche_Number (Fetched via lookup)
-    display_value: String // Tranche.zc_display_value (likely Tranche_Number)
-  },
-  fundedByRedball: Boolean, // Parsed from Funded_By_Redball (Checkbox field)
-  tags: Array, // Raw Tags lookup array from Tags (List field): [{ ID: String, zc_display_value: String }, ...]
-  processedTags: Array, // Derived from raw tags + tagMap: [{ ID: String, name: String, color: String }, ...]
-  os_id: String, // Parsed from OpenSolar_Project_ID (Number field)
-  addedTime: String, // Added_Time (System field - Timestamp string)
-  // Note: 'Stage' (Picklist) seems unused in favor of 'New_Stage' (Lookup)
-
-  // --- Events Info (Specific Date/Time fields for bookings) ---
-  surveyBooking: String, // Survey_Date_Time (Datetime field)
-  surveyStatus: String, // Survey_Status (Picklist field)
-  roofWorkBooking: String, // Roof_Work_Date_Time (Datetime field)
-  roofWorkStatus: String, // Roof_Work_Status (Picklist field)
-  treeWorkBooking: String, // Tree_Work_Date_Time (Datetime field)
-  treeWorkStatus: String, // Tree_Work_Status (Picklist field)
-  puWorkBooking: String, // PU_Work_Date_Time (Datetime field)
-  puWorkStatus: String, // PU_Work_Status (Picklist field)
-  installationBooking: String, // Installation_Date_Time (Datetime field)
-  installationStatus: String, // Installation_Status (Picklist field)
-  finalInspectionBooking: String, // Final_Inspection_Date_Time (Datetime field)
-  finalInspectionStatus: String, // Final_Inspection_Status (Picklist field)
-
-  // --- WorkDrive Info ---
-  project_folder: String, // Project_Folder_ID (Textarea field)
-  investor_folder: String, // Project_Investor_Folder_Id (Textarea field)
-
-  // --- Investor Tab ---
-  isPPA: String, // Is_PPA (Checkbox field, likely stored as "true"/"false")
-  ppaRate: Number, // PPA_Rate (Picklist field, value likely parsed to number)
-  rateYear: Number, // Rate_Year (Picklist field, value likely parsed to number)
-  isDomesticContent: Boolean, // Parsed from Domestic_Content (Checkbox field)
-  applicableRate: Number, // Applicable_Rate (Decimal field)
-  redballSubmissionDate: String, // Submitted_to_Redball (Date field)
-  ptoFunded: Boolean, // Parsed from PTO_Funded (Checkbox field)
-  investorM1Payment: Number, // Investor_M1_Payment (Currency field)
-  investorM1Date: String, // Investor_M1_Date (Date field)
-  investorM2Payment: Number, // Investor_M2_Payment (Currency field)
-  investorM2Date: String, // Investor_M2_Date (Date field)
-  investorM3Payment: Number, // Investor_M3_Payment (Currency field)
-  investorM3Date: String, // Investor_M3_Date (Date field)
-  calcProjectCost: Number, // Calculated_Project_Cost (Formula field)
-  projectCost: Number, // Project_Cost (Currency field)
-
-  // --- Property Info Tab ---
-  propertyInfo: String, // Property_Database_Ownership_Info (Textarea field)
-
-  // --- Overview/Sales Rep Tab ---
-  salesRep: { // Derived from Sales_Rep lookup and related fields
-    id: String, // Sales_Rep (Lookup Field ID)
-    name: String, // Sales_Rep.zc_display_value
-    email: String, // Sales_Rep.Email (Fetched via lookup)
-    phone: String, // Sales_Rep.Phone (Fetched via lookup)
-    organization: String, // Sales_Org.zc_display_value (Fetched via lookup)
-    commercialCommissionRate: Number, // Sales_Rep.Commercial_Commission_Rate (Fetched via lookup)
-    regularCommissionRate: Number, // Sales_Rep.Regular_Commission_Rate (Fetched via lookup)
-    sharedCommissionRate: Number // Sales_Rep.Shared_Commission_Rate (Fetched via lookup)
-  },
-  activeCommissionRate: Number, // Active_Commission_Rate (Picklist field, value likely parsed to number)
-
-  // --- Commission Milestones ---
-  M1_Amount: Number, // M1_Amount (Currency field)
-  M1_Paid_Date: String, // M1_Paid_Date (Date field)
-  M1_Release_Date: String, // M1_Release_Date (Date field)
-  M1_Status: String, // M1_Status (Picklist field)
-  M2_Amount: Number, // M2_Amount (Currency field)
-  M2_Paid_Date: String, // M2_Paid_Date (Date field)
-  M2_Release_Date: String, // M2_Release_Date (Date field)
-  M2_Status: String, // M2_Status (Picklist field)
-  M3_Amount: Number, // M3_Amount (Currency field)
-  M3_Paid_Date: String, // M3_Paid_Date (Date field)
-  M3_Status: String, // M3_Status (Picklist field)
-
-  // --- Commission Advance ---
-  Total_Commission_Advance: Number, // Total_Commission_Advance (Currency field)
-  Comm_Advance_Paid_Date: String, // Comm_Advance_Paid_Date (Date field)
-  Commission_Advance_Status: String, // Commission_Advance_Status (Picklist field)
-
-  // --- System Fields ---
-  kw_STC: Number, // kW_STC (Decimal field)
-  annualOutput: Number, // Parsed from Annual_Output_kWh (Number field)
-  offset: String, // Formatted from Offset (Formula field)
-  yield: String, // Formatted from Yield (Formula field)
-  isApproved: Boolean, // Parsed from Is_Approved (Checkbox field)
-  yieldLessThan1050: Boolean, // Parsed from Yield_Less (Checkbox field)
-
-  // --- Related Lists (Arrays of Objects, defined by separate forms/grids) ---
-  activities: [ /* See Activities Schema */ ],
-  communications: [ /* See Communications Schema */ ],
-  documents: [ /* See Documents Schema */ ],
-  materials: Array, // From Bill_of_Materials grid (detailed schema TBD)
-  notes: [ /* See Notes Schema */ ],
-  permits: Array, // From Permitting grid (detailed schema TBD)
-  surveys: [ /* See Survey Results Schema */ ],
-  issues: [ /* See Issues Schema */ ],
-  contacts: [ /* See Contacts Schema */ ]
-
-  // --- Fields NOT explicitly used in fetchProjectDetails/React Code (Examples from Form Script) ---
-  // Checklist Section Fields (Signed_Contract, Utility_Bill, Proof_of_Ownership, etc.)
-  // Previous_Stage_ID
-  // Stage_Last_Updated
-  // Is_Demo
-  // Need_Help
-  // Weekly_Email_Opt_In, Weekly_Email_Last_Sent
-  // Created_Date
-  // Roof_Material1 (Seems replaced by Roof_Type)
-  // Is_Sold
-  // On_MD_Feeder_Map
-  // NEM_or_CREF
-  // Ready_for_Inves
-  // Installer (Lookup)
-  // Dates Section Fields (NTP_Date, Permit_Approval_Date, etc.)
-  // CO2_Tons_Lifetime
-  // Price_w_Tax, Price_without_Tax
-  // Sales_Rep_2 (Lookup)
-  // Total_Sales_Commission (Formula)
-  // QuickBooks Section Fields
-  // Development Fields (Trello_Card_ID, etc.)
-  // Unused URL Fields (Project_Folder_Link, etc.)
-  // Unused Ownership Check Fields
-  // Other unused fields...
-}
-```
-
---- 
 
 ## Related List Schemas (Based on React Code Usage)
 

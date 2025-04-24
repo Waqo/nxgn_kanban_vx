@@ -7,11 +7,18 @@ import BaseNotification from '../components/common/BaseNotification.js'; // ADD 
 // Import KanbanToolbar
 import KanbanToolbar from '../components/kanban/KanbanToolbar.js';
 import KanbanBoardSkeleton from '../components/kanban/KanbanBoardSkeleton.js'; // Import Skeleton
+// --- ADD Import for Modal ---
+import ProjectDetailModal from '../components/modal/ProjectDetailModal.js';
 
-// Ensure Vuex is available for mapGetters
-if (typeof Vuex === 'undefined') {
-  console.warn('Vuex might not be loaded yet for helpers in WidgetView.');
-}
+// --- Pinia Store Imports ---
+import { useUiStore } from '../store/uiStore.js';
+import { useUserStore } from '../store/userStore.js'; // Import user store
+import { useLookupsStore } from '../store/lookupsStore.js'; // Import lookups store
+import { useModalStore } from '../store/modalStore.js'; // Import modal store
+
+// --- Pinia Helper Import ---
+const { mapState, mapActions } = Pinia;
+
 
 const WidgetView = {
   name: 'WidgetView',
@@ -20,7 +27,8 @@ const WidgetView = {
     DevToolbar, // Register DevToolbar locally
     BaseNotification, // ADD Registration
     KanbanToolbar, // Register KanbanToolbar
-    KanbanBoardSkeleton // Register Skeleton locally
+    KanbanBoardSkeleton, // Register Skeleton locally
+    ProjectDetailModal // Register ProjectDetailModal
   },
   data() {
     return {
@@ -28,55 +36,48 @@ const WidgetView = {
     };
   },
   computed: {
-    // Use mapGetters to get states needed for view logic
-    ...(typeof Vuex !== 'undefined' ? Vuex.mapGetters({
-        isAdmin: 'user/isAdmin',
-        // Map global loading/error state from UI module
-        isGloballyLoading: 'ui/isGloballyLoading',
-        globalError: 'ui/globalError',
-        activeNotifications: 'ui/activeNotifications', // ADD Fallback
-        // Add getter for lookup loading state
-        isLoadingLookups: 'lookups/isLoading'
-    }) : {
-        // Fallbacks
-        isAdmin: () => false,
-        isGloballyLoading: () => false,
-        globalError: () => null,
-        activeNotifications: () => [], // ADD Fallback
-        isLoadingLookups: () => true // Assume loading if Vuex fails
+    // --- Map Pinia State/Getters ---
+    ...mapState(useUiStore, ['isGloballyLoading', 'globalError', 'activeNotifications']),
+    ...mapState(useUserStore, ['isAdmin']), 
+    ...mapState(useLookupsStore, { isLoadingLookups: 'isLoading'}), 
+    // Map modal visibility state using object syntax for aliasing
+    ...mapState(useModalStore, {
+        isModalVisible: 'isVisible' // Map state.isVisible to computed.isModalVisible
     }),
-
+    
+    // --- Map Remaining Vuex Getters --- (None should be left)
+    // Remove the leftover mapping for lookups/isLoading
+    // ...(typeof Vuex !== 'undefined' ? Vuex.mapGetters({
+    //     isLoadingLookups: 'lookups/isLoading' 
+    // }) : {
+    //     isLoadingLookups: () => true 
+    // }),
+    
     // Use the mapped global states
     isLoading() {
-      return this.isGloballyLoading;
+      // Uses Pinia mapped states
+      return this.isGloballyLoading || this.isLoadingLookups;
     },
     error() {
+      // Uses Pinia mapped state
       return this.globalError;
     }
   },
   methods: {
-    // Map removeNotification action
-    ...(typeof Vuex !== 'undefined' ? Vuex.mapActions('ui', {
-        removeNotification: 'removeNotification' // Map action
-    }) : {
-        // Fallback method
-        removeNotification(id) { console.error('Vuex not available, cannot remove notification', id); }
-    }),
+    // --- Map Pinia Actions ---
+    ...mapActions(useUiStore, ['removeNotification']),
 
-    // Methods specific to this view
-    // We will likely dispatch actions here or in mounted
-    fetchInitialData() {
-      console.log('WidgetView: fetchInitialData called (implementation pending).');
-      // Example dispatch:
-      // this.$store.dispatch('user/fetchCurrentUser');
-      // this.$store.dispatch('lookups/fetchAllLookups');
-      // this.$store.dispatch('projects/fetchInitialProjects');
-    }
+    // Remove the fetchInitialData method as it's now handled in App.js
+    // fetchInitialData() {
+    //   console.log('WidgetView: fetchInitialData called.');
+    //   this.$store.dispatch('fetchInitialData');
+    // }
   },
   mounted() {
-    console.log('WidgetView mounted. Dispatching fetchInitialData...');
-    // Dispatch the root action to fetch all essential data
-    this.$store.dispatch('fetchInitialData');
+    // Remove dispatch call from here
+    // console.log('WidgetView mounted. Dispatching fetchInitialData...');
+    // this.fetchInitialData(); 
+    console.log('WidgetView mounted. Initialization called in App.js.');
   },
   // Reference the template defined in widget.html
   // template: '#widget-view-template'
@@ -102,7 +103,8 @@ const WidgetView = {
             <!-- Render Kanban Board when not loading and no error -->
             <div v-else class="widget-content h-full"> 
                <kanban-board></kanban-board>
-              <!-- Placeholder for Project Details Modal (conditionally rendered) -->
+              <!-- Render modal based on Pinia state -->
+              <project-detail-modal v-if="isModalVisible"></project-detail-modal> 
             </div>
         </div>
 

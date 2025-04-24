@@ -1,5 +1,3 @@
-// app/components/common/BaseTextArea.js
-
 export default {
   name: 'BaseTextArea',
   props: {
@@ -16,12 +14,21 @@ export default {
       default: ''
     },
     rows: {
-        type: Number,
-        default: 3
+      type: Number,
+      default: 4
     },
-    required: { type: Boolean, default: false },
-    disabled: { type: Boolean, default: false },
-    // Add props for error states, help text later if needed
+    id: {
+        type: String,
+        default: () => `textarea-${Math.random().toString(36).substring(2, 9)}`
+    },
+    name: {
+        type: String,
+        default: 'textarea'
+    },
+    disabled: {
+        type: Boolean,
+        default: false
+    }
   },
   emits: ['update:modelValue'],
   methods: {
@@ -29,10 +36,25 @@ export default {
       this.$emit('update:modelValue', event.target.value);
     }
   },
-  // Template defined in widget.html
-  template: '#base-textarea-template'
-};
-
-// Expose globally
-// window.AppComponents = window.AppComponents || {};
-// window.AppComponents.BaseTextArea = BaseTextArea; 
+  template: `
+    <div>
+      <label v-if="label" :for="id" class="block text-sm font-medium leading-6 text-gray-900">{{ label }}</label>
+      <div class="mt-1">
+        <textarea 
+            :rows="rows" 
+            :name="name" 
+            :id="id" 
+            :class="[
+                'block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400',
+                'focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6',
+                disabled ? 'cursor-not-allowed bg-gray-50 text-gray-500 ring-gray-200' : 'bg-white'
+            ]" 
+            :placeholder="placeholder"
+            :value="modelValue"
+            @input="handleInput"
+            :disabled="disabled"
+        />
+      </div>
+    </div>
+  `
+}; 

@@ -28,6 +28,8 @@ import {
   FIELD_TRANCHE_ID,
   FIELD_TRANCHE_NUMBER
 } from '../config/constants.js';
+// --- ADD Import for EVENT_TYPES ---
+import { EVENT_TYPES } from '../config/options.js';
 
 const DataProcessors = {
 
@@ -40,7 +42,7 @@ const DataProcessors = {
    *                           Shape: [{ id: String, title: String, view: String, description: String, order: Number }, ...]
    */
   processStagesData(stagesResponse) {
-    console.log('DataProcessors: Processing Stages Response:', stagesResponse);
+    // console.log('DataProcessors: Processing Stages Response:', stagesResponse);
     if (!stagesResponse || stagesResponse.code !== 3000 || !Array.isArray(stagesResponse.data)) {
       console.warn('DataProcessors: Invalid or empty stages response received.', stagesResponse);
       return [];
@@ -62,7 +64,7 @@ const DataProcessors = {
         }))
         .sort((a, b) => a.order - b.order); // Sort by order ascending
 
-      console.log('DataProcessors: Processed Stages:', processedStages);
+      // console.log('DataProcessors: Processed Stages:', processedStages);
       return processedStages;
     } catch (error) {
       console.error('DataProcessors: Error processing stages data:', error);
@@ -78,7 +80,7 @@ const DataProcessors = {
    * @returns {Array<object>} An array of processed project objects.
    */
   processProjectsData(rawProjectsData) {
-    console.log(`DataProcessors: Processing ${rawProjectsData?.length || 0} raw project records.`);
+    // console.log(`DataProcessors: Processing ${rawProjectsData?.length || 0} raw project records.`);
     if (!Array.isArray(rawProjectsData)) {
       console.warn('DataProcessors: Invalid input for processProjectsData, expected an array.');
       return [];
@@ -144,7 +146,7 @@ const DataProcessors = {
           return project;
       });
 
-      console.log(`DataProcessors: Finished processing ${processedProjects.length} projects.`);
+      // console.log(`DataProcessors: Finished processing ${processedProjects.length} projects.`);
       return processedProjects;
 
     } catch (error) {
@@ -160,7 +162,7 @@ const DataProcessors = {
    * @returns {Array<object>} Array of processed sales rep objects: [{ id: String, name: String }, ...]
    */
   processSalesRepsData(salesRepsResponse) {
-    console.log('DataProcessors: Processing Sales Reps Response:', salesRepsResponse);
+    // console.log('DataProcessors: Processing Sales Reps Response:', salesRepsResponse);
     if (!salesRepsResponse || salesRepsResponse.code !== 3000 || !Array.isArray(salesRepsResponse.data)) {
       console.warn('DataProcessors: Invalid or empty sales reps response received.', salesRepsResponse);
       return [];
@@ -188,7 +190,7 @@ const DataProcessors = {
    * @returns {Array<object>} Array of processed sales org objects: [{ id: String, name: String }, ...]
    */
    processSalesOrgsData(salesOrgsResponse) {
-    console.log('DataProcessors: Processing Sales Orgs Response:', salesOrgsResponse);
+    // console.log('DataProcessors: Processing Sales Orgs Response:', salesOrgsResponse);
     if (!salesOrgsResponse || salesOrgsResponse.code !== 3000 || !Array.isArray(salesOrgsResponse.data)) {
       console.warn('DataProcessors: Invalid or empty sales orgs response received.', salesOrgsResponse);
       return [];
@@ -214,7 +216,7 @@ const DataProcessors = {
    * @returns {Map<String, object>} Map of tag ID to tag object: { name, color, category, description }
    */
   processTagsData(tagsResponse) {
-    console.log('DataProcessors: Processing Tags Response:', tagsResponse);
+    // console.log('DataProcessors: Processing Tags Response:', tagsResponse);
      if (!tagsResponse || tagsResponse.code !== 3000 || !Array.isArray(tagsResponse.data)) {
       console.warn('DataProcessors: Invalid or empty tags response received.', tagsResponse);
       return new Map();
@@ -233,7 +235,7 @@ const DataProcessors = {
                     description: tag[FIELD_TAG_DESCRIPTION] || "" // Use constant
                 });
             });
-        console.log('DataProcessors: Processed Tags Map:', tagsMap);
+        // console.log('DataProcessors: Processed Tags Map:', tagsMap);
         return tagsMap;
      } catch (error) {
         console.error('DataProcessors: Error processing tags data:', error);
@@ -248,7 +250,7 @@ const DataProcessors = {
    * @returns {Array<object>} Array of processed tranche objects: [{ id: String, number: Number, ... (other fields) }, ...]
    */
   processTranchesData(tranchesResponse) {
-    console.log('DataProcessors: Processing Tranches Response:', tranchesResponse);
+    // console.log('DataProcessors: Processing Tranches Response:', tranchesResponse);
     if (!tranchesResponse || tranchesResponse.code !== 3000 || !Array.isArray(tranchesResponse.data)) {
       console.warn('DataProcessors: Invalid or empty tranches response received.', tranchesResponse);
       return [];
@@ -270,7 +272,127 @@ const DataProcessors = {
   },
 
   // --- Placeholder for other processing functions ---
-  // processProjectDetails(projectResponse) { ... }
+  processProjectDetailsData(projectResponse, contactsResponse) {
+    // console.log('DataProcessors: Project Data Received for Processing):', projectResponse);
+    if (!projectResponse) {
+      console.warn('DataProcessors: processProjectDetailsData called without projectResponse.');
+      return null;
+    }
+
+    try {
+        // Start with the raw project details
+        const processedData = { ...projectResponse };
+
+        // --- 1. Ensure Related Lists are Arrays --- 
+        const relatedListKeys = [
+            'Activities', 'Communication', 'Documents', 'Bill_of_Materials', 
+            'Notes', 'Permitting', 'Survey_Results', 'Issues', 'Tags', 'Contacts1', // Contacts1 is the grid in Project form
+            'Tasks' // Added Tasks
+            // Add other related list API names as needed
+        ];
+        relatedListKeys.forEach(key => {
+            if (!(key in processedData) || processedData[key] === null || processedData[key] === undefined) {
+                processedData[key] = [];
+            } else if (!Array.isArray(processedData[key])) {
+                 console.warn(`DataProcessors: Expected array for related list '${key}', but got ${typeof processedData[key]}. Setting to empty array.`);
+                 processedData[key] = [];
+            }
+        });
+
+        // --- 2. Add Separately Fetched Contacts --- 
+        processedData.Contacts = Array.isArray(contactsResponse) ? contactsResponse : [];
+
+        // --- 3. Process Specific Fields (Booleans, Numbers, Ensure Lookups) --- 
+        const fieldsToProcess = {
+            // Booleans (from checkbox strings)
+            Is_Cash_Finance: val => val === 'true',
+            Commercial: val => val === 'true',
+            Is_Approved: val => val === 'true',
+            Need_Help: val => val === 'true',
+            Funded_By_Redball: val => val === 'true',
+            Is_PPA: val => val === 'true',
+            Domestic_Content: val => val === 'true',
+            PTO_Funded: val => val === 'true',
+            Yield_Less: val => val === 'true',
+            // Numbers (from strings)
+            kW_STC: val => parseFloat(val) || 0,
+            Annual_Usage: val => parseFloat(val) || 0,
+            Annual_Output_kWh: val => parseFloat(val) || 0,
+            Project_Cost: val => parseFloat(val) || 0,
+            Calculated_Project_Cost: val => parseFloat(val) || 0,
+            Investor_M1_Payment: val => parseFloat(val) || 0,
+            Investor_M2_Payment: val => parseFloat(val) || 0,
+            Investor_M3_Payment: val => parseFloat(val) || 0,
+            Applicable_Rate: val => parseFloat(val) || 0,
+            PPA_Rate: val => parseFloat(val) || null, // Allow null for PPA rate
+            Rate_Year: val => val ? parseInt(val, 10) : null,
+            Active_Commission_Rate: val => parseFloat(val) || 0,
+            M1_Amount: val => parseFloat(val) || 0,
+            M2_Amount: val => parseFloat(val) || 0,
+            M3_Amount: val => parseFloat(val) || 0,
+            Total_Commission_Advance: val => parseFloat(val) || 0,
+            Revision_Number: val => val ? parseInt(val, 10) : null, 
+            // Ensure Lookups are objects or null
+            New_Stage: val => val && val.ID ? val : null,
+            Tranche: val => val && val.ID ? val : null,
+            Owner_Name: val => val && val.ID ? val : null,
+            Sales_Rep: val => val && val.ID ? val : null,
+            Sales_Org: val => val && val.ID ? val : null,
+            // Dates remain strings
+        };
+
+        for (const key in fieldsToProcess) {
+            if (processedData.hasOwnProperty(key)) {
+                processedData[key] = fieldsToProcess[key](processedData[key]);
+            }
+        }
+        
+        // --- 4. Specific Related List Processing (Example: Sort Notes) ---
+        if (processedData.Notes) {
+             processedData.Notes.sort((a, b) => {
+                const timeA = a.Added_Time ? new Date(a.Added_Time).getTime() : 0;
+                const timeB = b.Added_Time ? new Date(b.Added_Time).getTime() : 0;
+                return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+             });
+             // TODO: Further note processing (attachments, replies) if needed later
+        }
+        
+        // TODO: Process Tags using tagMap lookup from store state (requires passing lookup state)
+        // Example structure:
+        // const tagMap = rootGetters['lookups/tagsMap']; // Need to pass rootGetters
+        // processedData.processedTags = (processedData.Tags || [])
+        //    .map(rawTag => tagMap.get(rawTag.ID))
+        //    .filter(Boolean); // Filter out tags not found in the map
+        processedData.processedTags = []; // Placeholder for now
+
+  
+
+        // --- Construct Events Array (based on old EventsSection logic) ---
+        processedData.Events = EVENT_TYPES.map(eventType => {
+            const bookingValue = processedData[eventType.bookingField];
+            const statusValue = processedData[eventType.statusField] || 'TBD'; // Default to TBD
+            return {
+                id: `${eventType.type}-${processedData.ID}`, // Create a unique ID
+                type: eventType.type,
+                date: bookingValue || null, // Keep raw date string or null
+                status: statusValue,
+                possibleStatuses: eventType.possibleStatuses,
+                // Add API field names for potential updates later
+                apiBookingField: eventType.bookingField,
+                apiStatusField: eventType.statusField 
+            };
+        });
+
+        // TODO: Process other related lists (Documents, Surveys etc.) as needed
+
+        // console.log('DataProcessors: Finished processing details (Minimal Transformations): ', processedData);
+        return processedData;
+
+    } catch (error) {
+        console.error('DataProcessors: Error processing project details data:', error, 'Raw Data:', projectResponse);
+        return null; // Return null on error
+    }
+  }
   // processUsersData(usersResponse) { 
   //   // Use FIELD_USER_* constants here
   // }

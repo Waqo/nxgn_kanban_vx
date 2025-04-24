@@ -12,9 +12,9 @@ const ZohoAPIService = {
    */
   async getInitParams() {
     try {
-      console.log("ZohoAPIService: Fetching Init Params...");
+      // console.log("ZohoAPIService: Fetching Init Params...");
       const response = await ZOHO.CREATOR.UTIL.getInitParams();
-      console.log("ZohoAPIService: Init Params Received:", response);
+      // console.log("ZohoAPIService: Init Params Received:", response);
       // Directly return the response object which contains loginUser, appLinkName etc.
       return response;
     } catch (error) {
@@ -47,9 +47,9 @@ const ZohoAPIService = {
     if (appName) config.app_name = appName;
 
     try {
-      console.log(`ZohoAPIService: Fetching records for report: ${reportName}`, config);
+      // console.log(`ZohoAPIService: Fetching records for report: ${reportName}`, config);
       const response = await ZOHO.CREATOR.DATA.getRecords(config);
-      console.log(`ZohoAPIService: Records received for ${reportName}:`, response);
+      // console.log(`ZohoAPIService: Records received for ${reportName}:`, response);
 
       if (response.code !== 3000) {
         // Handle potential API errors indicated by non-3000 codes
@@ -84,9 +84,9 @@ const ZohoAPIService = {
     if (appName) config.app_name = appName;
 
     try {
-      console.log(`ZohoAPIService: Fetching record by ID: ${recordId} from report: ${reportName}`, config);
+      // console.log(`ZohoAPIService: Fetching record by ID: ${recordId} from report: ${reportName}`, config);
       const response = await ZOHO.CREATOR.DATA.getRecordById(config);
-      console.log(`ZohoAPIService: Record received for ID ${recordId}:`, response);
+      // console.log(`ZohoAPIService: Record received for ID ${recordId}:`, response);
 
       if (response.code !== 3000) {
           console.error(`ZohoAPIService: API Error fetching record ${recordId}:`, response);
@@ -121,9 +121,9 @@ const ZohoAPIService = {
       if (appName) config.app_name = appName;
 
       try {
-          console.log(`ZohoAPIService: Updating record ID: ${recordId} in report: ${reportName}`, config);
+          // console.log(`ZohoAPIService: Updating record ID: ${recordId} in report: ${reportName}`, config);
           const response = await ZOHO.CREATOR.DATA.updateRecordById(config);
-          console.log(`ZohoAPIService: Record update response for ID ${recordId}:`, response);
+          // console.log(`ZohoAPIService: Record update response for ID ${recordId}:`, response);
 
           if (response.code !== 3000) {
               console.error(`ZohoAPIService: API Error updating record ${recordId}:`, response);
@@ -156,9 +156,9 @@ const ZohoAPIService = {
       if (appName) config.app_name = appName;
 
       try {
-          console.log(`ZohoAPIService: Adding record to form: ${formName}`, config);
+          // console.log(`ZohoAPIService: Adding record to form: ${formName}`, config);
           const response = await ZOHO.CREATOR.DATA.addRecords(config);
-          console.log(`ZohoAPIService: Record add response for form ${formName}:`, response);
+          // console.log(`ZohoAPIService: Record add response for form ${formName}:`, response);
 
           if (response.code !== 3000) {
               console.error(`ZohoAPIService: API Error adding record to ${formName}:`, response);
@@ -191,10 +191,10 @@ const ZohoAPIService = {
       if (appName) config.app_name = appName;
 
       try {
-          console.log(`ZohoAPIService: Deleting record ID: ${recordId} from report: ${reportName}`, config);
+          // console.log(`ZohoAPIService: Deleting record ID: ${recordId} from report: ${reportName}`, config);
           // Note: The SDK method is deleteRecordById, but the response structure in docs shows result as an array.
           const response = await ZOHO.CREATOR.DATA.deleteRecordById(config);
-          console.log(`ZohoAPIService: Record delete response for ID ${recordId}:`, response);
+          // console.log(`ZohoAPIService: Record delete response for ID ${recordId}:`, response);
 
           // Check the nested result code if the outer code is 3000
           if (response.code === 3000 && response.result && response.result[0]?.code !== 3000) {
@@ -239,9 +239,9 @@ const ZohoAPIService = {
       if (appName) config.app_name = appName;
 
       try {
-          console.log(`ZohoAPIService: Uploading file to field ${fieldName} for record ${recordId} in report ${reportName}`, config);
+          // console.log(`ZohoAPIService: Uploading file to field ${fieldName} for record ${recordId} in report ${reportName}`, config);
           const response = await ZOHO.CREATOR.FILE.uploadFile(config);
-          console.log(`ZohoAPIService: File upload response for record ${recordId}:`, response);
+          // console.log(`ZohoAPIService: File upload response for record ${recordId}:`, response);
 
           if (response.code !== 3000) {
               console.error(`ZohoAPIService: API Error uploading file for record ${recordId}:`, response);
@@ -276,10 +276,10 @@ const ZohoAPIService = {
       if (appName) config.app_name = appName;
 
       try {
-          console.log(`ZohoAPIService: Reading file from field ${fieldName} for record ${recordId} in report ${reportName}`, config);
+          // console.log(`ZohoAPIService: Reading file from field ${fieldName} for record ${recordId} in report ${reportName}`, config);
           // The SDK directly returns the file data (e.g., Blob) on success
           const fileData = await ZOHO.CREATOR.FILE.readFile(config);
-          console.log(`ZohoAPIService: File read success for record ${recordId}, Field ${fieldName}. Type:`, typeof fileData);
+          // console.log(`ZohoAPIService: File read success for record ${recordId}, Field ${fieldName}. Type:`, typeof fileData);
           return fileData;
       } catch (error) {
           // Errors might not have a standard code/message structure like data APIs
@@ -313,7 +313,7 @@ const ZohoAPIService = {
         config.window = 'new';
     }
 
-    console.log(`ZohoAPIService: Navigating parent URL with config:`, config);
+    // console.log(`ZohoAPIService: Navigating parent URL with config:`, config);
     try {
         // Check if the specific function exists
         if (typeof ZOHO.CREATOR.UTIL.navigateParentURL === 'function') 

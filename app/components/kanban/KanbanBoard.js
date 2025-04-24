@@ -4,10 +4,18 @@ import KanbanColumn from './KanbanColumn.js';
 // Import Local Storage utility
 import { loadSetting, saveSetting, LS_KEYS } from '../../utils/localStorage.js';
 
-// Ensure Vuex is available for mapState
-if (typeof Vuex === 'undefined') {
-  console.warn('Vuex might not be loaded yet for mapState helper in KanbanBoard.');
-}
+// --- Pinia Store Imports ---
+import { useUiStore } from '../../store/uiStore.js';
+import { useLookupsStore } from '../../store/lookupsStore.js'; // Import lookups store
+import { useProjectsStore } from '../../store/projectsStore.js'; // Import projects store
+
+// --- Pinia Helper Import ---
+const { mapState, mapActions } = Pinia;
+
+// Vuex no longer needed here unless modal module is used directly
+// if (typeof Vuex === 'undefined') {
+//   console.warn('Vuex might not be loaded yet for mapState helper in KanbanBoard.');
+// }
 
 const KanbanBoard = {
   name: 'KanbanBoard',
@@ -25,42 +33,34 @@ const KanbanBoard = {
     };
   },
   computed: {
-    // Map state
-    ...(typeof Vuex !== 'undefined' ? Vuex.mapState({
-        isLoadingProjects: state => state.projects.isLoading,
-        projectError: state => state.projects.error,
-        stages: state => state.lookups.stages,
-        tranches: state => state.lookups.tranches,
-        isLoadingLookups: state => state.lookups.isLoading,
-        lookupsError: state => state.lookups.error,
-        currentStageView: state => state.ui.currentStageView, 
-        // Access boardViewMode directly here or map it
-        boardViewMode: state => state.ui.boardViewMode 
-    }) : {
-        // Fallbacks
-        isLoadingProjects: () => false,
-        projectError: () => null,
-        stages: () => [],
-        tranches: () => [],
-        isLoadingLookups: () => false,
-        lookupsError: () => null,
-        currentStageView: () => 'all',
-        boardViewMode: () => 'stages'
+    // --- Map Pinia State/Getters ---
+    ...mapState(useUiStore, ['currentStageView', 'boardViewMode']),
+    ...mapState(useLookupsStore, {
+        stages: 'stages', 
+        tranches: 'tranches', 
+        isLoadingLookups: 'isLoading', 
+        lookupsError: 'error' 
     }),
-    // Map getters
-    ...(typeof Vuex !== 'undefined' ? Vuex.mapGetters({
-        displayProjects: 'projects/filteredSortedProjects'
-    }) : {
-        // Fallback
-        displayProjects: () => { console.error("Vuex not loaded, cannot get projects"); return []; }
+    // Map projects state/getters
+    ...mapState(useProjectsStore, {
+        isLoadingProjects: 'isLoading',
+        projectError: 'error',
+        displayProjects: 'filteredSortedProjects' // Use the main filtered/sorted getter
     }),
 
-    // Combined loading state
+    // --- Map Remaining Vuex State --- (None needed)
+    // ...(typeof Vuex !== 'undefined' ? Vuex.mapState({ ... }) : { ... }),
+
+    // --- Map Remaining Vuex Getters --- (None needed)
+    // ...(typeof Vuex !== 'undefined' ? Vuex.mapGetters({ ... }) : { ... }),
+
+    // Combined loading state (now uses Pinia isLoadingLookups and isLoadingProjects)
     isLoading() {
         return this.isLoadingProjects || this.isLoadingLookups;
     },
-    // Combined error state
+    // Combined error state (now uses Pinia lookupsError and projectError)
     error() {
+        // Prioritize project error? Or combine messages?
         return this.projectError || this.lookupsError;
     },
 
@@ -158,6 +158,12 @@ const KanbanBoard = {
        }
   },
   methods: {
+    // --- Map Pinia Actions ---
+    ...mapActions(useProjectsStore, [
+        'updateProjectStage', 
+        'updateProjectTranche'
+    ]),
+
     // Drag and Drop Handlers
     handleDragStart(cardId, columnId) { // Use generic columnId
       console.log(`KanbanBoard: Drag started - Card: ${cardId}, Source Column: ${columnId}`);
@@ -188,24 +194,17 @@ const KanbanBoard = {
         return;
       }
 
-      // --- Dispatch based on view mode --- 
+      // --- Call mapped Pinia actions directly --- 
       if (this.boardViewMode === 'tranches') {
-          console.log(`KanbanBoard: Dispatching updateProjectTranche - Move Card ${cardIdToMove} from Column ${sourceColId} to Tranche ${targetColId}`);
-          // Pass targetColId directly (it will be the tranche ID or 'unassigned')
-          this.$store.dispatch('projects/updateProjectTranche', {
-              projectId: cardIdToMove,
-              newTrancheId: targetColId // Can be null if 'unassigned'
-          }).catch(error => {
-              console.error("KanbanBoard: Error dispatching updateProjectTranche:", error);
-          });
+          console.log(`KanbanBoard: Calling Pinia updateProjectTranche...`);
+          // Call mapped action
+          this.updateProjectTranche({ projectId: cardIdToMove, newTrancheId: targetColId })
+              .catch(error => console.error("KanbanBoard: Error calling updateProjectTranche:", error));
       } else { // Default to stage view
-          console.log(`KanbanBoard: Dispatching updateProjectStage - Move Card ${cardIdToMove} from Column ${sourceColId} to Stage ${targetColId}`);
-      this.$store.dispatch('projects/updateProjectStage', {
-          projectId: cardIdToMove,
-              newStageId: targetColId
-      }).catch(error => {
-          console.error("KanbanBoard: Error dispatching updateProjectStage:", error);
-      });
+          console.log(`KanbanBoard: Calling Pinia updateProjectStage...`);
+          // Call mapped action
+          this.updateProjectStage({ projectId: cardIdToMove, newStageId: targetColId })
+              .catch(error => console.error("KanbanBoard: Error calling updateProjectStage:", error));
       }
     },
     resetDragState() {

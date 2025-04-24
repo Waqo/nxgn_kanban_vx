@@ -5,10 +5,13 @@ import { formatDateMMDDYY } from '../../utils/helpers.js';
 // Import Cancelled Stage ID constant
 import { FIELD_PROJECT_CANCELLED_STAGE_ID, REPORT_USERS } from '../../config/constants.js';
 
-// Ensure Vuex is available (needed for mapActions now)
-if (typeof Vuex === 'undefined') {
-  console.warn('Vuex might not be loaded yet for mapGetters/mapActions helper in KanbanCard.');
-}
+// Import Pinia stores and helpers
+import { useUserStore } from '../../store/userStore.js'; // Import user store
+import { useProjectsStore } from '../../store/projectsStore.js'; // Import projects store
+import { useModalStore } from '../../store/modalStore.js'; // Import modal store
+const { mapState } = Pinia; // Use alias for clarity
+
+
 
 const KanbanCard = {
     name: 'KanbanCard',
@@ -25,18 +28,9 @@ const KanbanCard = {
     },
     emits: ['dragstart', 'dragend'], // Emits events handled by KanbanColumn
     computed: {
-      // Map the duplicate IDs getter from the store here
-      ...(typeof Vuex !== 'undefined' ? Vuex.mapGetters({
-          duplicateProjectIds: 'projects/duplicateLatLongProjectIds'
-      }) : {
-          // Fallback
-          duplicateProjectIds: () => new Set()
-      }),
-      ...(typeof Vuex !== 'undefined' ? Vuex.mapState('user', {
-           // Map current user state to get the agent's ID
-           currentUserId: state => state.currentUser?.id
-      }) : {
-          currentUserId: () => null
+      // Map user state
+      ...mapState(useUserStore, {
+           currentUserId: (store) => store.currentUser?.id
       }),
       formattedAddress() {
         if (!this.project.address) return 'No Address';
@@ -188,19 +182,21 @@ const KanbanCard = {
               title: `${yieldVal} kWh/kWp`
           };
       },
-      // Computed property to check if this card is a potential duplicate (excluding cancelled)
+      // isPossibleDuplicate - Access store directly
       isPossibleDuplicate() {
-          const isDuplicate = this.duplicateProjectIds.has(this.project.ID);
+          const projectsStore = useProjectsStore(); // Get store instance
+          const duplicateIds = projectsStore.duplicateLatLongProjectIds; // Access getter directly
+          
+          // Add safety check in case getter isn't ready immediately
+          if (!duplicateIds || typeof duplicateIds.has !== 'function') { 
+              // console.warn('KanbanCard: duplicateProjectIds Set not yet available.');
+              return false; // Default to false if Set is not ready
+          }
+          
+          const isDuplicate = duplicateIds.has(this.project.ID);
           const isCancelled = this.project.New_Stage?.ID === FIELD_PROJECT_CANCELLED_STAGE_ID;
           return isDuplicate && !isCancelled;
       },
-      // Map UI action for notifications
-      ...(typeof Vuex !== 'undefined' ? Vuex.mapActions('ui', [
-          'addNotification'
-      ]) : {
-          // Provide a function for addNotification in the fallback case
-          addNotification(notification) { console.error('Vuex not available, cannot add notification', notification); }
-      }),
     },
     methods: {
       handleDragStart(event) {
@@ -238,7 +234,8 @@ const KanbanCard = {
               .then(response => {
                   console.log(`KanbanCard: SUCCESS - User call status updated for ${agentUserId}.`);
                   console.log(`KanbanCard: Triggering parent page reload.`);
-                  // Reload the parent page after successful update
+                  // Reload the parent page after successful update.
+                  // NOTE: This reload is REQUIRED by the Zoho integration to properly handle the call initiation process.
                   try {
                      if (this.$api && typeof this.$api.navigateParentUrl === 'function') {
                          this.$api.navigateParentUrl({ action: "reload" }); // Call with reload action
@@ -282,7 +279,13 @@ const KanbanCard = {
                   alert("Could not open email client. Please check browser settings or copy the email address manually.");
               }
           }
-      }
+      },
+      // --- ADD Method to handle card click ---
+      handleCardClick() {
+          const modalStore = useModalStore(); // Get instance
+          console.log(`KanbanCard: Card clicked, calling modalStore.openModal for Project ID: ${this.project.ID}`);
+          modalStore.openModal(this.project.ID); // Call Pinia action
+      },
     },
     template: `
         <div
@@ -294,6 +297,7 @@ const KanbanCard = {
               project.Need_Help ? 'border-l-4 border-red-500' : '',
               project.ID === draggedCardId ? 'opacity-50 border-dashed border-blue-300 bg-gray-50' : '' // Apply styling if this card is being dragged
           ]"
+          @dblclick="handleCardClick"
           >
           <!-- Card Header -->
           <div :class="[

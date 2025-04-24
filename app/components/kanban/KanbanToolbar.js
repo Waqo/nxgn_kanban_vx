@@ -13,18 +13,49 @@ import {
     STAGE_VIEW_OPTIONS
 } from '../../config/options.js';
 
-// Ensure Vuex is available for mapState/mapGetters
-if (typeof Vuex === 'undefined') {
-  console.warn('Vuex might not be loaded yet for helpers in KanbanToolbar.');
-}
+// --- Pinia Store Import ---
+import { useUiStore } from '../../store/uiStore.js';
+import { useLookupsStore } from '../../store/lookupsStore.js'; // Import lookups store
+import { useProjectsStore } from '../../store/projectsStore.js'; // Import projects store
+// --- ADD Import for Modal Store ---
+import { useModalStore } from '../../store/modalStore.js';
+
+// --- Pinia Helper Import ---
+const { mapState, mapActions } = Pinia;
+
+// --- Vue/VueUse Imports (assuming VueUse is global via CDN) ---
+const { computed } = Vue; 
+const { useTimeAgo } = VueUse;
+
+// Vuex no longer needed here unless modal module is used directly
+// if (typeof Vuex === 'undefined') {
+//   console.warn('Vuex might not be loaded yet for helpers in KanbanToolbar.');
+// }
 
 const KanbanToolbar = {
   name: 'KanbanToolbar',
   components: { BaseToggle }, // Added BaseToggle
+  setup() {
+    // --- Composition API Logic for useTimeAgo ---
+    const projectsStore = useProjectsStore();
+
+    // Create a computed ref to the timestamp for useTimeAgo
+    const lastUpdatedRef = computed(() => projectsStore.lastUpdatedTimestamp);
+
+    // Call useTimeAgo with the reactive timestamp
+    // It returns a ref containing the relative time string
+    const timeAgo = useTimeAgo(lastUpdatedRef);
+
+    // Return the ref so it's accessible in the template and computed properties
+    return {
+      timeAgo
+    };
+  },
   data() {
     return {
-      currentTime: Date.now(), // For reactive time updates
-      updateInterval: null, // To store the interval ID
+      // REMOVE currentTime and updateInterval
+      // currentTime: Date.now(),
+      // updateInterval: null,
       // Local state ONLY for the search input binding
       localSearchTerm: '',
       searchResults: [], // Added for search results
@@ -37,43 +68,33 @@ const KanbanToolbar = {
     };
   },
   computed: {
-    // Map getters
-    ...(typeof Vuex !== 'undefined' ? Vuex.mapGetters({
-        // Lookups
-        tagsForFilter: 'lookups/tagsForFilter',
-        salesRepsForFilter: 'lookups/salesRepsForFilter',
-        salesOrgsForFilter: 'lookups/salesOrgsForFilter',
-        tranches: 'lookups/tranches', // Map tranches getter
-        // Projects
-        currentFilters: 'projects/currentFilters',
-        currentSortBy: 'projects/currentSortBy',
-        currentSortDirection: 'projects/currentSortDirection',
-        allProjects: 'projects/projectList',
-        totalFilteredSystemSizeKw: 'projects/totalFilteredSystemSizeKw',
-        filteredProjectCount: 'projects/filteredProjectCount', // Add getter
-        tranchedProjectCount: 'projects/tranchedProjectCount', // Add getter
-        // UI
-        currentStageView: 'ui/currentStageView',
-        boardViewMode: 'ui/boardViewMode' // Map board view mode getter
-    }) : {
-        // Fallbacks
-        tagsForFilter: () => [],
-        salesRepsForFilter: () => [],
-        salesOrgsForFilter: () => [],
-        tranches: () => [], // Fallback
-        currentFilters: () => ({}),
-        currentSortBy: () => 'dateSold',
-        currentSortDirection: () => 'desc',
-        allProjects: () => [],
-        totalFilteredSystemSizeKw: () => '0.00',
-        filteredProjectCount: () => 0,
-        tranchedProjectCount: () => 0,
-        currentStageView: () => 'all',
-        boardViewMode: () => 'stages' // Fallback
-    }),
+    // --- Map Pinia State/Getters ---
+    ...mapState(useUiStore, [
+        'currentStageView',
+        'boardViewMode'
+    ]),
+    ...mapState(useLookupsStore, [
+        'tagsForFilter', // Getter
+        'salesRepsForFilter', // Getter
+        'salesOrgsForFilter', // Getter
+        'tranches' // Simple state
+    ]),
+    // Map projects state/getters
+    ...mapState(useProjectsStore, [
+        'currentFilters',
+        'currentSortBy',
+        'currentSortDirection',
+        { allProjects: 'projectList' }, // Map state projectList to computed allProjects
+        'totalFilteredSystemSizeKw', // Getter
+        'filteredProjectCount', // Getter
+        'tranchedProjectCount', // Getter
+        // REMOVE mapping for lastUpdatedRelative getter
+        // 'lastUpdatedRelative' 
+        // --- ADD Mapping for lastUpdatedTimestamp state ---
+        'lastUpdatedTimestamp'
+    ]),
 
     // Sync local search term with store on initial load or reset
-    // Note: Direct v-model on store state is discouraged, hence local state
     storedSearchTerm() {
         return this.currentFilters.searchTerm || '';
     },
@@ -81,12 +102,6 @@ const KanbanToolbar = {
     // Computed property to check if the current view mode is 'tranches'
     isTrancheView() {
       return this.boardViewMode === 'tranches';
-    },
-    
-    // NEW Computed Property for display
-    displayTimeSinceUpdate() {
-        // Rely on project store getter which uses the helper
-        return this.$store.getters['projects/lastUpdatedRelative']; 
     },
     
     // Computed property to determine which project count to display
@@ -173,11 +188,12 @@ const KanbanToolbar = {
       },
       // Reset value dropdown when filter type changes
       selectedFilterType(newValue, oldValue) {
-          // Clear the *previous* filter in the store when the type changes
           if (oldValue) {
               const oldStoreKey = this.getStoreKeyForFilterType(oldValue.value);
                if (oldStoreKey) {
-                   this.setFilter({ key: oldStoreKey, value: [] }); // Reset to empty array or null as appropriate
+                   // Call Pinia action directly
+                   const projectsStore = useProjectsStore(); 
+                   projectsStore.setFilter({ key: oldStoreKey, value: [] }); 
                }
           }
       }
@@ -185,32 +201,32 @@ const KanbanToolbar = {
   mounted() {
     // Add listener for clicks outside search results
     document.addEventListener('click', this.handleClickOutsideSearch);
-    // Start timer to update currentTime every 60 seconds
-    this.updateInterval = setInterval(() => {
-        this.currentTime = Date.now();
-    }, 60000); // 60000ms = 1 minute
+    // REMOVE timer interval logic
+    // this.updateInterval = setInterval(() => {
+    //     this.currentTime = Date.now();
+    // }, 60000); // 60000ms = 1 minute
   },
   beforeUnmount() {
       // Clean up listener and debounce timer
       document.removeEventListener('click', this.handleClickOutsideSearch);
       clearTimeout(this.searchDebounceTimeout); 
-      // Clear the interval timer
-      clearInterval(this.updateInterval);
+      // REMOVE timer interval cleanup
+      // clearInterval(this.updateInterval);
   },
   methods: {
-    // Map actions
-    ...(typeof Vuex !== 'undefined' ? {
-        ...Vuex.mapActions('projects', [
-            'setSearchTerm',
-            'setFilter',
-            'setSort',
-            'resetFiltersAndSort'
-        ]),
-        ...Vuex.mapActions('ui', [
-            'setStageView',
-            'setBoardViewMode' // Map board view mode action
-        ])
-    } : {}),
+    // --- Map Pinia Actions ---
+    ...mapActions(useUiStore, [
+        'setStageView',
+        'setBoardViewMode'
+    ]),
+    // Map projects actions
+    ...mapActions(useProjectsStore, [
+        'setSearchTerm',
+        'setFilter',
+        'setSort',
+        'resetFiltersAndSort',
+        'fetchInitialProjects' // Map fetch action for refresh button
+    ]),
 
     // --- Local Component Methods ---
     // Search Related
@@ -229,27 +245,56 @@ const KanbanToolbar = {
     },
     updateSearchResults(term) {
         const searchTerm = term.trim().toLowerCase();
+        // --- Access store directly ---
+        const projectsStore = useProjectsStore();
+
         if (!searchTerm) {
             this.searchResults = [];
             this.showResults = false;
             return;
         }
-        this.searchResults = this.allProjects.filter(p => 
-            p.contactName?.toLowerCase().includes(searchTerm) ||
+        
+        // --- Check store loading state FIRST ---
+        if (projectsStore.isLoading) {
+             console.warn("KanbanToolbar: updateSearchResults called while projectsStore is still loading.");
+             this.searchResults = []; // Clear results if loading
+             this.showResults = false;
+             return; 
+        }
+
+        // --- Get project list directly from store state ---
+        const projects = projectsStore.projectList;
+        
+        // --- GUARD CLAUSE: Check if directly accessed list is an array ---
+        if (!Array.isArray(projects)) {
+             console.warn("KanbanToolbar: updateSearchResults called but projectsStore.projectList is not an array.");
+             this.searchResults = [];
+             this.showResults = false;
+             return; // Don't proceed if data isn't loaded
+        }
+        // --- END GUARD CLAUSE ---
+        
+        // --- Filter the directly accessed list ---
+        this.searchResults = projects.filter(p => 
+            (p.Owner_Name_Display?.toLowerCase().includes(searchTerm) ||
             p.addressLine1?.toLowerCase().includes(searchTerm) ||
             p.address?.toLowerCase().includes(searchTerm) ||
             p.city?.toLowerCase().includes(searchTerm) ||
             p.state?.toLowerCase().includes(searchTerm) ||
             p.zip?.toLowerCase().includes(searchTerm) ||
-            p.id?.toLowerCase().includes(searchTerm) ||
-            p.OpenSolar_Project_ID?.toLowerCase().includes(searchTerm)
+            p.ID?.toLowerCase().includes(searchTerm) || // Corrected: was p.id
+            p.OpenSolar_Project_ID?.toLowerCase().includes(searchTerm))
         ).slice(0, 10);
         this.showResults = this.searchResults.length > 0;
     },
     selectSearchResult(project) {
         console.log("Search result selected:", project);
+        // --- ADD Get modal store instance ---
+        const modalStore = useModalStore();
         this.clearSearch();
-        alert(`Project clicked: ${project.contactName} (ID: ${project.id})\nImplement modal opening logic here.`);
+        // --- REPLACE Alert with modal opening ---
+        // alert(`Project clicked: ${project.contactName} (ID: ${project.id})\nImplement modal opening logic here.`);
+        modalStore.openModal(project.ID); // Use project ID
     },
     hideSearchResults() {
        this.showResults = false;
@@ -257,6 +302,13 @@ const KanbanToolbar = {
     handleClickOutsideSearch(event) {
         if (this.$refs.searchContainer && !this.$refs.searchContainer.contains(event.target)) {
             this.hideSearchResults();
+        }
+    },
+    handleSearchFocus() {
+        // Only show results on focus if there are already results
+        // for the current term and the term isn't empty.
+        if (this.localSearchTerm && this.searchResults.length > 0) {
+            this.showResults = true;
         }
     },
     
@@ -340,32 +392,6 @@ const KanbanToolbar = {
         const newMode = isTranches ? 'tranches' : 'stages';
         this.setBoardViewMode(newMode);
     },
-    
-    // --- Utility Methods ---
-    formatRelativeTime(timestamp, nowReference) {
-        if (!timestamp) return 'Never';
-        const now = new Date(nowReference);
-        const past = new Date(timestamp);
-        const diffInSeconds = Math.floor((now - past) / 1000);
-        const diffInMinutes = Math.floor(diffInSeconds / 60);
-        const diffInHours = Math.floor(diffInMinutes / 60);
-        const diffInDays = Math.floor(diffInHours / 24);
-
-        if (diffInSeconds < 60) {
-            return 'Just now';
-        } else if (diffInMinutes < 60) {
-            return `${diffInMinutes}m ago`;
-        } else if (diffInHours < 24) {
-            return `${diffInHours}h ago`;
-        } else if (diffInDays === 1) {
-            return 'Yesterday';
-        } else if (diffInDays < 7) {
-            return `${diffInDays}d ago`;
-        } else {
-            // Fallback to simple date format for older dates
-            return past.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }); 
-        }
-    }
   },
   // Template defined in widget.html
   // template: '#kanban-toolbar-template'
@@ -378,7 +404,7 @@ const KanbanToolbar = {
                     <base-text-input
                         v-model="localSearchTerm"
                         @keyup.enter="applySearch"
-                        @focus="updateSearchResults(localSearchTerm)" 
+                        @focus="handleSearchFocus"
                         @blur="hideSearchResults" 
                         placeholder="Search..."
                         class="w-full"
@@ -540,13 +566,13 @@ const KanbanToolbar = {
                     Reset
                  </base-button>
                  <!-- Refresh Button -->
-                 <base-button @click="$store.dispatch('projects/fetchInitialProjects')" variant="secondary" size="md" class="px-3 py-1.5 text-sm flex-shrink-0">
+                 <base-button @click="fetchInitialProjects" variant="secondary" size="md" class="px-3 py-1.5 text-sm flex-shrink-0">
                      <i class="fas fa-sync-alt mr-1"></i> Refresh
                  </base-button>
                  <!-- Last Updated -->
                  <div class="text-xs text-gray-500 flex items-center gap-1 flex-shrink-0">
                      <i class="fas fa-clock text-gray-400"></i>
-                     <span>{{ displayTimeSinceUpdate }}</span>
+                     <span v-if="lastUpdatedTimestamp" class="flex-shrink-0" :title="lastUpdatedTimestamp ? new Date(lastUpdatedTimestamp).toLocaleString() : 'Never'">{{ timeAgo }}</span>
                  </div>
             </div>
         </div>

@@ -1,0 +1,27 @@
+## Kanban Code Audit - Review Points (Consolidated)
+
+### KanbanBoard.js (`app/components/kanban/KanbanBoard.js`)
+
+*   **Performance:** The computed properties `projectsByStage` and `projectsByTranche` re-filter `displayProjects` on every update. With 1000+ records, monitor performance on slower devices or complex filters. Consider optimizations (e.g., different state structure, further debouncing of filter inputs) if needed. VueUse doesn't directly optimize synchronous filtering/sorting itself.
+*   **Cleanup:** Watchers on `displayedStages`, `projectsByStage`, `projectsByTranche` appear to be for debugging and could likely be removed.
+
+### KanbanColumn.js (`app/components/kanban/KanbanColumn.js`)
+
+*   **Cleanup:** The `onCardClick` method logs the click but modal opening is handled in `KanbanCard`. This method might be redundant and could potentially be removed.
+*   **Drag Behavior:** Monitor the `handleDragLeave` logic (`!this.$el.contains(event.relatedTarget)`) across different browsers during complex drag movements to ensure `isDragOver` behaves consistently. (VueUse `useDrag` could be an alternative if native drag/drop becomes problematic, but likely not necessary now).
+
+### KanbanCard.js (`app/components/kanban/KanbanCard.js`)
+
+*   **Required Behavior (`handlePhoneClick`):** The phone call logic triggers a full parent page reload, which is **required by Zoho** integration to initiate the call. **Recommendation:** Add a code comment explaining *why* the reload is necessary.
+*   **UX (Modal Trigger):** Double-clicking the card (`@dblclick`) to open the modal is the **intended behavior** to avoid accidental opening during drag attempts. (No change needed).
+
+### KanbanToolbar.js (`app/components/kanban/KanbanToolbar.js`)
+
+*   **Code Duplication/Improvement:** Remove the duplicated `formatRelativeTime` function. **Recommendation:** Replace the custom `formatRelativeTime` in `helpers.js` entirely with `useTimeAgo` from `@vueuse/core` for a potentially more robust and standardized solution.
+*   **Performance/Refinement (Search):** The search filters `allProjects` (1000+ records) on each keystroke (debounced). Monitor performance. **Recommendation:** Consider using `useDebounceFn` from `@vueuse/core` to refine the existing debounce logic for the search input handling for cleaner implementation.
+*   **Functionality (Search):** Replace the `alert` in `selectSearchResult` with the actual modal opening logic (e.g., `modalStore.openModal(project.ID)`).
+*   ~~**Component Interaction:** Ensure the `handleFilterValueChange` logic correctly handles the value emitted by `BaseSelectMenu` (object vs. primitive) and aligns with the expected store structure.~~ (Verified: `BaseSelectMenu` emits the full object when appropriate, and toolbar logic handles it correctly).
+
+### projectsStore.js (`app/store/projectsStore.js`)
+
+*   **Performance:** The main `filteredSortedProjects` getter performs all filtering/sorting on 1000+ records. Monitor performance closely, especially with multiple active filters. Optimizations might involve improving filter logic efficiency or adjusting how/when filters are applied rather than direct VueUse functions for the synchronous computation itself. 
