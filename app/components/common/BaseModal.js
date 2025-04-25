@@ -113,7 +113,7 @@ export default {
                     <!-- Inner content wrapper -->
                     <div v-if="show" class="flex flex-col h-full w-full" @click.stop> 
                         <!-- Header Slot -->
-                        <div class="modal-header px-1 pt-0 border-b border-gray-200 flex-shrink-0">
+                        <div class="modal-header flex-shrink-0">
                             <slot name="header">
                                 <!-- Default Header -->
                                 <div class="flex items-center justify-between">

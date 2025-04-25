@@ -69,16 +69,17 @@ const ZohoAPIService = {
    * @param {string} reportName - The link name of the report.
    * @param {string} recordId - The ID of the record to fetch.
    * @param {string} [appName] - Optional app link name if fetching from another app.
+   * @param {string} [fieldConfig='detail_view'] - Optional field config ('detail_view', 'quick_view', 'all', 'custom'). Defaults to 'detail_view'.
    * @returns {Promise<object>} Promise resolving with the record data object.
    */
-  async getRecordById(reportName, recordId, appName) {
+  async getRecordById(reportName, recordId, appName, fieldConfig = 'detail_view') {
     if (!reportName || !recordId) {
       throw new Error("ZohoAPIService: reportName and recordId are required for getRecordById.");
     }
 
     const config = {
       report_name: reportName,
-      field_config: "detail_view",
+      field_config: fieldConfig,
       id: recordId,
     };
     if (appName) config.app_name = appName;
@@ -369,6 +370,23 @@ const ZohoAPIService = {
              alert(`Could not perform navigation action '${config.action}'. Please check browser settings.`);
         }
     }
+  },
+
+  /**
+   * Fetches query parameters from the parent page URL.
+   * @returns {Promise<object>} Promise resolving with the query parameters object.
+   */
+  async getQueryParams() {
+      try {
+          console.log("ZohoAPIService: Fetching Query Params...");
+          const response = await ZOHO.CREATOR.UTIL.getQueryParams();
+          console.log("ZohoAPIService: Query Params Received:", response);
+          return response;
+      } catch (error) {
+          console.error("ZohoAPIService: Error fetching query params:", error);
+          // Don't re-throw, allow other init steps to proceed if possible
+          return {}; // Return empty object on error
+      }
   },
 
   // async invokeCustomApi(functionName, data, appName) { ... } // Placeholder

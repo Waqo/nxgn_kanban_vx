@@ -7,6 +7,8 @@
 export const LS_KEYS = {
     COLLAPSED_COLUMNS: 'kanbanWidgetCollapsedColumns',
     ACTIVE_MODAL: 'kanbanWidgetActiveModal',
+    TOOLBAR_SORT: 'kanbanWidgetToolbarSort',
+    BOARD_STAGE_VIEW: 'kanbanWidgetBoardStageView',
     // Add other keys here later, e.g.:
     // TOOLBAR_FILTERS: 'kanbanWidgetToolbarFilters',
     // TOOLBAR_SORT: 'kanbanWidgetToolbarSort',

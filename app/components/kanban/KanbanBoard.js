@@ -96,6 +96,7 @@ const KanbanBoard = {
              console.warn("KanbanBoard: Skipping stage due to missing id:", stage);
         }
       });
+      console.log('KanbanBoard: Projects grouped by stage:', grouped);
       return grouped;
     },
     // Group projects by tranche

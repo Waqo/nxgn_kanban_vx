@@ -1,6 +1,7 @@
 import DataProcessors from '../utils/processors.js';
 import { LS_KEYS, saveSetting, loadSetting } from '../utils/localStorage.js';
 import { useProjectsStore } from './projectsStore.js'; // Import projects store
+import { logActivity } from '../services/activityLogService.js';
 
 // Access Pinia global
 const { defineStore } = Pinia;

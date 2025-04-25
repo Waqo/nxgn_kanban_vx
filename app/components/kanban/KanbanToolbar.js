@@ -24,8 +24,8 @@ import { useModalStore } from '../../store/modalStore.js';
 const { mapState, mapActions } = Pinia;
 
 // --- Vue/VueUse Imports (assuming VueUse is global via CDN) ---
-const { computed } = Vue; 
-const { useTimeAgo } = VueUse;
+const { computed, watch, ref } = Vue;
+const { useTimeAgo, useDebounceFn } = VueUse;
 
 // Vuex no longer needed here unless modal module is used directly
 // if (typeof Vuex === 'undefined') {
@@ -36,19 +36,72 @@ const KanbanToolbar = {
   name: 'KanbanToolbar',
   components: { BaseToggle }, // Added BaseToggle
   setup() {
-    // --- Composition API Logic for useTimeAgo ---
+    // --- Composition API Logic ---
     const projectsStore = useProjectsStore();
+    const lookupsStore = useLookupsStore(); // ADD Lookups Store instance
 
-    // Create a computed ref to the timestamp for useTimeAgo
+    // --- Time Ago --- 
     const lastUpdatedRef = computed(() => projectsStore.lastUpdatedTimestamp);
-
-    // Call useTimeAgo with the reactive timestamp
-    // It returns a ref containing the relative time string
     const timeAgo = useTimeAgo(lastUpdatedRef);
+    
+    // --- Search State & Logic ---
+    const searchResults = ref([]);
+    const showResults = ref(false);
+    
+    // Define the core search logic as a function within setup
+    const updateSearchResultsLogic = (term) => {
+        const searchTerm = term.trim().toLowerCase();
+        // Access store directly
+        const currentProjectsStore = useProjectsStore(); // Get fresh instance inside if needed, or use outer scope one
+        
+        if (!searchTerm) {
+            searchResults.value = [];
+            showResults.value = false;
+            return;
+        }
+        
+        // Check store loading state FIRST
+        if (currentProjectsStore.isLoading) {
+            console.warn("KanbanToolbar(setup): updateSearchResults called while projectsStore is still loading.");
+            searchResults.value = []; // Clear results if loading
+            showResults.value = false;
+            return; 
+        }
+        
+        // Get project list directly from store state
+        const projects = currentProjectsStore.projectList;
+        
+        // GUARD CLAUSE: Check if directly accessed list is an array
+        if (!Array.isArray(projects)) {
+            console.warn("KanbanToolbar(setup): updateSearchResults called but projectsStore.projectList is not an array.");
+            searchResults.value = [];
+            showResults.value = false;
+            return; // Don't proceed if data isn't loaded
+        }
+        
+        // Filter the directly accessed list
+        searchResults.value = projects.filter(p => 
+            (p.Owner_Name_Display?.toLowerCase().includes(searchTerm) ||
+            p.addressLine1?.toLowerCase().includes(searchTerm) ||
+            p.address?.toLowerCase().includes(searchTerm) ||
+            p.city?.toLowerCase().includes(searchTerm) ||
+            p.state?.toLowerCase().includes(searchTerm) ||
+            p.zip?.toLowerCase().includes(searchTerm) ||
+            p.ID?.toLowerCase().includes(searchTerm) || // Corrected: was p.id
+            p.OpenSolar_Project_ID?.toLowerCase().includes(searchTerm))
+        ).slice(0, 10);
+        showResults.value = searchResults.value.length > 0;
+    };
+    
+    // Create the debounced function using useDebounceFn
+    const debouncedUpdateSearchResults = useDebounceFn(updateSearchResultsLogic, 300);
 
-    // Return the ref so it's accessible in the template and computed properties
+    // Return the refs and debounced function so they are accessible
     return {
-      timeAgo
+      timeAgo,
+      searchResults,
+      showResults,
+      debouncedUpdateSearchResults
     };
   },
   data() {
@@ -58,8 +111,6 @@ const KanbanToolbar = {
       // updateInterval: null,
       // Local state ONLY for the search input binding
       localSearchTerm: '',
-      searchResults: [], // Added for search results
-      showResults: false, // Added to control dropdown visibility
       searchDebounceTimeout: null, // Added for debouncing search
       // Add local state for dropdowns if using complex components later
       // Add state for dynamic filter type
@@ -77,7 +128,11 @@ const KanbanToolbar = {
         'tagsForFilter', // Getter
         'salesRepsForFilter', // Getter
         'salesOrgsForFilter', // Getter
-        'tranches' // Simple state
+        'tranches', // Simple state
+        // Map individual loading states
+        'isLoadingTags',
+        'isLoadingSalesReps',
+        'isLoadingSalesOrgs'
     ]),
     // Map projects state/getters
     ...mapState(useProjectsStore, [
@@ -117,11 +172,19 @@ const KanbanToolbar = {
     // Dynamically compute options for the second dropdown
     filterValueOptions() {
         if (!this.selectedFilterType) return [];
+        const lookupsStore = useLookupsStore(); // Get store instance
         switch (this.selectedFilterType.value) {
-            case 'tags':        return this.tagsForFilter;
-            case 'salesRep':    return this.salesRepsForFilter;
-            case 'salesOrg':    return this.salesOrgsForFilter;
-            case 'projectType': return PROJECT_TYPE_OPTIONS; 
+            case 'tags':        
+                if (lookupsStore.isLoadingTags) return [{ value: '_loading', label: 'Loading Tags...', disabled: true }];
+                return this.tagsForFilter;
+            case 'salesRep':    
+                if (lookupsStore.isLoadingSalesReps) return [{ value: '_loading', label: 'Loading Reps...', disabled: true }];
+                return this.salesRepsForFilter;
+            case 'salesOrg':    
+                if (lookupsStore.isLoadingSalesOrgs) return [{ value: '_loading', label: 'Loading Orgs...', disabled: true }];
+                return this.salesOrgsForFilter;
+            case 'projectType': 
+                return PROJECT_TYPE_OPTIONS; 
             default:            return [];
         }
     },
@@ -173,7 +236,6 @@ const KanbanToolbar = {
       },
       // Watch local search term for changes to update results (with debounce)
       localSearchTerm(newValue) {
-          clearTimeout(this.searchDebounceTimeout);
           if (!newValue.trim()) {
               this.searchResults = [];
               this.showResults = false;
@@ -181,10 +243,8 @@ const KanbanToolbar = {
               // this.applySearch(); 
               return;
           }
-          // Debounce the search result calculation
-          this.searchDebounceTimeout = setTimeout(() => {
-              this.updateSearchResults(newValue);
-          }, 300); // 300ms debounce
+          // Call the debounced function (defined in setup)
+          this.debouncedUpdateSearchResults(newValue);
       },
       // Reset value dropdown when filter type changes
       selectedFilterType(newValue, oldValue) {
@@ -195,6 +255,15 @@ const KanbanToolbar = {
                    const projectsStore = useProjectsStore(); 
                    projectsStore.setFilter({ key: oldStoreKey, value: [] }); 
                }
+          }
+          // --- Trigger On-Demand Fetch --- 
+          if (newValue) {
+              const lookupsStore = useLookupsStore();
+              switch (newValue.value) {
+                  case 'tags': lookupsStore.fetchTags(); break;
+                  case 'salesRep': lookupsStore.fetchSalesReps(); break;
+                  case 'salesOrg': lookupsStore.fetchSalesOrgs(); break;
+              }
           }
       }
   },
@@ -232,9 +301,11 @@ const KanbanToolbar = {
     // Search Related
     applySearch() {
       clearTimeout(this.searchDebounceTimeout);
-      this.updateSearchResults(this.localSearchTerm);
+      // --- Call the debounced function directly if needed, or just rely on watch? ---
+      // Let's rely on the watcher + debounced function for updates.
+      // We might need to trigger it if the user hits Enter *before* debounce finishes.
+      // this.debouncedUpdateSearchResults(this.localSearchTerm); // Trigger immediately on Enter
       this.setSearchTerm(this.localSearchTerm);
-      this.showResults = this.searchResults.length > 0;
     },
     clearSearch() {
         clearTimeout(this.searchDebounceTimeout);
@@ -243,50 +314,6 @@ const KanbanToolbar = {
         this.showResults = false;
         this.setSearchTerm('');
     },
-    updateSearchResults(term) {
-        const searchTerm = term.trim().toLowerCase();
-        // --- Access store directly ---
-        const projectsStore = useProjectsStore();
-
-        if (!searchTerm) {
-            this.searchResults = [];
-            this.showResults = false;
-            return;
-        }
-        
-        // --- Check store loading state FIRST ---
-        if (projectsStore.isLoading) {
-             console.warn("KanbanToolbar: updateSearchResults called while projectsStore is still loading.");
-             this.searchResults = []; // Clear results if loading
-             this.showResults = false;
-             return; 
-        }
-
-        // --- Get project list directly from store state ---
-        const projects = projectsStore.projectList;
-        
-        // --- GUARD CLAUSE: Check if directly accessed list is an array ---
-        if (!Array.isArray(projects)) {
-             console.warn("KanbanToolbar: updateSearchResults called but projectsStore.projectList is not an array.");
-             this.searchResults = [];
-             this.showResults = false;
-             return; // Don't proceed if data isn't loaded
-        }
-        // --- END GUARD CLAUSE ---
-        
-        // --- Filter the directly accessed list ---
-        this.searchResults = projects.filter(p => 
-            (p.Owner_Name_Display?.toLowerCase().includes(searchTerm) ||
-            p.addressLine1?.toLowerCase().includes(searchTerm) ||
-            p.address?.toLowerCase().includes(searchTerm) ||
-            p.city?.toLowerCase().includes(searchTerm) ||
-            p.state?.toLowerCase().includes(searchTerm) ||
-            p.zip?.toLowerCase().includes(searchTerm) ||
-            p.ID?.toLowerCase().includes(searchTerm) || // Corrected: was p.id
-            p.OpenSolar_Project_ID?.toLowerCase().includes(searchTerm))
-        ).slice(0, 10);
-        this.showResults = this.searchResults.length > 0;
-    },
     selectSearchResult(project) {
         console.log("Search result selected:", project);
         // --- ADD Get modal store instance ---
@@ -294,7 +321,7 @@ const KanbanToolbar = {
         this.clearSearch();
         // --- REPLACE Alert with modal opening ---
         // alert(`Project clicked: ${project.contactName} (ID: ${project.id})\nImplement modal opening logic here.`);
-        modalStore.openModal(project.ID); // Use project ID
+        modalStore.openModal(project.ID);
     },
     hideSearchResults() {
        this.showResults = false;
@@ -307,7 +334,7 @@ const KanbanToolbar = {
     handleSearchFocus() {
         // Only show results on focus if there are already results
         // for the current term and the term isn't empty.
-        if (this.localSearchTerm && this.searchResults.length > 0) {
+        if (this.localSearchTerm && this.searchResults.value.length > 0) {
             this.showResults = true;
         }
     },
@@ -391,6 +418,47 @@ const KanbanToolbar = {
     handleViewModeToggle(isTranches) {
         const newMode = isTranches ? 'tranches' : 'stages';
         this.setBoardViewMode(newMode);
+    },
+
+    // --- Expose store actions needed directly ---
+    // We need fetchCoreLookups for the refresh button
+    fetchCoreLookups() {
+        const lookupsStore = useLookupsStore();
+        return lookupsStore.fetchCoreLookups(); // Return promise if needed
+    },
+    // Need projects fetch for refresh button
+    fetchInitialProjects() {
+        const projectsStore = useProjectsStore();
+        return projectsStore.fetchInitialProjects();
+    },
+
+    // Refresh Method
+    async handleRefresh() {
+        const uiStore = useUiStore();
+        // Use a notification for loading state during refresh
+        const loadingNotificationId = `refresh-manual-${Date.now()}`;
+        uiStore.addNotification({
+            id: loadingNotificationId,
+            type: 'info',
+            message: 'Refreshing Data...',
+            duration: 0 // Persistent
+        });
+        
+        try {
+            // Fetch core data again
+            await Promise.all([
+                this.fetchCoreLookups(), // Call method that accesses store
+                this.fetchInitialProjects() // Call method that accesses store
+            ]);
+            // User data is fetched implicitly via fetchCoreLookups -> initService logic
+            // (or could explicitly call fetchCurrentUser if needed after lookups)
+            uiStore.addNotification({ type: 'success', message: 'Data Refreshed!' });
+        } catch (error) {
+            console.error("KanbanToolbar: Error during manual refresh:", error);
+            uiStore.addNotification({ type: 'error', message: `Refresh failed: ${error.message || 'Unknown error'}`, title: 'Refresh Error' });
+        } finally {
+             uiStore.removeNotification(loadingNotificationId);
+        }
     },
   },
   // Template defined in widget.html
@@ -566,7 +634,7 @@ const KanbanToolbar = {
                     Reset
                  </base-button>
                  <!-- Refresh Button -->
-                 <base-button @click="fetchInitialProjects" variant="secondary" size="md" class="px-3 py-1.5 text-sm flex-shrink-0">
+                 <base-button @click="handleRefresh" variant="secondary" size="md" class="px-3 py-1.5 text-sm flex-shrink-0">
                      <i class="fas fa-sync-alt mr-1"></i> Refresh
                  </base-button>
                  <!-- Last Updated -->

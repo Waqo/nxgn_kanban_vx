@@ -83,6 +83,9 @@ export const EVENT_TYPES = [
     }
 ];
 
+// Roles allowed for user lists (e.g., impersonation, tagging)
+export const TEAM_USER_ROLES = ['Project Manager', 'Admin'];
+
 // Add other sets of static options as needed
 // Example:
 // export const DEFAULT_NOTIFICATION_DURATION = 5000; 

@@ -67,4 +67,44 @@ export function formatDateMMDDYY(dateString) {
     }
 }
 
+/**
+ * Formats a date string using specified options (e.g., for install date display).
+ * @param {string | number | Date | null} dateString - The date input to format.
+ * @param {object} options - Options for toLocaleDateString (e.g., { month: 'short', day: 'numeric', year: 'numeric' }).
+ * @returns {string | null} The formatted date string, or null if invalid.
+ */
+export function formatDateWithOptions(dateString, options = { month: 'short', day: 'numeric', year: 'numeric' }) {
+    if (!dateString) return null;
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) {
+            throw new Error('Invalid date provided to formatDateWithOptions');
+        }
+        return date.toLocaleDateString('en-US', options);
+    } catch (e) {
+        console.error(`Error formatting date '${dateString}' with options:`, e);
+        return null;
+    }
+}
+
+/**
+ * Calculates an approximate install date (e.g., 2 months after sold date).
+ * @param {string | number | Date | null} soldDateString - The sold date.
+ * @returns {Date | null} The calculated Date object, or null if input is invalid.
+ */
+export function calculateApproxInstallDate(soldDateString) {
+    if (!soldDateString) return null;
+    try {
+        const date = new Date(soldDateString);
+        if (isNaN(date.getTime())) {
+            throw new Error('Invalid date provided to calculateApproxInstallDate');
+        }
+        date.setMonth(date.getMonth() + 2); // Add 2 months
+        return date;
+    } catch (e) {
+        console.error(`Error calculating approx install date for '${soldDateString}':`, e);
+        return null;
+    }
+}
+
 // Add other general helper functions here as needed 

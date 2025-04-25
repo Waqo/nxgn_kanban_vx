@@ -9,9 +9,18 @@ import { useModalStore } from '../store/modalStore.js';
 
 // Import Local Storage Utilities
 import { LS_KEYS, loadSetting } from '../utils/localStorage.js';
+// Import Constants for Init Record
+import {
+  REPORT_KANBAN_INIT,
+  KANBAN_INIT_RECORD_ID
+} from '../config/constants.js';
+
+// --- CORRECT Import ZohoAPIService ---
+import ZohoAPIService from './zohoCreatorAPI.js';
 
 /**
- * Initializes the application by fetching all essential data.
+ * Initializes the application by fetching essential data for initial display
+ * and then fetching secondary data in the background.
  * Manages global loading and error states via the UI store.
  */
 export async function initializeApp() {
@@ -22,58 +31,110 @@ export async function initializeApp() {
   const projectsStore = useProjectsStore();
   const modalStore = useModalStore();
 
-  // Basic check to prevent re-initialization if needed (optional)
-  // Could add a flag in uiStore if more complex logic is required
-  // if (uiStore.appInitialized) { // Assuming an appInitialized flag exists
-  //    console.log("App Init Service: Already initialized.");
-  //    return;
-  // }
+  let queryParamsFromUrl = null; // Variable to hold the params
 
-  // console.log("App Init Service: Starting initialization...");
+  // --- Fetch Query Params (Fire and Forget, but store result) ---
+  ZohoAPIService.getQueryParams()
+    .then(queryParams => {
+        console.log("App Init Service: Parent Query Params:", queryParams);
+        queryParamsFromUrl = queryParams; // Store the result
+    })
+    .catch(error => {
+        // Error is already logged in the service, but we could log context here
+        console.error("App Init Service: Failed to get query params during init.");
+    });
+
+  // --- Fetch and Log Kanban Init Record (Fire and Forget) ---
+  // Pass null for appName (3rd arg) and 'quick_view' for fieldConfig (4th arg)
+  // ZohoAPIService.getRecordById(REPORT_KANBAN_INIT, KANBAN_INIT_RECORD_ID, null, 'quick_view')
+  //     .then(initRecordData => {
+  //         console.log("App Init Service: Kanban Init Record Data (Quick View):", initRecordData);
+  //         // You can process or store initRecordData here if needed later
+  //     })
+  //     .catch(error => {
+  //         console.error(`App Init Service: Failed to get Kanban Init Record (ID: ${KANBAN_INIT_RECORD_ID}) during init.`);
+  //         // Error is already logged in ZohoAPIService.getRecordById
+  //     });
+
+  console.log("App Init Service: Starting initialization...");
   uiStore.setGlobalLoading(true);
   uiStore.setGlobalError(null);
-  // uiStore.setAppInitialized(false); // Set initialized state if using flag
 
   try {
-    // --- Step 1: Fetch Lookups (Pinia) ---
-    // console.log("App Init Service: Fetching Lookups...");
-    await lookupsStore.fetchRequiredLookups();
-    // console.log("App Init Service: Lookups fetched.");
+    // --- Fetch Kanban Init Record First (Await) ---
+    console.log("App Init Service: Fetching Kanban Init Record...");
+    const initRecordData = await ZohoAPIService.getRecordById(REPORT_KANBAN_INIT, KANBAN_INIT_RECORD_ID, null, 'quick_view');
+    console.log("App Init Service: Kanban Init Record Data (Quick View):", initRecordData);
 
-    // --- Step 2a: Fetch User (Pinia) ---
-    // console.log("App Init Service: Fetching Current User...");
+    // --- Phase 1: Fetch Remaining Core Data (Awaited) ---
+    // Pass initRecordData to lookupsStore
+    console.log("App Init Service: Fetching Core Lookups (using init data) and Initial Projects...");
+    
+    // Fetch Core Lookups (will use init data) and Projects concurrently
+    await Promise.all([
+        projectsStore.fetchInitialProjects()
+    ]);
+    
+    // Now process lookups using the fetched data
+    await lookupsStore.fetchCoreLookups(initRecordData); // Pass init data
+    
+    console.log("App Init Service: Core Lookups (Stages/Tranches from init data) and Projects fetched.");
+
+    // --- Fetch Current User (Depends on Core Lookups existing, but fetch is independent) --- 
+    console.log("App Init Service: Fetching Current User...");
+    // User fetch is now independent of lookups store
     await userStore.fetchCurrentUser();
-    // console.log("App Init Service: User fetched.");
+    console.log("App Init Service: User fetched.");
 
-    // --- Step 2b: Fetch Projects (Pinia) ---
-    // console.log("App Init Service: Fetching Initial Projects...");
-    await projectsStore.fetchInitialProjects();
-    // console.log("App Init Service: Projects fetched.");
-
-    // uiStore.setAppInitialized(true); // Set initialized state
-    // console.log("App Init Service: Core data fetching completed.");
-
-    // --- Restore Modal State (Pinia) ---
-    const savedModalState = loadSetting(LS_KEYS.ACTIVE_MODAL, null);
-    if (savedModalState && savedModalState.expiresAt && savedModalState.expiresAt > Date.now()) {
-      // console.log("App Init Service: Found valid saved modal state...");
-      // Use await here if openModal becomes async and needs completion before app mount
-      modalStore.openModal(savedModalState.projectId);
-    } else if (savedModalState) {
-      // console.log("App Init Service: Found expired modal state. Clearing...");
-      localStorage.removeItem(LS_KEYS.ACTIVE_MODAL);
+    // --- Check for projectId in URL *BEFORE* checking localStorage ---
+    let openedModalFromUrl = false;
+    if (queryParamsFromUrl && queryParamsFromUrl.projectId) {
+        const urlProjectId = queryParamsFromUrl.projectId;
+        console.log(`App Init Service: Found projectId=${urlProjectId} in URL. Opening modal...`);
+        modalStore.openModal(urlProjectId); // Open modal using ID from URL
+        openedModalFromUrl = true;
+        // Clear any potentially conflicting saved modal state from previous sessions
+        localStorage.removeItem(LS_KEYS.ACTIVE_MODAL);
+        console.log("App Init Service: Removed potentially conflicting saved modal state.");
     }
 
-    // console.log("App Init Service: Initialization sequence finished successfully.");
+    // --- Restore Modal State from localStorage (only if not opened from URL) ---
+    if (!openedModalFromUrl) {
+        const savedModalState = loadSetting(LS_KEYS.ACTIVE_MODAL, null);
+        if (savedModalState && savedModalState.expiresAt && savedModalState.expiresAt > Date.now()) {
+          console.log("App Init Service: Found valid saved modal state, restoring...");
+          modalStore.openModal(savedModalState.projectId);
+        } else if (savedModalState) {
+          console.log("App Init Service: Found expired modal state. Clearing...");
+          localStorage.removeItem(LS_KEYS.ACTIVE_MODAL);
+        }
+    }
+
+    // --- Phase 1 Complete: Initial render can happen now ---
+    console.log("App Init Service: Phase 1 (Core data) completed. Setting global loading false.");
+    uiStore.setGlobalLoading(false); // <<<=== SET LOADING FALSE HERE
+
+    // --- Phase 2: Fetch Filter Lookups (Tags, Reps, Orgs) - Fire and Forget ---
+    // These are not awaited, they run in the background after initial render.
+    // No need to explicitly call them here, they will be fetched on demand by the toolbar.
+    console.log("App Init Service: Filter lookups (Tags, Reps, Orgs) will be fetched on demand.");
+    
+    console.log("App Init Service: Initialization sequence finished.");
 
   } catch (error) {
+    // Catch errors from Promise.all or fetchCurrentUser if they re-throw
     console.error("App Init Service: CRITICAL ERROR during initialization sequence:", error);
-    uiStore.setGlobalError(`Initialization failed: ${error.message || 'Unknown error'}`);
-    // uiStore.setAppInitialized(false); // Ensure initialized is false on error
-    // Optionally re-throw if you want App.js to catch it
-    // throw error; 
-  } finally {
-    uiStore.setGlobalLoading(false);
-    // console.log("App Init Service: Global loading state set to false.");
+    // Use the error already set in the specific store action if possible,
+    // or set a generic one.
+    if (!uiStore.globalError) { // Don't overwrite specific errors if stores set them
+         uiStore.setGlobalError(`Initialization failed: ${error.message || 'Unknown error'}`);
+    }
+    // Ensure loading is false even if phase 1 errors out
+    uiStore.setGlobalLoading(false); 
   }
+  // REMOVE finally block as loading is set earlier
+  // finally {
+  //   uiStore.setGlobalLoading(false);
+  //   console.log("App Init Service: Global loading state set to false.");
+  // }
 } 

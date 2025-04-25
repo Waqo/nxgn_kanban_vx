@@ -12,7 +12,9 @@ import {
   FIELD_PROJECT_HO_CANCELLED_REDBALL_STAGE_ID,
   DEFAULT_SORT_DIRECTION,
   FIELD_PROJECT_TRANCHE_LOOKUP,
-  REPORT_CONTACTS
+  REPORT_CONTACTS,
+  ACTIVITY_SOURCE_PORTAL,
+  START_IN_DEMO_MODE
 } from '../config/constants.js';
 // Import helper function
 // import { formatRelativeTime } from '../utils/helpers.js';
@@ -23,8 +25,17 @@ import { EVENT_TYPES } from '../config/options.js';
 import { useUiStore } from './uiStore.js'; 
 import { useLookupsStore } from './lookupsStore.js'; 
 
+// Import Activity Log Service
+import { logActivity } from '../services/activityLogService.js';
+
+// Import localStorage utils
+import { LS_KEYS, saveSetting, loadSetting } from '../utils/localStorage.js';
+
 // Access Pinia global
 const { defineStore } = Pinia;
+
+// --- ADD Configuration Flag ---
+// const START_IN_DEMO_MODE = true; // Remove this local definition
 
 const DEFAULT_SORT_FIELD = 'Owner_Name_Display';
 const defaultSort = { field: DEFAULT_SORT_FIELD, direction: DEFAULT_SORT_DIRECTION };
@@ -46,10 +57,10 @@ export const useProjectsStore = defineStore('projects', {
     isLoading: false,
     error: null,
     lastUpdatedTimestamp: null,
-    filterModeIsDemosOnly: false,
+    filterModeIsDemosOnly: START_IN_DEMO_MODE,
     filters: { ...defaultFilters },
-    sortBy: defaultSort.field,
-    sortDirection: defaultSort.direction,
+    sortBy: loadSetting(LS_KEYS.TOOLBAR_SORT, defaultSort).field,
+    sortDirection: loadSetting(LS_KEYS.TOOLBAR_SORT, defaultSort).direction,
   }),
 
   getters: {
@@ -255,11 +266,15 @@ export const useProjectsStore = defineStore('projects', {
     _setSort({ field, direction }) {
         this.sortBy = field || defaultSort.field;
         this.sortDirection = direction || defaultSort.direction;
+        // --- Save updated sort settings to localStorage ---
+        saveSetting(LS_KEYS.TOOLBAR_SORT, { field: this.sortBy, direction: this.sortDirection });
     },
     _resetFiltersSort() {
         this.filters = { ...defaultFilters };
         this.sortBy = defaultSort.field;
         this.sortDirection = defaultSort.direction;
+        // --- Save default sort settings to localStorage ---
+        saveSetting(LS_KEYS.TOOLBAR_SORT, { field: this.sortBy, direction: this.sortDirection });
     },
     // Actions replacing mutations for optimistic updates
     _updateProjectStageOptimistic({ projectId, newStageId, newStageTitle }) {
@@ -331,7 +346,13 @@ export const useProjectsStore = defineStore('projects', {
        let recordCursor = null;
        let hasMoreRecords = true;
        const reportName = REPORT_PROJECTS;
-       let finalCriteria = `(${FIELD_PROJECT_STAGE_LOOKUP}.ID != ${FIELD_PROJECT_ARCHIVED_STAGE_ID})`;
+       // Define criteria to exclude only the Pre-Sale stage (since Archived doesn't exist)
+       let finalCriteria = `(${FIELD_PROJECT_STAGE_LOOKUP}.ID != ${FIELD_PROJECT_PRE_SALE_STAGE_ID})`;
+       // Add demo condition based on the INITIAL state set by START_IN_DEMO_MODE
+       if (START_IN_DEMO_MODE) {
+           finalCriteria += ` && (${FIELD_PROJECT_IS_DEMO} == true)`;
+       }
+       console.log(`Projects Store (Pinia): Fetching projects with criteria: ${finalCriteria}`);
 
       try {
         // ... (while loop for fetching)
@@ -339,8 +360,8 @@ export const useProjectsStore = defineStore('projects', {
           const response = await ZohoAPIService.getRecords( reportName, finalCriteria, 1000, recordCursor );
           if (response.code !== 3000) throw new Error(response.message || `API Error Code ${response.code}`);
           if (response.data?.length > 0) allRawProjects = allRawProjects.concat(response.data);
-          recordCursor = response.more_records;
-          hasMoreRecords = !!response.more_records;
+          recordCursor = response.record_cursor;
+          hasMoreRecords = !!response.record_cursor;
         }
         
         const processedProjects = DataProcessors.processProjectsData(allRawProjects);
@@ -403,6 +424,9 @@ export const useProjectsStore = defineStore('projects', {
 
         try {
            await ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, { data: { [FIELD_PROJECT_STAGE_LOOKUP]: newStageId } });
+           // --- Log Activity (Fire and Forget) ---
+           logActivity(projectId, `Stage updated to '${newStageTitle}'`); 
+           
            uiStore.removeNotification(loadingNotificationId);
            uiStore.addNotification({ type: 'success', message: `Project moved to ${newStageTitle}` });
         } catch (error) {
@@ -444,6 +468,9 @@ export const useProjectsStore = defineStore('projects', {
 
         try {
             await ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, { data: { [FIELD_PROJECT_TRANCHE_LOOKUP]: newTrancheId } }); 
+            // --- Log Activity (Fire and Forget) ---
+            logActivity(projectId, `Tranche updated to '${newTrancheDisplay}'`);
+            
             uiStore.removeNotification(loadingNotificationId);
             uiStore.addNotification({ type: 'success', message: `Project moved to ${newTrancheDisplay}` });
         } catch (error) {

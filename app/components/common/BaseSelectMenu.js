@@ -88,7 +88,7 @@ export default {
                 :id="attrs.id || 'select-' + attrs.name" 
                 :name="attrs.name" 
                 v-bind="attrs" 
-                class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 appearance-none disabled:bg-gray-50 disabled:cursor-not-allowed"
+                class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-0 focus:ring-offset-0 focus:border-gray-300 sm:text-sm sm:leading-6 appearance-none disabled:bg-gray-50 disabled:cursor-not-allowed"
             >
                 <option v-if="placeholder" value="" :selected="selectValue === null || selectValue === ''" disabled>{{ placeholder }}</option>
                 <option v-for="(option, index) in options" 

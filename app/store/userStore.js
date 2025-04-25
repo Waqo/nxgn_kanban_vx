@@ -4,11 +4,13 @@ import {
   FIELD_USER_EMAIL,
   FIELD_USER_NAME,
   FIELD_USER_ROLE,
+  REPORT_USERS,
+  ADMIN_USER_EMAIL, // Import admin email constant
   // Add other relevant user field constants if needed
 } from '../config/constants.js';
 
-// Import Pinia lookups store
-import { useLookupsStore } from './lookupsStore.js'; 
+// Import Pinia lookups store (needed for impersonation)
+import { useLookupsStore } from './lookupsStore.js';
 
 // Access Pinia global
 const { defineStore } = Pinia;
@@ -31,7 +33,7 @@ export const useUserStore = defineStore('user', {
 
     // isAdmin needs access to originalUser state
     isAdmin: (state) => {
-        return state.originalUser?.email?.toLowerCase() === 'admin@dcnexgen.com';
+        return state.originalUser?.email?.toLowerCase() === ADMIN_USER_EMAIL.toLowerCase(); // Use imported constant
     },
   },
 
@@ -59,9 +61,7 @@ export const useUserStore = defineStore('user', {
     
     // Main public actions
     async fetchCurrentUser() {
-      const lookupsStore = useLookupsStore(); 
-      
-      // console.log("User Store (Pinia): Starting fetchCurrentUser...");
+      console.log("User Store (Pinia): Starting fetchCurrentUser...");
       this._setLoading(true);
       this._setError(null);
       this._setUserState(null); // Clear current user
@@ -77,17 +77,33 @@ export const useUserStore = defineStore('user', {
         if (!userEmail) {
           throw new Error("Could not determine logged-in user email from init params.");
         }
-        // console.log(`User Store (Pinia): Found user email: ${userEmail}`);
+        console.log(`User Store (Pinia): Found user email: ${userEmail}`);
 
-        const allUsers = lookupsStore.users || []; 
-        if (allUsers.length === 0) {
-            console.warn("User Store (Pinia): Lookups.users array is empty.");
-            throw new Error("User list from lookups store is not available or empty.");
+        // --- Fetch user record directly via API ---
+        let loggedInUserRecord = null;
+        try {
+            const criteria = `(${FIELD_USER_EMAIL} == "${userEmail}")`;
+            console.log(`User Store (Pinia): Fetching user record with criteria: ${criteria}`);
+            const response = await ZohoAPIService.getRecords(REPORT_USERS, criteria);
+            
+            if (response.code !== 3000) {
+                throw new Error(response.message || `API Error Code ${response.code}`);
+            }
+            
+            if (response.data && response.data.length === 1) {
+                loggedInUserRecord = response.data[0];
+            } else if (response.data && response.data.length > 1) {
+                console.warn(`User Store (Pinia): Multiple user records found for email ${userEmail}. Using the first one.`);
+                loggedInUserRecord = response.data[0];
+            } else {
+                // No record found, handled below by the fallback mechanism
+                console.warn(`User Store (Pinia): No user record found via API for email ${userEmail}.`);
+            }
+        } catch (apiError) {
+            console.error(`User Store (Pinia): API error fetching user record for ${userEmail}:`, apiError);
+            // Let the fallback mechanism handle this case
         }
-
-        const loggedInUserRecord = allUsers.find(
-            user => user[FIELD_USER_EMAIL]?.toLowerCase() === userEmail.toLowerCase()
-        );
+        // --- End API Fetch ---
 
         if (!loggedInUserRecord) {
            console.warn(`User Store (Pinia): User record not found for email ${userEmail}. Creating fallback.`);

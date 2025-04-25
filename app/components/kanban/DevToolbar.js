@@ -11,6 +11,7 @@ import { useUserStore } from '../../store/userStore.js'; // Import user store
 import { useLookupsStore } from '../../store/lookupsStore.js';
 import { useProjectsStore } from '../../store/projectsStore.js'; // Import projects store
 const { mapState, mapActions } = Pinia;
+const { storeToRefs } = Pinia; // <<< ADD storeToRefs
 
 // Vuex no longer needed here unless modal module is used directly
 
@@ -18,16 +19,32 @@ const DevToolbar = {
   name: 'DevToolbar',
   components: {
     BaseButton,
-    BaseSelectMenu, // Register SelectMenu
+    // BaseSelectMenu, // Using native select now
     BaseBadge, // Register Badge
     BaseToggle, // Register BaseToggle
+  },
+  setup() {
+    // --- Composition API for direct state access & actions ---
+    const lookupsStore = useLookupsStore();
+
+    // Use storeToRefs to get reactive refs for state/getters
+    // This is needed for isLoadingTeamUsers reactivity in computed
+    const { usersForImpersonationDropdown, isLoadingTeamUsers } = storeToRefs(lookupsStore);
+    
+    // Action to trigger fetch (can be called from methods)
+    const fetchTeamUsers = () => lookupsStore.fetchTeamUsers();
+
+    return {
+        // Expose reactive state/getters and actions needed
+        usersForImpersonationDropdown,
+        isLoadingTeamUsers,
+        fetchTeamUsers
+    };
   },
   computed: {
     // --- Map Pinia State/Getters ---
     // Map user store state/getters
     ...mapState(useUserStore, ['currentUser', 'isImpersonating', 'originalUser']), 
-    // Map from lookups store:
-    ...mapState(useLookupsStore, ['usersForImpersonationDropdown']),
     // Map projects store state
     ...mapState(useProjectsStore, ['filterModeIsDemosOnly']),
 
@@ -50,10 +67,15 @@ const DevToolbar = {
         }
     },
     impersonationOptions() {
-        // Uses Pinia state/getters
+        // Check loading state from setup() ref
+        if (this.isLoadingTeamUsers) {
+            return [{ value: '', label: 'Loading Users...', disabled: true }];
+        }
+        
+        // Uses Pinia state/getters exposed via setup()
         const options = [
             { value: '', label: 'Select User to Impersonate...' },
-            ...(this.usersForImpersonationDropdown || [])
+            ...(this.usersForImpersonationDropdown || []) // Use ref from setup
         ];
         if (this.isImpersonating && this.originalUser) {
             options.push({
@@ -106,6 +128,12 @@ const DevToolbar = {
     hardRefresh() {
       location.reload(true); 
     },
+
+    // Method to trigger fetch when dropdown is interacted with
+    handleImpersonateFocus() {
+        // Call the fetch function exposed from setup()
+        this.fetchTeamUsers();
+    },
   },
   // Template now defined inline
   template: `
@@ -124,12 +152,15 @@ const DevToolbar = {
             <select 
                 id="impersonate-select" 
                 v-model="impersonationTarget" 
+                @focus="handleImpersonateFocus" 
+                @mousedown="handleImpersonateFocus"  
                 class="px-2 py-1 border border-yellow-400 rounded bg-white text-xs w-48"
             >
                 <option 
                     v-for="option in impersonationOptions" 
                     :key="option.value || 'placeholder'" 
                     :value="option.value"
+                    :disabled="option.disabled"
                 >
                     {{ option.label }}
                 </option>

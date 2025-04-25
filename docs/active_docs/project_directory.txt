@@ -26,22 +26,30 @@ app/
 │   │   ├── BaseToggle.js
 │   │   └── DevToolbar.js
 │   └── kanban/
+│       ├── KanbanBoard.js
+│       ├── KanbanBoardSkeleton.js
+│       ├── KanbanCard.js
+│       ├── KanbanColumn.js
+│       ├── KanbanToolbar.js
+│       └── DevToolbar.js
 ├── config/
 │   ├── constants.js
 │   └── options.js
 ├── services/
-│   └── zohoCreatorAPI.js
+│   ├── zohoCreatorAPI.js
+│   ├── initService.js
+│   └── activityLogService.js
 ├── store/
-│   ├── modules/
-│   │   ├── lookups.js
-│   │   ├── projects.js
-│   │   ├── ui.js
-│   │   └── user.js
-│   └── store.js
+│   ├── lookupsStore.js
+│   ├── modalStore.js
+│   ├── projectsStore.js
+│   ├── uiStore.js
+│   └── userStore.js
 ├── translations/
 │   └── en.json
 ├── utils/
 │   ├── helpers.js
+│   ├── localStorage.js
 │   └── processors.js
 ├── views/
 │   └── WidgetView.js

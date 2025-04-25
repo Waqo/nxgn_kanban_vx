@@ -11,7 +11,10 @@ import {
   // Import other report names if needed
   // REPORT_EQUIPMENT,
   // REPORT_DOC_TYPES,
+  FIELD_USER_ROLE,
 } from '../config/constants.js';
+// Import Team User Roles option
+import { TEAM_USER_ROLES } from '../config/options.js';
 
 // Access Pinia global
 const { defineStore } = Pinia;
@@ -24,8 +27,12 @@ export const useLookupsStore = defineStore('lookups', {
     salesReps: [], 
     salesOrgs: [], 
     tranches: [], 
-    isLoading: false,
-    error: null, 
+    isLoadingCore: false, // Loading state for initial Stages, Tranches, Users
+    isLoadingTeamUsers: false,
+    isLoadingTags: false,
+    isLoadingSalesReps: false,
+    isLoadingSalesOrgs: false,
+    error: null, // Shared error state for simplicity, or could be split too
   }),
 
   getters: {
@@ -66,105 +73,191 @@ export const useLookupsStore = defineStore('lookups', {
 
   actions: {
     /**
-     * Fetches all required lookup data concurrently.
-     * Uses Pinia actions to directly modify state.
+     * Fetches core lookup data needed for initial board display and user context.
+     * Can optionally accept pre-fetched initData containing Stages and Tranches.
+     * @param {object} [initData] - Optional pre-fetched data from the init record.
      */
-    async fetchRequiredLookups() {
-      // console.log("Lookups Store (Pinia): Starting fetchRequiredLookups...");
-      this.isLoading = true;
+    async fetchCoreLookups(initData = null) {
+      if (this.isLoadingCore) return; // Prevent concurrent fetches
+      
+      this.isLoadingCore = true;
       this.error = null;
-
+      
+      // --- OPTIMIZATION: Use pre-fetched initData if available --- 
+      if (initData && initData.Stages && initData.Tranches) {
+          console.log("Lookups Store (Pinia): Using pre-fetched init data for Stages and Tranches.");
+          try {
+              this.stages = DataProcessors.processStagesData({ data: initData.Stages, code: 3000 }); // Wrap to match expected processor input
+              this.tranches = DataProcessors.processTranchesData({ data: initData.Tranches, code: 3000 }); // Wrap to match expected processor input
+              console.log("Lookups Store (Pinia): Stages and Tranches populated from init data.");
+          } catch (processingError) {
+              console.error("Lookups Store (Pinia): Error processing init data for Stages/Tranches:", processingError);
+              this.error = `Failed to process init data: ${processingError.message}`;
+              // Allow proceeding, but core lookups will be empty/incorrect
+          }
+          this.isLoadingCore = false;
+          console.log("Lookups Store (Pinia): Core loading finished (using init data).");
+          return; // Exit early as we used init data
+      }
+      // --- END OPTIMIZATION ---
+      
+      // --- Fallback or Original Logic: Fetch individually if initData wasn't provided/valid ---
+      console.warn("Lookups Store (Pinia): initData not provided or invalid. Fetching Stages/Tranches individually (Fallback).");
       const lookupsToFetch = {
-        stages: REPORT_STAGES,
-        tags: REPORT_TAGS,
-        users: REPORT_USERS,
-        salesReps: REPORT_SALES_REPS,
-        salesOrgs: REPORT_SALES_ORGS,
-        tranches: REPORT_TRANCHES,
+        stages: { report: REPORT_STAGES, processor: DataProcessors.processStagesData },
+        tranches: { report: REPORT_TRANCHES, processor: DataProcessors.processTranchesData },
       };
       const lookupKeys = Object.keys(lookupsToFetch);
 
       try {
         const promises = lookupKeys.map(key => {
-          const reportName = lookupsToFetch[key];
-          // console.log(`Lookups Store (Pinia): Fetching ${key} from ${reportName}...`);
-          return ZohoAPIService.getRecords(reportName)
+          const config = lookupsToFetch[key];
+          console.log(`Lookups Store (Pinia): Fetching core lookup: ${key}`);
+          return ZohoAPIService.getRecords(config.report)
             .catch(err => {
-              console.error(`Lookups Store (Pinia): Failed to fetch ${key} from ${reportName}:`, err);
+              console.error(`Lookups Store (Pinia): Failed to fetch core ${key}:`, err);
               return { _lookupError: true, key: key, error: err };
             });
         });
 
         const results = await Promise.all(promises);
-        // console.log("Lookups Store (Pinia): Raw fetch results:", results);
-
         let encounteredError = false;
-        let errorMessage = "Failed to load some lookup data: ";
+        let errorMessage = "Failed to load core lookup data: ";
 
         results.forEach((response, index) => {
           const key = lookupKeys[index];
-
-          if (response._lookupError) {
+          if (response._lookupError || response.code !== 3000) {
             encounteredError = true;
-            errorMessage += `${key} (${response.error.message || 'Unknown error'}); `;
-            return; 
-          }
-
-          if (!response || response.code !== 3000) {
-            encounteredError = true;
-            const msg = response?.message || `API Error Code ${response?.code || 'N/A'}`;
+            const msg = response._lookupError ? response.error.message : (response?.message || `API Error Code ${response?.code || 'N/A'}`);
             errorMessage += `${key} (${msg}); `;
-            console.error(`Lookups Store (Pinia): Zoho API error for ${key}:`, response);
-            return; 
+            console.error(`Lookups Store (Pinia): Error response for core ${key}:`, response);
+            return;
           }
-
           try {
-            switch (key) {
-              case 'stages':
-                this.stages = DataProcessors.processStagesData(response);
-                break;
-              case 'tags':
-                 this.tags = DataProcessors.processTagsData(response);
-                 break;
-              case 'users':
-                // Assuming processUsersData isn't ready yet
-                this.users = response.data || []; 
-                break;
-              case 'salesReps': 
-                this.salesReps = DataProcessors.processSalesRepsData(response);
-                break;
-              case 'salesOrgs': 
-                this.salesOrgs = DataProcessors.processSalesOrgsData(response);
-                break;
-              case 'tranches':
-                 this.tranches = DataProcessors.processTranchesData(response);
-                 break;
-              default:
-                console.warn(`Lookups Store (Pinia): No processing logic defined for key: ${key}`);
-            }
-             // console.log(`Lookups Store (Pinia): Successfully processed and committed ${key}.`);
+            const processor = lookupsToFetch[key].processor;
+            this[key] = processor(response); // Assign processed data directly to state
           } catch (processingError) {
-              encounteredError = true;
-              errorMessage += `${key} (Processing Error: ${processingError.message}); `;
-              console.error(`Lookups Store (Pinia): Error processing data for ${key}:`, processingError);
+            encounteredError = true;
+            errorMessage += `${key} (Processing Error: ${processingError.message}); `;
+            console.error(`Lookups Store (Pinia): Error processing core data for ${key}:`, processingError);
           }
         });
 
         if (encounteredError) {
           throw new Error(errorMessage);
         }
-
-        // console.log("Lookups Store (Pinia): fetchRequiredLookups completed successfully.");
+        console.log("Lookups Store (Pinia): fetchCoreLookups completed successfully.");
 
       } catch (error) {
-        console.error("Lookups Store (Pinia): Error in fetchRequiredLookups action:", error);
-        this.error = error.message || 'An unknown error occurred while fetching lookups.';
-        // Re-throw for the root action to catch
-        throw error;
+        console.error("Lookups Store (Pinia): Error in fetchCoreLookups action:", error);
+        this.error = error.message || 'An unknown error occurred while fetching core lookups.';
+        // Don't re-throw here, let initService handle overall loading state
       } finally {
-        this.isLoading = false;
-        // console.log("Lookups Store (Pinia): Loading finished.");
+        this.isLoadingCore = false;
+        console.log("Lookups Store (Pinia): Core loading (Stages, Tranches) finished.");
       }
+    },
+
+    /**
+     * Fetches Users with specific roles (e.g., Project Manager, Admin) on demand.
+     */
+    async fetchTeamUsers() {
+        if (this.users.length > 0 || this.isLoadingTeamUsers) return; // Don't refetch
+        console.log("Lookups Store (Pinia): Starting fetchTeamUsers...");
+        this.isLoadingTeamUsers = true;
+        this.error = null; // Clear previous errors
+        try {
+            // Construct criteria: (Role == "Project Manager" || Role == "Admin")
+            const roleCriteria = TEAM_USER_ROLES.map(role => `(${FIELD_USER_ROLE} == "${role}")`).join(" || ");
+            const criteria = `(${roleCriteria})`;
+            console.log(`Lookups Store (Pinia): Fetching team users with criteria: ${criteria}`);
+
+            const response = await ZohoAPIService.getRecords(REPORT_USERS, criteria);
+            if (response.code !== 3000) {
+                throw new Error(response.message || `API Error Code ${response.code}`);
+            }
+            // Store the raw user data, processing/filtering for dropdowns can happen in getters if needed
+            this.users = response.data || []; 
+            console.log(`Lookups Store (Pinia): Team Users (${this.users.length}) fetched successfully.`);
+        } catch (error) {
+            console.error("Lookups Store (Pinia): Error fetching Team Users:", error);
+            this.error = error.message || 'Failed to fetch Team Users.';
+            this.users = []; // Clear users on error
+        } finally {
+            this.isLoadingTeamUsers = false;
+        }
+    },
+
+    /**
+     * Fetches Tags data on demand.
+     */
+    async fetchTags() {
+        if (this.tags.size > 0 || this.isLoadingTags) return; // Don't refetch if already loaded or loading
+        console.log("Lookups Store (Pinia): Starting fetchTags...");
+        this.isLoadingTags = true;
+        this.error = null; // Clear previous errors
+        try {
+            const response = await ZohoAPIService.getRecords(REPORT_TAGS);
+            if (response.code !== 3000) {
+                throw new Error(response.message || `API Error Code ${response.code}`);
+            }
+            this.tags = DataProcessors.processTagsData(response);
+            console.log("Lookups Store (Pinia): Tags fetched successfully.");
+        } catch (error) {
+            console.error("Lookups Store (Pinia): Error fetching Tags:", error);
+            this.error = error.message || 'Failed to fetch Tags.';
+            // Potentially clear tags: this.tags = new Map();
+        } finally {
+            this.isLoadingTags = false;
+        }
+    },
+
+     /**
+     * Fetches Sales Reps data on demand.
+     */
+    async fetchSalesReps() {
+        if (this.salesReps.length > 0 || this.isLoadingSalesReps) return;
+        console.log("Lookups Store (Pinia): Starting fetchSalesReps...");
+        this.isLoadingSalesReps = true;
+        this.error = null;
+        try {
+            const response = await ZohoAPIService.getRecords(REPORT_SALES_REPS);
+            if (response.code !== 3000) {
+                throw new Error(response.message || `API Error Code ${response.code}`);
+            }
+            this.salesReps = DataProcessors.processSalesRepsData(response);
+            console.log("Lookups Store (Pinia): Sales Reps fetched successfully.");
+        } catch (error) {
+            console.error("Lookups Store (Pinia): Error fetching Sales Reps:", error);
+            this.error = error.message || 'Failed to fetch Sales Reps.';
+            // Potentially clear: this.salesReps = [];
+        } finally {
+            this.isLoadingSalesReps = false;
+        }
+    },
+
+    /**
+     * Fetches Sales Orgs data on demand.
+     */
+    async fetchSalesOrgs() {
+        if (this.salesOrgs.length > 0 || this.isLoadingSalesOrgs) return;
+        console.log("Lookups Store (Pinia): Starting fetchSalesOrgs...");
+        this.isLoadingSalesOrgs = true;
+        this.error = null;
+        try {
+            const response = await ZohoAPIService.getRecords(REPORT_SALES_ORGS);
+            if (response.code !== 3000) {
+                throw new Error(response.message || `API Error Code ${response.code}`);
+            }
+            this.salesOrgs = DataProcessors.processSalesOrgsData(response);
+            console.log("Lookups Store (Pinia): Sales Orgs fetched successfully.");
+        } catch (error) {
+            console.error("Lookups Store (Pinia): Error fetching Sales Orgs:", error);
+            this.error = error.message || 'Failed to fetch Sales Orgs.';
+            // Potentially clear: this.salesOrgs = [];
+        } finally {
+            this.isLoadingSalesOrgs = false;
+        }
     },
   }
 }); 

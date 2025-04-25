@@ -146,7 +146,7 @@ const DataProcessors = {
           return project;
       });
 
-      // console.log(`DataProcessors: Finished processing ${processedProjects.length} projects.`);
+       console.log(`DataProcessors: Processed Projects:`, processedProjects);
       return processedProjects;
 
     } catch (error) {
@@ -348,6 +348,18 @@ const DataProcessors = {
         }
         
         // --- 4. Specific Related List Processing (Example: Sort Notes) ---
+        if (Array.isArray(processedData.Activities) && processedData.Activities.length > 0) {
+             processedData.Activities.sort((a, b) => {
+                const timeA = a.Added_Time ? new Date(a.Added_Time).getTime() : 0;
+                const timeB = b.Added_Time ? new Date(b.Added_Time).getTime() : 0;
+                // Handle potential invalid dates by treating them as earliest (0)
+                const validTimeA = isNaN(timeA) ? 0 : timeA;
+                const validTimeB = isNaN(timeB) ? 0 : timeB;
+                return validTimeB - validTimeA; // Descending order
+             });
+             console.log("DataProcessors: Sorted Activities by Added_Time (desc)");
+        }
+        
         if (processedData.Notes) {
              processedData.Notes.sort((a, b) => {
                 const timeA = a.Added_Time ? new Date(a.Added_Time).getTime() : 0;
@@ -385,7 +397,7 @@ const DataProcessors = {
 
         // TODO: Process other related lists (Documents, Surveys etc.) as needed
 
-        // console.log('DataProcessors: Finished processing details (Minimal Transformations): ', processedData);
+         console.log('DataProcessors: Finished processing details (Minimal Transformations): ', processedData);
         return processedData;
 
     } catch (error) {
