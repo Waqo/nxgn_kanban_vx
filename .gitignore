@@ -1,2 +1,8 @@
 .DS_Store
 node_modules/
+
+# Cursor specific files
+.cursor/
+
+# Rules file (if user-specific)
+rules.mdc
