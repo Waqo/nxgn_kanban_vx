@@ -17,27 +17,40 @@ import {
     FIELD_PROJECT_FOLDER_LINK,
     FIELD_PROJECT_INVESTOR_FOLDER_LINK,
     FIELD_PROJECT_NEED_HELP,
+    TAG_CATEGORY_COLORS,
 } from '../../config/constants.js';
 
 // Import Helpers
-import { formatDateMMDDYY, formatDateWithOptions, calculateApproxInstallDate } from '../../utils/helpers.js';
+import { calculateApproxInstallDate } from '../../utils/helpers.js';
+// Import VueUse composable
+// Correct the import method for VueUse
+// import { useDateFormat } from 'vue-use'; 
 
 // Import Pinia stores and helpers
 import { useLookupsStore } from '../../store/lookupsStore.js';
 import { useProjectsStore } from '../../store/projectsStore.js';
+import { useUiStore } from '../../store/uiStore.js'; // Import UI store for notifications
+import { logActivity } from '../../services/activityLogService.js';
 const { mapState, mapActions } = Pinia;
+const { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } = Vue; // Add Vue refs
+// Destructure from global VueUse
+const { useDateFormat } = VueUse; 
 
 // Import common components used in the header
-import BaseSelectMenu from '../common/BaseSelectMenu.js';
-import BaseButton from '../common/BaseButton.js';
-import BaseBadge from '../common/BaseBadge.js';
+// import BaseSelectMenu from '../common/BaseSelectMenu.js';
+// import BaseButton from '../common/BaseButton.js';
+// import BaseBadge from '../common/BaseBadge.js';
+import Counters from './Counters.js';
 
 const ModalHeader = {
     name: 'ModalHeader',
     components: {
-        BaseSelectMenu,
-        BaseButton,
-        BaseBadge
+        // --- REMOVE Global Base Components Registration --- 
+        // BaseSelectMenu,
+        // BaseButton,
+        // BaseBadge,
+        // --- ADD Local Registration for Counters ---
+        Counters
     },
     props: {
         projectData: {
@@ -46,272 +59,387 @@ const ModalHeader = {
         },
         isLoading: Boolean,
         error: [String, Object, null],
-        // Assuming these are passed down or managed globally
         tabs: {
             type: Array,
-            default: () => [] // Example: [{ id: 'details', name: 'Details' }, { id: 'tasks', name: 'Tasks' }]
+            default: () => []
         },
         activeTab: {
             type: String,
-            default: '' // Example: 'details'
+            default: ''
         }
     },
     emits: ['close', 'update:activeTab', 'refresh-data', 'request-help'], // Added refresh/help emits
-    computed: {
-        ...mapState(useLookupsStore, [
-            'stages',
-            'tranches'
-        ]),
-        // Use a consistent naming convention for the main data object
-        project() {
-            return this.projectData;
-        },
-        contactName() {
-            // Provide a more descriptive loading state or default
-            if (this.isLoading) return 'Loading Name...';
-            return this.project?.[FIELD_PROJECT_CONTACT_NAME_LOOKUP]?.zc_display_value || 'Project Details';
-        },
-        contactEmail() {
-            return this.project?.[FIELD_PROJECT_CONTACT_EMAIL] || null;
-        },
-        contactPhone() {
-            return this.project?.[FIELD_PROJECT_CONTACT_PHONE] || null;
-        },
-        formattedAddress() {
-            if (this.isLoading) return 'Loading Address...';
-            if (!this.project?.[FIELD_PROJECT_ADDRESS]) return 'Address not available';
-            const addr = this.project[FIELD_PROJECT_ADDRESS];
-            // Ensure parts are strings and handle potential null/undefined values gracefully
-            const parts = [addr.address_line_1, addr.district_city, addr.state_province, addr.postal_code]
-                .map(part => String(part || '')) // Convert to string, handle null/undefined
-                .filter(Boolean); // Remove empty strings
-            return parts.join(', ') || 'Address incomplete';
-        },
-        currentStageId() {
-            // Use optional chaining safely
-            return this.project?.New_Stage?.ID ?? null;
-        },
-        currentTrancheId() {
-            return this.project?.Tranche?.ID ?? null;
-        },
-        stageOptions() {
-            // Ensure stages is an array before mapping
-            if (!Array.isArray(this.stages)) return [];
-            return this.stages.map(s => ({ value: s.id, label: s.title || 'Unnamed Stage' }));
-        },
-        trancheOptions() {
-            // Ensure tranches is an array before mapping
-            if (!Array.isArray(this.tranches)) return [{ value: null, label: 'Unassigned' }]; // Default if tranches not loaded
-            const options = this.tranches.map(t => ({ value: t.id, label: `Tranche ${t.number ?? 'N/A'}` }));
-            // Add the 'Unassigned' option at the beginning
-            return [{ value: null, label: 'Unassigned' }, ...options];
-        },
-        processedTags() {
-            const lookupsStore = useLookupsStore();
-            // Add more robust checks
-            if (this.isLoading || !this.project || !Array.isArray(this.project.Tags)) {
-                return [];
-            }
-            const tagsMap = lookupsStore.tags;
-            if (!tagsMap || !(tagsMap instanceof Map) || tagsMap.size === 0) {
-                 console.warn("ModalHeader: tagsMap not ready or empty for processedTags");
-                 // Optionally return raw tags if map isn't ready but tags exist
-                 // return this.project.Tags.map(rawTag => ({ id: rawTag.ID, name: `Tag ${rawTag.ID}` }));
-                 return [];
-            }
+    setup(props, { emit }) {
+        // --- Get Stores ---
+        const lookupsStore = useLookupsStore();
+        const projectsStore = useProjectsStore(); // Use directly instead of mapActions if preferred
+        const uiStore = useUiStore();
 
-            return this.project.Tags
-                .map(rawTag => {
-                    if (!rawTag || !rawTag.ID) return null; // Skip invalid tag data
-                    const mappedTag = tagsMap.get(rawTag.ID);
-                    // Provide default name if mapped tag is missing details
-                    return mappedTag ? { ...mappedTag, id: rawTag.ID, name: mappedTag.name || `Tag ${rawTag.ID}` } : { id: rawTag.ID, name: `Tag ${rawTag.ID}`, color: '#6b7280' }; // Default color
-                })
-                .filter(Boolean); // Filter out any nulls from invalid data
-        },
-        systemSizeDisplay() {
-            if (this.isLoading) return '... kW';
-            const size = parseFloat(this.project?.[FIELD_PROJECT_KW_STC]);
-            // Handle null, undefined, or non-numeric values
+        // --- State for Add Tag Dropdown ---
+        const showAddTagDropdown = ref(false);
+        const addTagButtonRef = ref(null); // Ref for the '+' button element
+        const addTagDropdownRef = ref(null); // Ref for the dropdown element
+
+        // --- Computed Properties (mostly unchanged) ---
+        const project = computed(() => props.projectData); // Use computed for reactivity
+
+        const contactName = computed(() => {
+            if (props.isLoading) return 'Loading Name...';
+            return project.value?.[FIELD_PROJECT_CONTACT_NAME_LOOKUP]?.zc_display_value || 'Project Details';
+        });
+
+        const contactEmail = computed(() => project.value?.[FIELD_PROJECT_CONTACT_EMAIL] || null);
+        const contactPhone = computed(() => project.value?.[FIELD_PROJECT_CONTACT_PHONE] || null);
+
+        const formattedAddress = computed(() => {
+            if (props.isLoading) return 'Loading Address...';
+            if (!project.value?.[FIELD_PROJECT_ADDRESS]) return 'Address not available';
+            const addr = project.value[FIELD_PROJECT_ADDRESS];
+            const parts = [addr.address_line_1, addr.district_city, addr.state_province, addr.postal_code]
+                .map(part => String(part || ''))
+                .filter(Boolean);
+            return parts.join(', ') || 'Address incomplete';
+        });
+
+        const currentStageId = computed(() => project.value?.New_Stage?.ID ?? null);
+        const currentTrancheId = computed(() => project.value?.Tranche?.ID ?? null);
+
+        const stageOptions = computed(() => {
+            if (!Array.isArray(lookupsStore.stages)) return [];
+            return lookupsStore.stages.map(s => ({ value: s.id, label: s.title || 'Unnamed Stage' }));
+        });
+
+        const trancheOptions = computed(() => {
+            if (!Array.isArray(lookupsStore.tranches)) return [{ value: null, label: 'Unassigned' }];
+            const options = lookupsStore.tranches.map(t => ({ value: t.id, label: `Tranche ${t.number ?? 'N/A'}` }));
+            return [{ value: null, label: 'Unassigned' }, ...options];
+        });
+
+        // --- Processed Tags (with simplified setter for optimistic updates) ---
+        const processedTags = computed({
+            get() {
+                if (props.isLoading || !project.value || !Array.isArray(project.value.Tags)) {
+                    return [];
+                }
+                const tagsMap = lookupsStore.tags;
+                if (!tagsMap || !(tagsMap instanceof Map) || tagsMap.size === 0) {
+                    // console.warn("Tags map not ready or empty in lookupsStore");
+                    return []; // Return empty if lookups aren't ready
+                }
+
+                return project.value.Tags
+                    .map(rawTag => {
+                        if (!rawTag || !rawTag.ID) return null;
+                        const mappedTag = tagsMap.get(rawTag.ID);
+                        if (!mappedTag) {
+                            console.warn(`Tag ID ${rawTag.ID} not found in lookups store.`);
+                            return { id: rawTag.ID, name: `Tag ${rawTag.ID}`, badgeColorName: 'gray', description: 'Unknown Tag' };
+                        }
+                        const category = mappedTag.category || 'default';
+                        const badgeColorName = TAG_CATEGORY_COLORS[category] || TAG_CATEGORY_COLORS['default'] || 'gray';
+
+                        return {
+                             id: rawTag.ID, 
+                             name: mappedTag.name || `Tag ${rawTag.ID}`,
+                             badgeColorName: badgeColorName,
+                             description: mappedTag.description || ''
+                        };
+                    })
+                    .filter(Boolean) 
+                    .sort((a, b) => a.name.localeCompare(b.name)); 
+            },
+            set(newProcessedTagsArray) {
+                // This setter allows direct manipulation for optimistic UI updates.
+                // It assumes the parent component handles the actual data persistence.
+                if (project.value && Array.isArray(project.value.Tags)) {
+                    // Map back to the raw format expected by projectData.Tags
+                    project.value.Tags = newProcessedTagsArray.map(procTag => ({
+                        ID: procTag.id,
+                        // Note: zc_display_value might not be perfectly accurate here
+                        // if the name was derived from the lookup, but it's for UI display.
+                        zc_display_value: procTag.name
+                    }));
+                    // console.log('ProcessedTags setter updated project.value.Tags (optimistic)');
+                } else {
+                     console.error('Cannot set processedTags, project prop or project.Tags not valid.');
+                }
+            }
+        });
+
+        // --- Computed Property for Available Tags (for the Add Tag dropdown) ---
+        const availableTagsForAdding = computed(() => {
+            const allTagsMap = lookupsStore.tags;
+            const currentTagIds = new Set(processedTags.value.map(tag => tag.id));
+
+            if (!allTagsMap || allTagsMap.size === 0) return [];
+
+            const available = [];
+            allTagsMap.forEach((tagData, tagId) => {
+                if (!currentTagIds.has(tagId)) {
+                    const category = tagData.category || 'default';
+                    const badgeColorName = TAG_CATEGORY_COLORS[category] || TAG_CATEGORY_COLORS['default'] || 'gray';
+                    available.push({
+                        id: tagId,
+                        name: tagData.name || `Tag ${tagId}`,
+                        badgeColorName: badgeColorName,
+                        description: tagData.description || ''
+                    });
+                }
+            });
+
+            return available.sort((a, b) => a.name.localeCompare(b.name));
+        });
+
+
+        // --- Other Computed Properties (unchanged) ---
+        const systemSizeDisplay = computed(() => {
+            if (props.isLoading) return '... kW';
+            const size = parseFloat(project.value?.[FIELD_PROJECT_KW_STC]);
             return !isNaN(size) && size > 0 ? `${size.toFixed(2)} kW` : '0.00 kW';
-        },
-        paymentOptionDisplay() {
-            if (this.isLoading) return 'Loading...';
-            return this.project?.[FIELD_PROJECT_PAYMENT_OPTION] || 'N/A'; // Provide fallback
-        },
-        projectTypeBadge() {
-            if (this.isLoading) return { text: '...', colorClass: 'bg-gray-400', title: 'Loading Type' };
-            // Explicitly check for the string 'true'
-            const isCommercial = String(this.project?.[FIELD_PROJECT_COMMERCIAL]).toLowerCase() === 'true';
+        });
+        const paymentOptionDisplay = computed(() => project.value?.[FIELD_PROJECT_PAYMENT_OPTION] || 'N/A');
+        const projectTypeBadge = computed(() => {
+             if (props.isLoading) return { text: '...', colorClass: 'bg-gray-400', title: 'Loading Type' };
+            const isCommercial = String(project.value?.[FIELD_PROJECT_COMMERCIAL]).toLowerCase() === 'true';
             return {
                 text: isCommercial ? 'COM' : 'RES',
-                // Use Tailwind classes directly for easier maintenance
                 colorClass: isCommercial ? 'bg-purple-600 hover:bg-purple-700' : 'bg-sky-600 hover:bg-sky-700',
                 title: isCommercial ? 'Commercial Project' : 'Residential Project'
             };
-        },
-        soldDateDisplay() {
-            if (this.isLoading) return 'Loading Date...';
-            const date = this.project?.[FIELD_PROJECT_DATE_SOLD];
-            return date ? formatDateMMDDYY(date) : 'Not Set';
-        },
-        installDateDisplay() {
-            if (this.isLoading) return { text: 'Loading Date...', isApprox: false, colorClass: 'bg-gray-400' };
-            const installDate = this.project?.[FIELD_PROJECT_INSTALL_DATE_TIME];
-            const soldDate = this.project?.[FIELD_PROJECT_DATE_SOLD];
-
-            if (installDate) {
-                return {
-                    text: `Install: ${formatDateMMDDYY(installDate)}`,
-                    isApprox: false,
-                    colorClass: 'bg-green-600 hover:bg-green-700' // Success color for confirmed date
-                };
+        });
+        
+        // Date value refs with fallbacks
+        const projectSoldDate = computed(() => project.value?.[FIELD_PROJECT_DATE_SOLD] || '');
+        const projectInstallDateTime = computed(() => project.value?.[FIELD_PROJECT_INSTALL_DATE_TIME] || '');
+        
+        // Use useDateFormat wrapped in computed properties for fallbacks
+        const soldDateDisplay = computed(() => {
+            return projectSoldDate.value ? useDateFormat(projectSoldDate, 'MM/DD/YY', { locales: 'en-US' }).value : 'N/A';
+        });
+        
+        const installDate = computed(() => {
+            return projectInstallDateTime.value ? useDateFormat(projectInstallDateTime, 'MM/DD/YY', { locales: 'en-US' }).value : 'N/A';
+        });
+        
+        // Calculate Approx Install Date with fallback
+        const approxInstallDate = computed(() => {
+            if (!projectSoldDate.value) return null;
+            return calculateApproxInstallDate(projectSoldDate.value); // Use helper
+        });
+        
+        const formattedApproxInstallDate = computed(() => {
+            return approxInstallDate.value ? useDateFormat(approxInstallDate, 'MM/DD/YY', { locales: 'en-US' }).value : 'N/A';
+        });
+        
+        // Combined Install Date Display Logic
+        const installDateDisplay = computed(() => {
+             if (props.isLoading) return { text: 'Loading Date...', isApprox: false, colorClass: 'bg-gray-400' };
+             
+             if (projectInstallDateTime.value) {
+                 return { text: `Install: ${installDate.value}`, isApprox: false, colorClass: 'bg-green-600 hover:bg-green-700' };
             }
-            const approxDate = calculateApproxInstallDate(soldDate);
-            if (approxDate) {
-                return {
-                    text: `Approx: ${formatDateMMDDYY(approxDate)}`,
-                    isApprox: true,
-                    colorClass: 'bg-yellow-600 hover:bg-yellow-700' // Warning/notice color for approximate
-                };
+             if (approxInstallDate.value) {
+                 return { text: `Approx: ${formattedApproxInstallDate.value}`, isApprox: true, colorClass: 'bg-yellow-600 hover:bg-yellow-700' };
             }
-            return { text: 'Install: N/A', isApprox: false, colorClass: 'bg-gray-500 hover:bg-gray-600' }; // Neutral color if no date
-        },
-        // Check if the necessary IDs are present for external links
-        hasOpenSolarLink() {
-            return !!this.project?.[FIELD_PROJECT_OS_ID];
-        },
-        hasAduuLink() {
-            return !!this.project?.[FIELD_PROJECT_ADUU_ID];
-        },
-        hasProjectFolderLink() {
-            return !!this.project?.[FIELD_PROJECT_FOLDER_LINK]?.url;
-        },
-        hasInvestorFolderLink() {
-            return !!this.project?.[FIELD_PROJECT_INVESTOR_FOLDER_LINK]?.url;
-        },
-        isFundedByRedball() {
-            // Explicitly check for the string 'true'
-            return String(this.project?.[FIELD_PROJECT_FUNDED_REDBALL]).toLowerCase() === 'true';
-        }
-    },
-    methods: {
-        ...mapActions(useProjectsStore, [
-            'updateProjectStage',
-            'updateProjectTranche',
-            // Assuming actions for tags and funded status exist
-            'addProjectTag',
-            'removeProjectTag',
-            'updateProjectFundedStatus'
-        ]),
+             return { text: 'Install: N/A', isApprox: false, colorClass: 'bg-gray-500 hover:bg-gray-600' };
+        });
+        const hasOpenSolarLink = computed(() => !!project.value?.[FIELD_PROJECT_OS_ID]);
+        const hasAduuLink = computed(() => !!project.value?.[FIELD_PROJECT_ADUU_ID]);
+        const hasProjectFolderLink = computed(() => !!project.value?.[FIELD_PROJECT_FOLDER_LINK]?.url);
+        const hasInvestorFolderLink = computed(() => !!project.value?.[FIELD_PROJECT_INVESTOR_FOLDER_LINK]?.url);
+        const isFundedByRedball = computed(() => String(project.value?.[FIELD_PROJECT_FUNDED_REDBALL]).toLowerCase() === 'true');
 
-        // --- Event Handlers ---
-        handleStageChange(event) {
-            const newStageId = event.target.value;
-            // Prevent unnecessary updates if the value hasn't changed or project is missing
-            if (!this.project || newStageId === this.currentStageId) return;
+        // --- Methods ---
+        const handleStageChange = (selectedOption) => {
+            const newStageId = selectedOption ?? null;
+            if (!project.value || newStageId === currentStageId.value) return;
             console.log(`ModalHeader: Stage change selected: ID=${newStageId}`);
-            this.updateProjectStage({ projectId: this.project.ID, newStageId: newStageId })
-                .catch(err => console.error("Failed to update stage:", err)); // Add basic error handling
-        },
-        handleTrancheChange(event) {
-            const newTrancheId = event.target.value === 'null' ? null : event.target.value; // Handle 'Unassigned' which has value 'null'
-             // Prevent unnecessary updates
-            if (!this.project || newTrancheId === this.currentTrancheId) return;
+            projectsStore.updateProjectStage({ projectId: project.value.ID, newStageId: newStageId })
+                .catch(err => console.error("Failed to update stage:", err));
+        };
+
+        const handleTrancheChange = (selectedOption) => {
+            const newTrancheId = selectedOption ?? null;
+            if (!project.value || newTrancheId === currentTrancheId.value) return;
             console.log(`ModalHeader: Tranche change selected: ID=${newTrancheId}`);
-            this.updateProjectTranche({ projectId: this.project.ID, newTrancheId: newTrancheId })
-                 .catch(err => console.error("Failed to update tranche:", err)); // Add basic error handling
-        },
-        handleAddTagClick() {
-            // Replace alert with a more robust implementation (e.g., open a tag selection dropdown/modal)
-            console.warn('Add Tag UI not implemented yet.');
-            // Example of how you might call an action (if you had a tagIdToAdd)
-            // this.addProjectTag({ projectId: this.project.ID, tagId: tagIdToAdd });
-        },
-        handleRemoveTagClick(tagId) {
-             if (!this.project || !tagId) return;
-             console.log(`ModalHeader: Remove tag clicked: ID=${tagId}`);
-             // Add confirmation dialog before removing
-             if (confirm(`Are you sure you want to remove this tag?`)) {
-                 this.removeProjectTag({ projectId: this.project.ID, tagId: tagId })
-                     .catch(err => console.error("Failed to remove tag:", err));
-             }
-        },
-        handleEmailClick() {
-            if (this.contactEmail) {
-                window.location.href = `mailto:${this.contactEmail}`;
-            } else {
-                // Provide user feedback differently (e.g., disable button, show tooltip)
-                console.warn('No email available.');
+            projectsStore.updateProjectTranche({ projectId: project.value.ID, newTrancheId: newTrancheId })
+                 .catch(err => console.error("Failed to update tranche:", err));
+        };
+
+        // --- Add Tag Logic ---
+        const handleAddTagClick = () => {
+            showAddTagDropdown.value = !showAddTagDropdown.value;
+        };
+
+        const addTag = async (tagToAdd) => {
+            if (!project.value?.ID || !tagToAdd?.id) return;
+
+            showAddTagDropdown.value = false; // Hide dropdown immediately
+
+            const originalTags = [...processedTags.value]; // Store for revert
+            const currentTagIds = originalTags.map(tag => tag.id);
+
+            // Prevent adding duplicates (shouldn't happen if availableTagsForAdding is correct, but belt-and-suspenders)
+            if (currentTagIds.includes(tagToAdd.id)) {
+                console.warn(`Tag "${tagToAdd.name}" is already added.`);
+                return;
             }
-        },
-        handlePhoneClick() {
-            if (this.contactPhone) {
-                window.location.href = `tel:${this.contactPhone}`;
-            } else {
-                console.warn('No phone number available.');
+
+            const newTagIds = [...currentTagIds, tagToAdd.id];
+
+            // --- Optimistic UI Update ---
+            // Create the processed tag object based on the selected available tag
+            const newProcessedTag = {
+                id: tagToAdd.id,
+                name: tagToAdd.name,
+                badgeColorName: tagToAdd.badgeColorName,
+                description: tagToAdd.description
+            };
+            // Use the setter to update the underlying project.Tags
+            processedTags.value = [...originalTags, newProcessedTag].sort((a, b) => a.name.localeCompare(b.name));
+
+            // --- Specific Logging ---
+            logActivity(project.value.ID, `Tag added: ${tagToAdd.name}`);
+
+            try {
+                // Call the store action
+                await projectsStore.updateProjectTags({ projectId: project.value.ID, tagIds: newTagIds });
+                // Success - UI already updated, maybe show a brief success notification
+                uiStore.addNotification({ type: 'success', message: `Tag "${tagToAdd.name}" added.`, duration: 2000 });
+            } catch (error) {
+                console.error("Failed to add tag:", error);
+                // --- Revert UI on Error ---
+                processedTags.value = originalTags; // Use setter to revert
+                uiStore.addNotification({ type: 'error', message: `Failed to add tag "${tagToAdd.name}".`, title: 'Update Error' });
             }
-        },
-        handleAddressClick() {
-            // Implement actual map functionality or link to Google Maps
-            if (this.formattedAddress && this.formattedAddress !== 'Address not available' && this.formattedAddress !== 'Address incomplete') {
-                 const query = encodeURIComponent(this.formattedAddress);
-                 window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
-            } else {
-                 console.warn('Cannot open map, address unavailable.');
+        };
+
+        // --- Remove Tag Logic ---
+        const handleRemoveTagClick = async (tagIdToRemove) => {
+            if (!project.value?.ID || !processedTags.value) return;
+
+            const tagToRemove = processedTags.value.find(t => t.id === tagIdToRemove);
+            if (!tagToRemove) return;
+
+            const originalTags = [...processedTags.value]; // Store for revert
+            const currentTagIds = originalTags.map(tag => tag.id);
+            const newTagIds = currentTagIds.filter(id => id !== tagIdToRemove);
+
+            // --- Optimistic UI Update --- 
+            processedTags.value = originalTags.filter(tag => tag.id !== tagIdToRemove); // Use setter
+
+            // --- Specific Logging --- 
+            logActivity(project.value.ID, `Tag removed: ${tagToRemove.name}`);
+
+            try {
+                // Call the store action
+                await projectsStore.updateProjectTags({ projectId: project.value.ID, tagIds: newTagIds });
+                 uiStore.addNotification({ type: 'success', message: `Tag "${tagToRemove.name}" removed.`, duration: 2000 });
+            } catch (error) {
+                console.error("Failed to remove tag:", error);
+                // --- Revert UI on Error --- 
+                processedTags.value = originalTags; // Use setter to revert
+                uiStore.addNotification({ type: 'error', message: `Failed to remove tag "${tagToRemove.name}".`, title: 'Update Error' });
             }
-        },
-        handleOpenSolarClick() {
-            if (this.hasOpenSolarLink) {
-                window.open(`https://app.opensolar.com/#/projects/${this.project[FIELD_PROJECT_OS_ID]}`, '_blank');
-            } else {
-                console.warn('OpenSolar ID not available.');
+        };
+
+        // --- Other Event Handlers (unchanged) ---
+        const handleEmailClick = () => { if (contactEmail.value) window.location.href = `mailto:${contactEmail.value}`; };
+        const handlePhoneClick = () => { if (contactPhone.value) window.location.href = `tel:${contactPhone.value}`; };
+        const handleAddressClick = () => {
+            if (formattedAddress.value && formattedAddress.value !== 'Address not available' && formattedAddress.value !== 'Address incomplete') {
+                 const query = encodeURIComponent(formattedAddress.value);
+                 window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank'); // Use standard Google Maps URL
             }
-        },
-        handleAduuClick() {
-            if (this.hasAduuLink) {
-                window.open(`https://client.aduusolar.com/portal/orders/${this.project[FIELD_PROJECT_ADUU_ID]}`, '_blank');
-            } else {
-                console.warn('ADUU ID not available.');
-            }
-        },
-        handleFundedByRedballChange(event) {
+        };
+        const handleOpenSolarClick = () => { if (hasOpenSolarLink.value) window.open(`https://app.opensolar.com/#/projects/${project.value[FIELD_PROJECT_OS_ID]}`, '_blank'); };
+        const handleAduuClick = () => { if (hasAduuLink.value) window.open(`https://client.aduusolar.com/portal/orders/${project.value[FIELD_PROJECT_ADUU_ID]}`, '_blank'); };
+        const handleFundedByRedballChange = (event) => {
             const isChecked = event.target.checked;
-            if (!this.project) return;
-            console.log(`ModalHeader: Funded by Redball changed: ${isChecked}`);
-            this.updateProjectFundedStatus({ projectId: this.project.ID, isFunded: isChecked })
+            if (!project.value) return;
+            projectsStore.updateProjectFundedStatus({ projectId: project.value.ID, isFunded: isChecked })
                  .catch(err => {
                      console.error("Failed to update funded status:", err);
-                     // Optionally revert checkbox state on failure
-                     event.target.checked = !isChecked;
+                     event.target.checked = !isChecked; // Revert checkbox on failure
                  });
-        },
-        handleRefreshData() {
-            console.log('ModalHeader: Refresh Data requested');
-            this.$emit('refresh-data'); // Emit event for parent component to handle
-        },
-        handleRequestHelp() {
-             console.log('ModalHeader: Request Help clicked');
-             this.$emit('request-help'); // Emit event for parent component to handle
-        },
-        openProjectFolder() {
-            if (this.hasProjectFolderLink) {
-                window.open(this.project[FIELD_PROJECT_FOLDER_LINK].url, '_blank');
-            } else {
-                console.warn('Project Folder Link not available.');
-            }
-        },
-        openInvestorFolder() {
-            if (this.hasInvestorFolderLink) {
-                window.open(this.project[FIELD_PROJECT_INVESTOR_FOLDER_LINK].url, '_blank');
-            } else {
-                console.warn('Investor Folder Link not available.');
-            }
-        },
-        // --- Internal Methods ---
-        setActiveTab(tabId) {
-            this.$emit('update:activeTab', tabId); // Use v-model convention
-        }
+        };
+        const handleRefreshData = () => emit('refresh-data');
+        const handleRequestHelp = () => emit('request-help');
+        const openProjectFolder = () => { if (hasProjectFolderLink.value) window.open(project.value[FIELD_PROJECT_FOLDER_LINK].url, '_blank'); };
+        const openInvestorFolder = () => { if (hasInvestorFolderLink.value) window.open(project.value[FIELD_PROJECT_INVESTOR_FOLDER_LINK].url, '_blank'); };
+        const setActiveTab = (tabId) => emit('update:activeTab', tabId);
+
+        // --- Click Outside Handler for Add Tag Dropdown ---
+        const handleClickOutside = (event) => {
+          if (showAddTagDropdown.value &&
+              addTagButtonRef.value &&
+              !addTagButtonRef.value.contains(event.target) &&
+              addTagDropdownRef.value &&
+              !addTagDropdownRef.value.contains(event.target)) {
+            showAddTagDropdown.value = false;
+          }
+        };
+
+        onMounted(() => {
+          document.addEventListener('click', handleClickOutside, true); // Use capture phase
+        });
+
+        onBeforeUnmount(() => {
+          document.removeEventListener('click', handleClickOutside, true);
+        });
+
+
+        return {
+            // State & Refs
+            project, // Use computed project
+            isLoading: computed(() => props.isLoading), // Pass down reactive isLoading
+            error: computed(() => props.error), // Pass down reactive error
+            showAddTagDropdown,
+            addTagButtonRef,
+            addTagDropdownRef,
+
+            // Computed Props for Display
+            contactName,
+            contactEmail,
+            contactPhone,
+            formattedAddress,
+            currentStageId,
+            currentTrancheId,
+            stageOptions,
+            trancheOptions,
+            processedTags, // Use computed with setter
+            availableTagsForAdding, // For the dropdown
+            systemSizeDisplay,
+            paymentOptionDisplay,
+            projectTypeBadge,
+            soldDateDisplay,
+            installDate,
+            installDateDisplay,
+            hasOpenSolarLink,
+            hasAduuLink,
+            hasProjectFolderLink,
+            hasInvestorFolderLink,
+            isFundedByRedball,
+
+            // Methods
+            handleStageChange,
+            handleTrancheChange,
+            handleAddTagClick,
+            addTag, // New method to add a selected tag
+            handleRemoveTagClick,
+            handleEmailClick,
+            handlePhoneClick,
+            handleAddressClick,
+            handleOpenSolarClick,
+            handleAduuClick,
+            handleFundedByRedballChange,
+            handleRefreshData,
+            handleRequestHelp,
+            openProjectFolder,
+            openInvestorFolder,
+            setActiveTab,
+            emit // Make emit available if needed directly in template (though usually methods handle this)
+        };
     },
     template: `
         <div class="modal-header-content flex-none border-b border-gray-200 dark:border-gray-700">
@@ -336,10 +464,7 @@ const ModalHeader = {
                                 <button
                                     @click="handleEmailClick"
                                     :disabled="!contactEmail"
-                                    :class="[
-                                        'inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-blue-700 focus:ring-white',
-                                        contactEmail ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-white/10 text-white/50 cursor-not-allowed'
-                                    ]"
+                                    :class="['inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-blue-700 focus:ring-white', contactEmail ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-white/10 text-white/50 cursor-not-allowed']"
                                     :title="contactEmail ? 'Send Email: ' + contactEmail : 'Email not available'"
                                 >
                                     <i class="far fa-envelope w-4 h-4"></i>
@@ -348,10 +473,7 @@ const ModalHeader = {
                                 <button
                                     @click="handlePhoneClick"
                                     :disabled="!contactPhone"
-                                    :class="[
-                                        'inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-blue-700 focus:ring-white',
-                                        contactPhone ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-white/10 text-white/50 cursor-not-allowed'
-                                    ]"
+                                    :class="['inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-blue-700 focus:ring-white', contactPhone ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-white/10 text-white/50 cursor-not-allowed']"
                                     :title="contactPhone ? 'Call: ' + contactPhone : 'Phone not available'"
                                 >
                                     <i class="far fa-phone w-4 h-4"></i>
@@ -359,26 +481,25 @@ const ModalHeader = {
                                 </button>
                             </div>
                         </div>
-
                         <div class="flex flex-shrink-0 items-center gap-1 sm:gap-2">
-                            <button class="p-1.5 rounded-md text-blue-100 hover:bg-white/20 hover:text-white transition-colors duration-150 focus:outline-none focus:bg-white/20" title="More Actions (Not Implemented)">
+                             <button class="p-1.5 rounded-md text-blue-100 hover:bg-white/20 hover:text-white transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-white" title="More Actions (Not Implemented)">
                                 <i class="fas fa-ellipsis-v w-5 h-5"></i>
+                            </button>
+                            <button class="p-1.5 rounded-md text-blue-100 hover:bg-white/20 hover:text-white transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-white" title="Edit Project (Not Implemented)">
+                                <i class="fas fa-pencil-alt w-5 h-5"></i>
                             </button>
                             <button @click="handleRefreshData" class="p-1.5 rounded-md text-blue-100 hover:bg-white/20 hover:text-white transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-white" title="Refresh Project Data">
                                 <i class="fas fa-sync-alt w-5 h-5"></i>
                             </button>
-                            <button @click="$emit('close')" class="p-1.5 rounded-md text-blue-100 hover:bg-red-500/50 hover:text-white transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-white" title="Close Modal">
+                            <button @click="emit('close')" class="p-1.5 rounded-md text-blue-100 hover:bg-red-500/50 hover:text-white transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-white" title="Close Modal">
                                 <i class="fas fa-times w-5 h-5"></i>
                             </button>
                         </div>
                     </div>
 
-                    <div class="mt-4 flex items-center flex-wrap justify-start space-x-2">
-                         <!-- Stage Selector -->
-                         <div class="flex items-center gap-1.5"> 
+                    <div class="mt-4 flex items-center flex-wrap justify-start gap-x-3 gap-y-2">
                               <base-select-menu
                                    id="modal-stage-select"
-                                   class="w-40 pr-3 bg-white/10 text-white rounded-md text-sm font-medium hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-blue-700 focus:ring-white appearance-none transition-colors duration-150 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
                                    :modelValue="currentStageId"
                                    @update:modelValue="handleStageChange"
                                    :options="stageOptions"
@@ -386,17 +507,11 @@ const ModalHeader = {
                                    optionLabelKey="label"
                                    :disabled="isLoading || !stageOptions.length"
                                    placeholder="Select Stage..."
+                              class="w-40 bg-white/10 text-white rounded-md text-sm font-medium hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-blue-700 focus:ring-white appearance-none transition-colors duration-150 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
                                    :attrs="{ 'aria-label': 'Project Stage' }"
-                              >
-                              </base-select-menu>
-                         </div>
-                         
-                         <!-- Group Tranche Select and Funded Checkbox -->
-                         <div class="flex items-center gap-3">
-                             <!-- Tranche Select -->
+                         />
                                <base-select-menu
                                     id="modal-tranche-select"
-                                    class="px-3py-1 bg-white/10 text-white rounded-md text-sm font-medium hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-blue-700 focus:ring-white appearance-none transition-colors duration-150 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
                                     :modelValue="currentTrancheId"
                                     @update:modelValue="handleTrancheChange"
                                     :options="trancheOptions"
@@ -404,11 +519,10 @@ const ModalHeader = {
                                     optionLabelKey="label"
                                     :disabled="isLoading || !trancheOptions.length"
                                     placeholder="Select Tranche..."
+                               class="w-36 bg-white/10 text-white rounded-md text-sm font-medium hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-blue-700 focus:ring-white appearance-none transition-colors duration-150 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
                                     :attrs="{ 'aria-label': 'Project Tranche' }"
-                               >
-                               </base-select-menu>
-                             <!-- Funded by Redball Checkbox (Styled like a badge/button) -->
-                              <label class="px-3 py-1 bg-blue-600 text-white rounded-md text-sm font-medium flex items-center gap-2 cursor-pointer hover:bg-blue-700">
+                          />
+                         <label class="px-3 py-1 bg-white/10 text-white rounded-md text-sm font-medium flex items-center gap-2 cursor-pointer hover:bg-white/20 transition-colors duration-150">
                                  <input 
                                     type="checkbox" 
                                     :checked="isFundedByRedball" 
@@ -418,29 +532,22 @@ const ModalHeader = {
                                  />
                                  Funded By Redball
                               </label>
-                         </div>
-                        
-                         <!-- System Size (Styled Span) -->
-                         <span class="px-3 py-1 bg-blue-600 text-white rounded-md font-medium text-sm">{{ systemSizeDisplay }}</span>
-                         <!-- Payment Option (Styled Span) -->
-                         <span v-if="paymentOptionDisplay && paymentOptionDisplay !== 'N/A'" class="px-3 py-1 bg-blue-600 text-white rounded-md text-sm font-medium">{{ paymentOptionDisplay }}</span>
-                         <!-- Install Date (Styled Span) -->
+                         <span class="px-3 py-1 bg-white/20 text-white rounded-md font-medium text-sm">{{ systemSizeDisplay }}</span>
+                         <span v-if="paymentOptionDisplay && paymentOptionDisplay !== 'N/A'" class="px-3 py-1 bg-white/20 text-white rounded-md text-sm font-medium">{{ paymentOptionDisplay }}</span>
                          <span v-if="installDateDisplay" :class="installDateDisplay.colorClass" class="inline-flex items-center gap-1 text-white rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors duration-150" :title="installDateDisplay.isApprox ? 'Approximate Install Date' : 'Scheduled Install Date'"> 
                              {{ installDateDisplay.text }}
                          </span>
-                         <!-- Sold Date (Styled Span) -->
-                         <span v-if="soldDateDisplay && soldDateDisplay !== 'Not Set'" class="inline-flex items-center gap-1 bg-blue-600 text-white rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap" title="Date Sold">
+                         <span v-if="soldDateDisplay && soldDateDisplay !== 'N/A'" class="inline-flex items-center gap-1 bg-white/20 text-white rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap" title="Date Sold">
                               Sold: {{ soldDateDisplay }}
                          </span>
-                         <!-- Project Type (Styled Span) -->
-                         <span class="inline-block bg-blue-600 text-white rounded-md px-3 py-1 text-sm font-medium tracking-wide whitespace-nowrap" :title="projectTypeBadge.title"> 
+                         <span :class="projectTypeBadge.colorClass" class="inline-block text-white rounded-md px-3 py-1 text-sm font-medium tracking-wide whitespace-nowrap transition-colors duration-150" :title="projectTypeBadge.title">
                               {{ projectTypeBadge.text }}
                          </span>
                     </div>
 
                      <div class="flex justify-start text-sm text-blue-100 dark:text-blue-200 pt-1">
                         <button
-                            class="group inline-flex items-center gap-1.5 hover:text-white transition-colors duration-150 text-left"
+                            class="group inline-flex items-center gap-1.5 hover:text-white transition-colors duration-150 text-left disabled:opacity-70 disabled:cursor-not-allowed"
                             @click="handleAddressClick"
                             :title="formattedAddress !== 'Address not available' && formattedAddress !== 'Address incomplete' ? 'View address on map' : formattedAddress"
                             :disabled="formattedAddress === 'Address not available' || formattedAddress === 'Address incomplete'"
@@ -450,62 +557,84 @@ const ModalHeader = {
                         </button>
                     </div>
 
-                    <hr class="border-white/20">
-                    <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-2">
+                    <hr class="border-white/20 my-3"> <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-2">
                         <div class="flex items-center gap-2 flex-wrap flex-1 min-w-[200px]">
-                            <span class="text-xs font-medium text-blue-100 dark:text-blue-200 flex-shrink-0">Tags:</span>
+                            <span class="text-xs font-medium text-blue-100 dark:text-blue-200 flex-shrink-0 mr-1">Tags:</span>
                             <div class="flex items-center gap-1.5 flex-wrap">
-                                <span
+                                <base-badge
                                     v-for="tag in processedTags"
                                     :key="tag.id"
-                                    :style="{ backgroundColor: tag.color || '#4b5563' }"
-                                    class="group relative inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white shadow-sm transition-transform duration-150 hover:scale-105"
-                                    :title="tag.name"
+                                    :color="tag.badgeColorName"
+                                    size="sm"
+                                    class="group relative transition-transform duration-150 hover:scale-105 cursor-default"
+                                    :title="tag.description || tag.name"
                                 >
                                     {{ tag.name }}
                                     <button
                                         @click.stop="handleRemoveTagClick(tag.id)"
-                                        class="ml-1 -mr-1 p-0.5 text-white/70 hover:text-white hover:bg-black/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-red-400"
+                                        class="ml-1 -mr-1 p-0.5 text-current opacity-60 hover:opacity-100 focus:opacity-100 hover:bg-black/20 dark:hover:bg-white/20 rounded-full transition-all focus:outline-none focus:ring-1 focus:ring-current"
                                         title="Remove Tag"
                                     >
+                                        <span class="sr-only">Remove {{ tag.name }}</span>
                                         <svg class="h-2.5 w-2.5" stroke="currentColor" fill="none" viewBox="0 0 8 8"><path stroke-linecap="round" stroke-width="1.5" d="M1 1l6 6m0-6L1 7" /></svg>
                                     </button>
-                                </span>
+                                </base-badge>
+                                
+                                <div class="relative inline-block text-left">
                                 <button
+                                        ref="addTagButtonRef"
                                     @click="handleAddTagClick"
-                                    title="Add Tag (Not Implemented)"
-                                    class="flex-shrink-0 bg-white/20 text-white hover:bg-white/30 rounded-full w-6 h-6 flex items-center justify-center transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-blue-700 focus:ring-white"
+                                        title="Add Tag"
+                                        :disabled="availableTagsForAdding.length === 0"
+                                        class="flex-shrink-0 bg-white/20 text-white hover:bg-white/30 rounded-full w-6 h-6 flex items-center justify-center transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-blue-700 focus:ring-white disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <i class="fas fa-plus w-3 h-3"></i>
                                     <span class="sr-only">Add Tag</span>
                                 </button>
+
+                                    <transition
+                                        enter-active-class="transition ease-out duration-100"
+                                        enter-from-class="transform opacity-0 scale-95"
+                                        enter-to-class="transform opacity-100 scale-100"
+                                        leave-active-class="transition ease-in duration-75"
+                                        leave-from-class="transform opacity-100 scale-100"
+                                        leave-to-class="transform opacity-0 scale-95"
+                                    >
+                                        <div
+                                            v-if="showAddTagDropdown && availableTagsForAdding.length > 0"
+                                            ref="addTagDropdownRef"
+                                            class="origin-top-left absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-700 ring-1 ring-black ring-opacity-5 focus:outline-none z-50 max-h-60 overflow-y-auto"
+                                            role="menu" aria-orientation="vertical" aria-labelledby="add-tag-button"
+                                        >
+                                            <div class="py-1" role="none">
+                                                <button
+                                                    v-for="tag in availableTagsForAdding"
+                                                    :key="tag.id"
+                                                    @click="addTag(tag)"
+                                                    :title="tag.description || tag.name"
+                                                    class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white flex items-center gap-2 transition-colors duration-150"
+                                                    role="menuitem"
+                                                >
+                                                     <span class="truncate flex-1">{{ tag.name }}</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                         <div
+                                             v-else-if="showAddTagDropdown && availableTagsForAdding.length === 0"
+                                             ref="addTagDropdownRef"
+                                             class="origin-top-left absolute left-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-700 ring-1 ring-black ring-opacity-5 focus:outline-none z-50 p-4 text-sm text-gray-500 dark:text-gray-400"
+                                         >
+                                             No more tags available to add.
+                                         </div>
+                                    </transition>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-gray-50 dark:bg-gray-800 p-3 border-y border-gray-200 dark:border-gray-700">
-                 <div class="text-center text-sm text-gray-500 dark:text-gray-400 italic">(Counters Component Placeholder)</div>
-            </div>
-
-            <div class="bg-white dark:bg-gray-800 px-4 sm:px-6 pt-1">
-                <nav class="-mb-px flex space-x-6 sm:space-x-8 overflow-x-auto" aria-label="Tabs">
-                    <button v-for="tab in tabs"
-                        :key="tab.id"
-                        @click="setActiveTab(tab.id)"
-                        :class="[
-                            tab.id === activeTab
-                                ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600',
-                            'whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 rounded-t-sm'
-                        ]"
-                        :aria-current="tab.id === activeTab ? 'page' : undefined"
-                    >
-                        {{ tab.name }}
-                        </button>
-                </nav>
-            </div>
+            <counters v-if="project" :project="project"></counters>
         </div>
     `
 };

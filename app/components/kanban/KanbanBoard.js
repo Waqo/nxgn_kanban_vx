@@ -1,6 +1,5 @@
 // app/components/kanban/KanbanBoard.js
 
-import KanbanColumn from './KanbanColumn.js';
 // Import Local Storage utility
 import { loadSetting, saveSetting, LS_KEYS } from '../../utils/localStorage.js';
 
@@ -12,6 +11,9 @@ import { useProjectsStore } from '../../store/projectsStore.js'; // Import proje
 // --- Pinia Helper Import ---
 const { mapState, mapActions } = Pinia;
 
+// --- ADD Local Import ---
+import KanbanColumn from './KanbanColumn.js';
+
 // Vuex no longer needed here unless modal module is used directly
 // if (typeof Vuex === 'undefined') {
 //   console.warn('Vuex might not be loaded yet for mapState helper in KanbanBoard.');
@@ -20,6 +22,7 @@ const { mapState, mapActions } = Pinia;
 const KanbanBoard = {
   name: 'KanbanBoard',
   components: {
+    // --- ADD Local Registration ---
     KanbanColumn,
   },
   // Props are removed as data will come from the store

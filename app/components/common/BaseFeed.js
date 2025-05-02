@@ -1,61 +1,203 @@
+const { computed } = Vue;
+
 export default {
   name: 'BaseFeed',
   props: {
-    // Expects array of objects like:
-    // { id: 1, content: 'Applied to', target: 'Front End Developer', href: '#', date: 'Sep 20', datetime: '2020-09-20', icon: 'UserIcon', iconBackground: 'bg-gray-400' }
-    // We'll map icon string names to classes for simplicity without heroicons library
+    /**
+     * Array of items to display in the feed.
+     * The structure of each item is determined by the parent component using the slot.
+     */
     items: {
       type: Array,
-      required: true
+      required: true,
+      default: () => []
+    },
+    /**
+     * Unique key property for each item in the `items` array.
+     */
+    itemKey: {
+      type: String,
+      default: 'id'
+    },
+    /**
+     * Styling variant for the feed layout.
+     * - 'simple': Default vertical feed with icons offset to the left.
+     * - 'compact': A more compact feed, often used for comments or simpler events.
+     */
+    variant: {
+        type: String,
+        default: 'simple',
+        validator: (value) => ['simple', 'compact'].includes(value)
+    },
+    /**
+     * Whether to show the vertical connecting line between items.
+     */
+    showLine: {
+      type: Boolean,
+      default: true
+    },
+    /**
+     * Tailwind background color class for the connecting line.
+     */
+    lineColor: {
+        type: String,
+        default: 'bg-gray-200'
+    },
+    /**
+     * Tailwind width class for the connecting line.
+     */
+    lineWidth: {
+        type: String,
+        default: 'w-0.5'
+    },
+    /**
+     * Tailwind classes for positioning the top of the connecting line relative to the item's icon/marker.
+     * Adjust based on icon/marker size and desired alignment.
+     * e.g., 'top-4 left-4 -ml-px' for simple variant with size-8 icons.
+     * e.g., 'top-0 left-0 flex w-6 justify-center' for compact variant with size-6 icons.
+     */
+    lineOffset: {
+        type: String,
+        // Default will be set based on variant in computed properties
+        default: null
+    },
+    /**
+     * Custom CSS class(es) to apply to the root `ul` element.
+     */
+    listClass: {
+      type: String,
+      default: ''
+    },
+    /**
+     * Custom CSS class(es) to apply to each `li` element.
+     */
+    itemClass: {
+      type: String,
+      default: ''
+    },
+    /**
+     * Message to display when the `items` array is empty.
+     */
+    emptyMessage: {
+      type: String,
+      default: 'No feed items to display.'
     }
   },
-  methods: {
-    getIconClass(iconName) {
-        // Map simple names or Font Awesome names to CSS classes
-        // Add more mappings as needed
-        const iconMap = {
-            UserIcon: 'fas fa-user',
-            HandThumbUpIcon: 'fas fa-thumbs-up',
-            CheckIcon: 'fas fa-check',
-            // Add more... default to a calendar or info icon?
-            default: 'fas fa-info-circle'
-        };
-        return iconMap[iconName] || iconMap.default;
-    }
+  setup(props) {
+    const hasItems = computed(() => props.items && props.items.length > 0);
+
+    const listContainerClasses = computed(() => {
+        const classes = [];
+        if (props.variant === 'simple') {
+            classes.push('-mb-8'); // Negative margin for simple feed line overlap
+        } else if (props.variant === 'compact') {
+            classes.push('space-y-6'); // Spacing for comment-like feeds
+        }
+        if (props.listClass) {
+            classes.push(props.listClass);
+        }
+        return classes.join(' ');
+    });
+
+    const listItemClasses = computed(() => {
+        const classes = ['relative']; // Base relative positioning for line
+        if (props.variant === 'simple') {
+            classes.push('pb-8'); // Padding at the bottom for simple feed line
+        } else if (props.variant === 'compact') {
+            classes.push('flex gap-x-4'); // Flex layout for compact variant
+        }
+        if (props.itemClass) {
+            classes.push(props.itemClass);
+        }
+        return classes.join(' ');
+    });
+
+    const effectiveLineOffset = computed(() => {
+        if (props.lineOffset) return props.lineOffset;
+        // Provide defaults based on variant if no specific offset is given
+        return props.variant === 'compact'
+            ? 'absolute top-0 left-0 flex w-6 justify-center'
+            : 'absolute top-4 left-4 -ml-px'; // Default for 'simple'
+    });
+
+    const lineClasses = computed(() => {
+      const classes = [effectiveLineOffset.value];
+      if (props.variant === 'simple') {
+          classes.push('h-full', props.lineWidth, props.lineColor);
+      } else if (props.variant === 'compact') {
+          // For compact, the parent div provides the height, we just need width/color
+          classes.push(props.lineWidth, props.lineColor);
+      }
+      return classes.join(' ');
+    });
+
+    // Specific classes for the compact variant's line container div
+    const compactLineContainerClasses = computed(() => {
+        return 'absolute top-0 left-0 flex w-6 justify-center -bottom-6';
+    });
+
+    return {
+      hasItems,
+      listContainerClasses,
+      listItemClasses,
+      lineClasses,
+      compactLineContainerClasses,
+    };
   },
   template: `
-    <div class="flow-root">
-      <ul role="list" class="-mb-8">
-        <li v-for="(item, itemIdx) in items" :key="item.id">
-          <div class="relative pb-8">
-            <!-- Connecting line (except for last item) -->
-            <span v-if="itemIdx !== items.length - 1" class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+    <div class="base-feed flow-root">
+      <!-- Empty State -->
+      <div v-if="!hasItems" class="text-center py-6 text-gray-500">
+        <slot name="empty">
+          {{ emptyMessage }}
+        </slot>
+      </div>
+
+      <!-- Feed List -->
+      <ul v-else role="list" :class="listContainerClasses">
+        <li v-for="(item, index) in items" :key="item[itemKey] || index" :class="listItemClasses">
+          
+          <!-- Connecting Line (handled differently based on variant) -->
+          <template v-if="showLine && index !== items.length - 1">
+             <!-- Simple Variant Line -->
+             <span v-if="variant === 'simple'" :class="lineClasses" aria-hidden="true"></span>
+             <!-- Compact Variant Line (inside a container div) -->
+             <div v-else-if="variant === 'compact'" :class="compactLineContainerClasses">
+                 <div :class="lineClasses"></div>
+             </div>
+          </template>
+
+          <!-- Scoped Slot for Item Content -->
+          <!-- Parent component defines the rendering here -->
+          <slot name="item" :item="item" :index="index" :is-last="index === items.length - 1">
+            <!-- Default Fallback Content (Simple Structure) -->
             <div class="relative flex space-x-3">
-              <!-- Icon -->
+              <!-- Icon Placeholder -->
               <div>
-                <span :class="[item.iconBackground || 'bg-gray-400', 'flex h-8 w-8 items-center justify-center rounded-full ring-8 ring-white']">
-                  <!-- Use <i> with Font Awesome classes (ensure Font Awesome is loaded) -->
-                  <i :class="[getIconClass(item.icon), 'h-5 w-5 text-white']" aria-hidden="true"></i>
-                  <!-- Or use SVG paths if preferred -->
+                <span class="flex size-8 items-center justify-center rounded-full bg-gray-400 ring-8 ring-white">
+                  <i class="fas fa-info-circle size-5 text-white"></i>
                 </span>
               </div>
-              <!-- Content -->
+              <!-- Content Placeholder -->
               <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
                 <div>
                   <p class="text-sm text-gray-500">
-                    {{ item.content }} 
-                    <a v-if="item.href && item.target" :href="item.href" class="font-medium text-gray-900">{{ item.target }}</a>
-                    <span v-else-if="item.target" class="font-medium text-gray-900">{{ item.target }}</span>
+                    Default Slot: Item {{ item[itemKey] || index }}
                   </p>
                 </div>
                 <div class="text-right text-sm whitespace-nowrap text-gray-500">
-                  <time :datetime="item.datetime">{{ item.date }}</time>
+                  <time v-if="item.datetime || item.date">{{ item.date || 'No date' }}</time>
                 </div>
               </div>
             </div>
-          </div>
+          </slot>
         </li>
       </ul>
+
+      <!-- Footer Slot (e.g., for comment form) -->
+      <div v-if="$slots.footer" class="mt-6">
+        <slot name="footer"></slot>
+      </div>
     </div>
   `
 }; 

@@ -1,10 +1,10 @@
 // app/components/common/DevToolbar.js
 
 // Import base components used
-import BaseButton from '../common/BaseButton.js';
-import BaseSelectMenu from '../common/BaseSelectMenu.js'; // Import SelectMenu
-import BaseBadge from '../common/BaseBadge.js'; // Import Badge
-import BaseToggle from '../common/BaseToggle.js'; // Ensure BaseToggle is imported
+// import BaseButton from '../common/BaseButton.js'; // REMOVE - Globally registered
+// import BaseSelectMenu from '../common/BaseSelectMenu.js'; // REMOVE - Not used here & globally registered
+// import BaseBadge from '../common/BaseBadge.js'; // REMOVE - Globally registered
+// import BaseToggle from '../common/BaseToggle.js'; // REMOVE - Globally registered
 
 // Import Pinia stores and helpers
 import { useUserStore } from '../../store/userStore.js'; // Import user store
@@ -18,10 +18,10 @@ const { storeToRefs } = Pinia; // <<< ADD storeToRefs
 const DevToolbar = {
   name: 'DevToolbar',
   components: {
-    BaseButton,
+    // BaseButton, // REMOVE - Globally registered
     // BaseSelectMenu, // Using native select now
-    BaseBadge, // Register Badge
-    BaseToggle, // Register BaseToggle
+    // BaseBadge, // REMOVE - Globally registered
+    // BaseToggle, // REMOVE - Globally registered
   },
   setup() {
     // --- Composition API for direct state access & actions ---
@@ -31,14 +31,10 @@ const DevToolbar = {
     // This is needed for isLoadingTeamUsers reactivity in computed
     const { usersForImpersonationDropdown, isLoadingTeamUsers } = storeToRefs(lookupsStore);
     
-    // Action to trigger fetch (can be called from methods)
-    const fetchTeamUsers = () => lookupsStore.fetchTeamUsers();
-
     return {
         // Expose reactive state/getters and actions needed
         usersForImpersonationDropdown,
         isLoadingTeamUsers,
-        fetchTeamUsers
     };
   },
   computed: {
@@ -67,23 +63,34 @@ const DevToolbar = {
         }
     },
     impersonationOptions() {
+        // --- ADD LOGS --- 
+        console.log('[DevToolbar] Recomputing impersonationOptions...');
+        console.log('[DevToolbar] isLoadingTeamUsers:', this.isLoadingTeamUsers); 
         // Check loading state from setup() ref
         if (this.isLoadingTeamUsers) {
+            console.log('[DevToolbar] Returning loading option.');
             return [{ value: '', label: 'Loading Users...', disabled: true }];
         }
         
+        console.log('[DevToolbar] usersForImpersonationDropdown from store:', this.usersForImpersonationDropdown);
         // Uses Pinia state/getters exposed via setup()
         const options = [
             { value: '', label: 'Select User to Impersonate...' },
             ...(this.usersForImpersonationDropdown || []) // Use ref from setup
         ];
+        console.log('[DevToolbar] Options BEFORE filter:', options);
+
         if (this.isImpersonating && this.originalUser) {
             options.push({
                  value: this.originalUser.id,
                  label: `<- Revert to ${this.originalUser.name}`
             });
         }
-        return options.filter(opt => opt.value !== this.currentUser?.id || opt.value === ''); 
+        const finalOptions = options.filter(opt => opt.value !== this.currentUser?.id || opt.value === ''); 
+        console.log('[DevToolbar] Current User ID for filter:', this.currentUser?.id);
+        console.log('[DevToolbar] Final options AFTER filter:', finalOptions);
+        // --- END LOGS ---
+        return finalOptions;
     },
 
     // Computed property to bind v-model for the select menu
@@ -128,12 +135,6 @@ const DevToolbar = {
     hardRefresh() {
       location.reload(true); 
     },
-
-    // Method to trigger fetch when dropdown is interacted with
-    handleImpersonateFocus() {
-        // Call the fetch function exposed from setup()
-        this.fetchTeamUsers();
-    },
   },
   // Template now defined inline
   template: `
@@ -152,8 +153,6 @@ const DevToolbar = {
             <select 
                 id="impersonate-select" 
                 v-model="impersonationTarget" 
-                @focus="handleImpersonateFocus" 
-                @mousedown="handleImpersonateFocus"  
                 class="px-2 py-1 border border-yellow-400 rounded bg-white text-xs w-48"
             >
                 <option 

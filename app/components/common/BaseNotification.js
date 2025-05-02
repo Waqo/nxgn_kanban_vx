@@ -1,91 +1,166 @@
 // app/components/common/BaseNotification.js
 
+const { computed, ref, onMounted, onBeforeUnmount, watch } = Vue;
+
+// Mapping from color prop to icon classes
+const AlertIconMap = {
+    success: 'fas fa-check-circle',
+    error: 'fas fa-times-circle',
+    warning: 'fas fa-exclamation-triangle',
+    info: 'fas fa-info-circle',
+};
+
 export default {
   name: 'BaseNotification',
   props: {
-      // This component will likely get notifications from a global store (e.g., ui module)
-      // rather than direct props, but we can define props for a single instance for now.
-      type: { type: String, default: 'success' }, // success, error, warning, info
-      title: { type: String, default: '' },
-      message: { type: String, default: 'Notification message.' },
-      duration: { type: Number, default: 5000 } // Duration in ms, 0 for persistent
-  },
-  emits: ['close'],
-  data() {
-    return {
-        timeoutId: null
-    };
-  },
-  computed: {
-      iconComponent() {
-          // Placeholder: In a real app, these would be actual SVG components or icons
-          switch(this.type) {
-              case 'success': return 'CheckCircleIcon'; 
-              case 'error': return 'XCircleIcon'; 
-              case 'warning': return 'ExclamationTriangleIcon'; 
-              case 'info': return 'InformationCircleIcon'; 
-              default: return 'InformationCircleIcon';
-          }
+      // Unique ID for the notification (important for managing list)
+      id: {
+          type: [String, Number],
+          required: true
       },
-      iconColorClass() {
-           switch(this.type) {
+      type: { 
+          type: String, 
+          default: 'info', // success, error, warning, info
+          validator: (value) => Object.keys(AlertIconMap).includes(value)
+      }, 
+      title: { type: String, default: '' },
+      duration: { type: Number, default: 5000 }, // Duration in ms, 0 for persistent
+      dismissible: { type: Boolean, default: true },
+      // --- Add props for specific layout needs if variants aren't enough ---
+      // e.g., showAvatar: { type: Boolean, default: false }, avatarSrc: { type: String, default: ''}
+  },
+  emits: ['dismiss'],
+  setup(props, { emit, slots }) {
+      const timeoutId = ref(null);
+
+      const iconName = computed(() => AlertIconMap[props.type] || AlertIconMap.info);
+
+      // --- Style Computations --- 
+      // These are provided to slots for convenience, but slots can override
+      const iconColorClass = computed(() => {
+           switch(props.type?.toLowerCase()) {
               case 'success': return 'text-green-400'; 
               case 'error': return 'text-red-400'; 
               case 'warning': return 'text-yellow-400'; 
-              case 'info': return 'text-blue-400'; 
-              default: return 'text-gray-400';
+              case 'info': 
+              default: return 'text-blue-400'; 
           }
-      }
+      });
+      
+      const titleColorClass = computed(() => {
+           switch(props.type?.toLowerCase()) {
+              case 'success': return 'text-green-800'; 
+              case 'error': return 'text-red-800'; 
+              case 'warning': return 'text-yellow-800'; 
+              case 'info': 
+              default: return 'text-blue-800'; // Or maybe gray-900 for info?
+          }
+      });
+      
+       const contentColorClass = computed(() => {
+           switch(props.type?.toLowerCase()) {
+              case 'success': return 'text-green-700'; 
+              case 'error': return 'text-red-700'; 
+              case 'warning': return 'text-yellow-700'; 
+              case 'info': 
+              default: return 'text-blue-700'; // Or maybe gray-500 for info?
+          }
+      });
+      
+       const dismissButtonClasses = computed(() => {
+           // Base styling for the default dismiss button
+           return 'inline-flex rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none';
+       });
+
+      // --- Methods --- 
+      const handleDismiss = () => {
+          clearTimeout(timeoutId.value);
+          emit('dismiss', props.id); // Emit the ID for removal
+      };
+
+      const setAutoClose = () => {
+          clearTimeout(timeoutId.value);
+          // console.log(`BaseNotification (${props.id}): Checking duration in setAutoClose:`, props.duration, typeof props.duration);
+          if (props.duration > 0) {
+              // console.log(`BaseNotification (${props.id}): Setting timeout for ${props.duration}ms`);
+              timeoutId.value = setTimeout(() => {
+                  // console.log(`BaseNotification (${props.id}): Timeout expired, dismissing.`);
+                  handleDismiss();
+              }, props.duration);
+          } else {
+               // console.log(`BaseNotification (${props.id}): Duration is not > 0, not setting timeout.`);
+          }
+      };
+
+      onMounted(() => {
+          // console.log(`BaseNotification (${props.id}): Mounted with duration:`, props.duration, typeof props.duration);
+          setAutoClose();
+      });
+
+      onBeforeUnmount(() => {
+          clearTimeout(timeoutId.value);
+      });
+      
+      // Watch duration changes to reset timer
+      watch(() => props.duration, () => {
+         setAutoClose();
+      });
+
+      return {
+          iconName,
+          iconColorClass,
+          titleColorClass,
+          contentColorClass,
+          dismissButtonClasses,
+          handleDismiss
+      };
   },
-  methods: {
-    closeNotification() {
-      clearTimeout(this.timeoutId);
-      this.$emit('close');
-    },
-    setAutoClose() {
-        clearTimeout(this.timeoutId);
-        if (this.duration > 0) {
-            this.timeoutId = setTimeout(() => {
-                this.$emit('close');
-            }, this.duration);
-        }
-    }
-  },
-  mounted() {
-      this.setAutoClose();
-  },
-  beforeUnmount() {
-      clearTimeout(this.timeoutId);
-  },
-  // Template defined in widget.html
+  // Template renders only the notification panel itself
   template: `
-    <div class="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden">
-        <div class="p-4">
-            <div class="flex items-start">
-                <div class="flex-shrink-0">
-                    <!-- Placeholder for actual icon components -->
-                     <span :class="iconColorClass" class="h-6 w-6">
-                        <i v-if="type === 'success'" class="fas fa-check-circle"></i>
-                        <i v-else-if="type === 'error'" class="fas fa-times-circle"></i>
-                        <i v-else-if="type === 'warning'" class="fas fa-exclamation-triangle"></i>
-                        <i v-else class="fas fa-info-circle"></i>
-                     </span>
+    <div class="pointer-events-auto w-full max-w-sm overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+      <div class="p-4">
+        <div class="flex items-start">
+           <!-- Leading Slot (Icon/Avatar) -->
+           <div class="shrink-0">
+              <slot name="leading" :iconName="iconName" :iconColorClass="iconColorClass">
+                <!-- Default Icon -->
+                <i :class="[iconName, iconColorClass, 'h-6 w-6']" aria-hidden="true"></i>
+              </slot>
+           </div>
+           
+           <!-- Main Content Area -->
+           <div class="ml-3 w-0 flex-1 pt-0.5">
+                <slot name="content" :title="title" :titleColorClass="titleColorClass" :contentColorClass="contentColorClass">
+                    <!-- Default Title -->
+                    <p v-if="title" :class="['text-sm font-medium', titleColorClass]">{{ title }}</p>
+                    <!-- Default Slot for message -->
+                    <div :class="['text-sm', contentColorClass, title ? 'mt-1' : '']">
+                        <slot></slot>
+                    </div>
+                </slot>
+                <!-- Actions Slot (Below Content) -->
+                <div v-if="$slots.actions" class="mt-3 flex space-x-7">
+                     <slot name="actions"></slot>
                 </div>
-                <div class="ml-3 w-0 flex-1 pt-0.5">
-                    <p v-if="title" class="text-sm font-medium text-gray-900">{{ title }}</p>
-                    <p class="mt-1 text-sm text-gray-500">{{ message }}</p>
-                </div>
-                <div class="ml-4 flex-shrink-0 flex">
-                    <button @click="closeNotification" class="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        <span class="sr-only">Close</span>
-                        <!-- Heroicon name: solid/x -->
-                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
+           </div>
+           
+           <!-- Trailing Actions / Close Button -->
+           <div class="ml-4 flex shrink-0">
+              <slot name="trailing-actions">
+                 <!-- Default Close Button -->
+                 <slot name="close" :dismissFn="handleDismiss">
+                     <button v-if="dismissible" 
+                             type="button" 
+                             @click="handleDismiss" 
+                             :class="dismissButtonClasses">
+                       <span class="sr-only">Close</span>
+                       <i class="fas fa-times h-5 w-5" aria-hidden="true"></i>
+                     </button>
+                 </slot>
+              </slot>
+           </div>
         </div>
+      </div>
     </div>
   `
 };

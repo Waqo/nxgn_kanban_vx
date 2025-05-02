@@ -7,13 +7,18 @@
 import WidgetView from './views/WidgetView.js';
 import ZohoAPIService from './services/zohoCreatorAPI.js';
 import { initializeApp } from './services/initService.js'; // IMPORT Initialization Service
+// --- ADD Error Log Service Import ---
+import { logErrorToZoho } from './services/errorLogService.js';
 
-// Import Component Definitions
-import KanbanCard from './components/kanban/KanbanCard.js';
-import KanbanColumn from './components/kanban/KanbanColumn.js';
-import KanbanToolbar from './components/kanban/KanbanToolbar.js';
-import KanbanBoard from './components/kanban/KanbanBoard.js';
-import DevToolbar from './components/kanban/DevToolbar.js';
+// --- REMOVE Import for non-Base Kanban Components ---
+// import KanbanCard from './components/kanban/KanbanCard.js';
+// import KanbanColumn from './components/kanban/KanbanColumn.js';
+// import KanbanToolbar from './components/kanban/KanbanToolbar.js';
+// import KanbanBoard from './components/kanban/KanbanBoard.js';
+// import DevToolbar from './components/kanban/DevToolbar.js';
+// import KanbanBoardSkeleton from './components/kanban/KanbanBoardSkeleton.js';
+
+// Import Base Component Definitions (Keep These)
 import BaseToggle from './components/common/BaseToggle.js';
 import BaseButton from './components/common/BaseButton.js';
 import BaseBadge from './components/common/BaseBadge.js';
@@ -35,21 +40,22 @@ import BaseTable from './components/common/BaseTable.js';
 import BaseStackedList from './components/common/BaseStackedList.js';
 import BaseDescriptionList from './components/common/BaseDescriptionList.js';
 import BaseTextInput from './components/common/BaseTextInput.js';
-import KanbanBoardSkeleton from './components/kanban/KanbanBoardSkeleton.js';
-import ProjectDetailModal from './components/modal/ProjectDetailModal.js';
-import ModalHeader from './components/modal/ModalHeader.js';
-import OverviewTab from './components/modal/tabs/overview/OverviewTab.js';
-import ContactsTab from './components/modal/tabs/contacts/ContactsTab.js';
-import DocumentsTab from './components/modal/tabs/documents/DocumentsTab.js';
-import SurveyTab from './components/modal/tabs/survey/SurveyTab.js';
-import SystemsTab from './components/modal/tabs/systems/SystemsTab.js';
-import TasksTab from './components/modal/tabs/tasks/TasksTab.js';
-import PermittingTab from './components/modal/tabs/permitting/PermittingTab.js';
-import CommissionsTab from './components/modal/tabs/commissions/CommissionsTab.js';
-import PropertyInfoTab from './components/modal/tabs/propertyInfo/PropertyInfoTab.js';
-import ActivityTab from './components/modal/tabs/activity/ActivityTab.js';
-import CommunicationsTab from './components/modal/tabs/communications/CommunicationsTab.js';
-import InvestorsTab from './components/modal/tabs/investors/InvestorsTab.js';
+
+// --- REMOVE Import for Modal and Tab Components ---
+// import ProjectDetailModal from './components/modal/ProjectDetailModal.js';
+// import ModalHeader from './components/modal/ModalHeader.js';
+// import OverviewTab from './components/modal/tabs/overview/OverviewTab.js';
+// import ContactsTab from './components/modal/tabs/contacts/ContactsTab.js';
+// import DocumentsTab from './components/modal/tabs/documents/DocumentsTab.js';
+// import SurveyTab from './components/modal/tabs/survey/SurveyTab.js';
+// import SystemsTab from './components/modal/tabs/systems/SystemsTab.js';
+// import TasksTab from './components/modal/tabs/tasks/TasksTab.js';
+// import PermittingTab from './components/modal/tabs/permitting/PermittingTab.js';
+// import CommissionsTab from './components/modal/tabs/commissions/CommissionsTab.js';
+// import PropertyInfoTab from './components/modal/tabs/propertyInfo/PropertyInfoTab.js';
+// import ActivityTab from './components/modal/tabs/activity/ActivityTab.js';
+// import CommunicationsTab from './components/modal/tabs/communications/CommunicationsTab.js';
+// import InvestorsTab from './components/modal/tabs/investors/InvestorsTab.js';
 
 // 1. --- CREATE VUE APP INSTANCE ---
 const app = Vue.createApp(WidgetView);
@@ -61,6 +67,8 @@ const pinia = createPinia();
 app.use(pinia); // Ensure Pinia is registered BEFORE initialization call
 // console.log('Pinia Instance Registered:', pinia);
 
+
+
 // --- CALL INITIALIZATION SERVICE ---
 initializeApp(); // Call the initialization function
 
@@ -68,15 +76,15 @@ initializeApp(); // Call the initialization function
 // console.log('Registering global components...');
 // console.log('VueUse Install Status:', VueUse);
 
-// Kanban Components
-app.component('KanbanCard', KanbanCard);
-app.component('KanbanColumn', KanbanColumn);
-app.component('KanbanToolbar', KanbanToolbar);
-app.component('KanbanBoard', KanbanBoard);
-app.component('DevToolbar', DevToolbar);
-app.component('KanbanBoardSkeleton', KanbanBoardSkeleton);
+// --- REMOVE Kanban Components Registration ---
+// app.component('KanbanCard', KanbanCard);
+// app.component('KanbanColumn', KanbanColumn);
+// app.component('KanbanToolbar', KanbanToolbar);
+// app.component('KanbanBoard', KanbanBoard);
+// app.component('DevToolbar', DevToolbar);
+// app.component('KanbanBoardSkeleton', KanbanBoardSkeleton);
 
-// Common Components
+// Common Components (Keep These Global)
 app.component('BaseToggle', BaseToggle);
 app.component('BaseButton', BaseButton);
 app.component('BaseBadge', BaseBadge);
@@ -98,51 +106,43 @@ app.component('BaseTable', BaseTable);
 app.component('BaseStackedList', BaseStackedList);
 app.component('BaseDescriptionList', BaseDescriptionList);
 app.component('BaseTextInput', BaseTextInput);
+// Keep Base* components registered
 
 // 5. --- GLOBAL PROPERTIES ---
 app.config.globalProperties.$api = ZohoAPIService;
 
-// --- ADD Registration for Modal ---
-app.component('ProjectDetailModal', ProjectDetailModal);
+// --- ADD Global Error Handler ---
+app.config.errorHandler = (err, instance, info) => {
+  console.error("Global Error Handler Caught:", err, instance, info); // Keep console log for debugging
 
-// --- ADD Registration for Modal Header ---
-app.component('ModalHeader', ModalHeader);
+  // --- Prepare Context ---
+  const context = {
+    vueInfo: info, // e.g., lifecycle hook name
+    componentName: instance?.$options?.name || 'Unknown Component',
+    // Optionally add props or simplified state if safe and useful
+    // componentProps: instance?.$props ? JSON.stringify(instance.$props) : '{}',
+  };
 
-// --- ADD Registration for Overview Tab ---
-app.component('OverviewTab', OverviewTab);
+  // --- Call Logging Service --- 
+  // Run async but don't await (fire and forget)
+  logErrorToZoho(err, context);
+};
 
-// --- ADD Registration for Contacts Tab ---
-app.component('ContactsTab', ContactsTab);
-
-// --- ADD Registration for Documents Tab ---
-app.component('DocumentsTab', DocumentsTab);
-
-// --- ADD Registration for Survey Tab ---
-app.component('SurveyTab', SurveyTab);
-
-// --- ADD Registration for Systems Tab ---
-app.component('SystemsTab', SystemsTab);
-
-// --- ADD Registration for Tasks Tab ---
-app.component('TasksTab', TasksTab);
-
-// --- ADD Registration for Permitting Tab ---
-app.component('PermittingTab', PermittingTab);
-
-// --- ADD Registration for Commissions Tab ---
-app.component('CommissionsTab', CommissionsTab);
-
-// --- ADD Registration for Property Info Tab ---
-app.component('PropertyInfoTab', PropertyInfoTab);
-
-// --- ADD Registration for Activity Tab ---
-app.component('ActivityTab', ActivityTab);
-
-// --- ADD Registration for Communications Tab ---
-app.component('CommunicationsTab', CommunicationsTab);
-
-// --- ADD Registration for Investors Tab ---
-app.component('InvestorsTab', InvestorsTab);
+// --- REMOVE Modal and Tab Component Registrations ---
+// app.component('ProjectDetailModal', ProjectDetailModal);
+// app.component('ModalHeader', ModalHeader);
+// app.component('OverviewTab', OverviewTab);
+// app.component('ContactsTab', ContactsTab);
+// app.component('DocumentsTab', DocumentsTab);
+// app.component('SurveyTab', SurveyTab);
+// app.component('SystemsTab', SystemsTab);
+// app.component('TasksTab', TasksTab);
+// app.component('PermittingTab', PermittingTab);
+// app.component('CommissionsTab', CommissionsTab);
+// app.component('PropertyInfoTab', PropertyInfoTab);
+// app.component('ActivityTab', ActivityTab);
+// app.component('CommunicationsTab', CommunicationsTab);
+// app.component('InvestorsTab', InvestorsTab);
 
 // 6. --- MOUNT THE APPLICATION ---
 app.mount('#app');

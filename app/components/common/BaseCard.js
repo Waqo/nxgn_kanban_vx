@@ -9,6 +9,7 @@ export default {
     noShadow: { type: Boolean, default: false },
     noRounding: { type: Boolean, default: false },
     fullWidthMobile: { type: Boolean, default: false },
+    bodyFlex: { type: Boolean, default: false },
   },
   template: `
     <div :class="cardClasses">
@@ -52,26 +53,30 @@ export default {
 
     // Compute dynamic classes
     const cardClasses = Vue.computed(() => [
-      'overflow-hidden',
+      props.bodyFlex ? 'flex flex-col' : 'overflow-hidden',
+      'border border-gray-200',
       props.cardBg, // Base card background
       { 'shadow-sm': !props.noShadow },
       props.noRounding ? '' : (props.fullWidthMobile ? 'sm:rounded-lg' : 'rounded-lg'),
-      { 'divide-y divide-gray-200': needsDivider.value }
     ]);
 
     const headerClasses = Vue.computed(() => [
       'px-4 py-5 sm:px-6',
+      { 'shrink-0': props.bodyFlex },
+      { 'border-b border-gray-200': hasHeader.value && (hasBody.value || hasFooter.value) },
       props.headerBg ?? '' // Apply specific header bg if provided
     ]);
 
     const bodyClasses = Vue.computed(() => [
-      props.noBodyPadding ? '' : 'px-4 py-5 sm:p-6',
+      { 'flex-1 min-h-0 overflow-y-auto': props.bodyFlex },
+      (props.noBodyPadding && props.bodyFlex) ? '' : (props.noBodyPadding ? '' : 'px-4 py-5 sm:p-6'),
       props.bodyBg ?? '' // Apply specific body bg if provided
     ]);
 
     const footerClasses = Vue.computed(() => [
       'px-4 py-4 sm:px-6',
-      // Apply specific footer bg, defaulting to gray-50 if card is white, else cardBg
+      { 'shrink-0': props.bodyFlex },
+      { 'border-t border-gray-200': hasFooter.value && (hasHeader.value || hasBody.value) },
       props.footerBg ?? (props.cardBg === 'bg-white' && hasFooter.value ? 'bg-gray-50' : '')
     ]);
 

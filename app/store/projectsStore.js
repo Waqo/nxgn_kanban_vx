@@ -10,11 +10,23 @@ import {
   FIELD_PROJECT_CANCELLED_STAGE_ID,
   FIELD_PROJECT_NOT_VIABLE_STAGE_ID,
   FIELD_PROJECT_HO_CANCELLED_REDBALL_STAGE_ID,
+  FIELD_PROJECT_DUPLICATE_JOBS_STAGE_ID,
   DEFAULT_SORT_DIRECTION,
   FIELD_PROJECT_TRANCHE_LOOKUP,
-  REPORT_CONTACTS,
   ACTIVITY_SOURCE_PORTAL,
-  START_IN_DEMO_MODE
+  START_IN_DEMO_MODE,
+  FIELD_PROJECT_CONTACT_NAME_LOOKUP,
+  FIELD_PROJECT_TAGS,
+  FIELD_PROJECT_FUNDED_REDBALL,
+  FIELD_PROJECT_TRIG_CREATE_FOLDERS,
+  REPORT_PROJECT_DETAILS,
+  FORM_ISSUES,
+  FIELD_ISSUE_CONTENT,
+  FIELD_ISSUE_PROJECT_LOOKUP,
+  FIELD_ISSUE_AUTHOR_TEXT,
+  FIELD_ISSUE_USER_LOOKUP,
+  FIELD_ISSUE_NOTIFY_SALES,
+  FIELD_ISSUE_TAGGED_USERS
 } from '../config/constants.js';
 // Import helper function
 // import { formatRelativeTime } from '../utils/helpers.js';
@@ -24,12 +36,15 @@ import { EVENT_TYPES } from '../config/options.js';
 // Import other Pinia stores needed for actions/getters
 import { useUiStore } from './uiStore.js'; 
 import { useLookupsStore } from './lookupsStore.js'; 
+import { useModalStore } from './modalStore.js';
 
 // Import Activity Log Service
 import { logActivity } from '../services/activityLogService.js';
 
 // Import localStorage utils
 import { LS_KEYS, saveSetting, loadSetting } from '../utils/localStorage.js';
+// --- ADD Error Log Service Import ---
+import { logErrorToZoho } from '../services/errorLogService.js';
 
 // Access Pinia global
 const { defineStore } = Pinia;
@@ -51,6 +66,9 @@ const defaultFilters = {
     needHelp: null, 
 };
 
+// --- REMOVE Project lookup field name constant --- 
+// const FIELD_CONTACT_PROJECT_LOOKUP = 'Project';
+
 export const useProjectsStore = defineStore('projects', {
   state: () => ({
     projectList: [], 
@@ -59,6 +77,7 @@ export const useProjectsStore = defineStore('projects', {
     lastUpdatedTimestamp: null,
     filterModeIsDemosOnly: START_IN_DEMO_MODE,
     filters: { ...defaultFilters },
+    filterOnlyDuplicates: false,
     sortBy: loadSetting(LS_KEYS.TOOLBAR_SORT, defaultSort).field,
     sortDirection: loadSetting(LS_KEYS.TOOLBAR_SORT, defaultSort).direction,
   }),
@@ -144,6 +163,14 @@ export const useProjectsStore = defineStore('projects', {
              });
         }
 
+        // --- ADDED: Apply Duplicate Filter ---
+        if (state.filterOnlyDuplicates) {
+            const duplicateIds = state.duplicateLatLongProjectIds; // Access via state directly in getter
+            if (duplicateIds instanceof Set) { // Ensure it's a Set
+                projectsToDisplay = projectsToDisplay.filter(p => duplicateIds.has(p.ID));
+            }
+        }
+
         // Apply Sorting
         projectsToDisplay.sort((a, b) => {
             const sortByField = state.sortBy;
@@ -184,7 +211,8 @@ export const useProjectsStore = defineStore('projects', {
             FIELD_PROJECT_PRE_SALE_STAGE_ID,
             FIELD_PROJECT_CANCELLED_STAGE_ID,
             FIELD_PROJECT_NOT_VIABLE_STAGE_ID,
-            FIELD_PROJECT_HO_CANCELLED_REDBALL_STAGE_ID
+            FIELD_PROJECT_HO_CANCELLED_REDBALL_STAGE_ID,
+            FIELD_PROJECT_DUPLICATE_JOBS_STAGE_ID
         ];
 
         // Access uiStore state directly
@@ -273,6 +301,7 @@ export const useProjectsStore = defineStore('projects', {
         this.filters = { ...defaultFilters };
         this.sortBy = defaultSort.field;
         this.sortDirection = defaultSort.direction;
+        this.filterOnlyDuplicates = false;
         // --- Save default sort settings to localStorage ---
         saveSetting(LS_KEYS.TOOLBAR_SORT, { field: this.sortBy, direction: this.sortDirection });
     },
@@ -346,12 +375,14 @@ export const useProjectsStore = defineStore('projects', {
        let recordCursor = null;
        let hasMoreRecords = true;
        const reportName = REPORT_PROJECTS;
-       // Define criteria to exclude only the Pre-Sale stage (since Archived doesn't exist)
-       let finalCriteria = `(${FIELD_PROJECT_STAGE_LOOKUP}.ID != ${FIELD_PROJECT_PRE_SALE_STAGE_ID})`;
-       // Add demo condition based on the INITIAL state set by START_IN_DEMO_MODE
-       if (START_IN_DEMO_MODE) {
-           finalCriteria += ` && (${FIELD_PROJECT_IS_DEMO} == true)`;
-       }
+       // Define criteria based on START_IN_DEMO_MODE
+       let finalCriteria = null; // Initialize to null (no filter)
+       if (START_IN_DEMO_MODE) { 
+           // If in demo mode, apply the standard filters
+           finalCriteria = `(${FIELD_PROJECT_STAGE_LOOKUP}.ID != ${FIELD_PROJECT_PRE_SALE_STAGE_ID}) && (${FIELD_PROJECT_IS_DEMO} == true)`;
+       } 
+       // If START_IN_DEMO_MODE is false, finalCriteria remains null (no filters applied)
+       
        console.log(`Projects Store (Pinia): Fetching projects with criteria: ${finalCriteria}`);
 
       try {
@@ -431,6 +462,14 @@ export const useProjectsStore = defineStore('projects', {
            uiStore.addNotification({ type: 'success', message: `Project moved to ${newStageTitle}` });
         } catch (error) {
            console.error("Projects Store (Pinia): Failed to update project stage:", error);
+           // --- ADD Log error to Zoho --- 
+           logErrorToZoho(error, { 
+             operation: 'updateProjectStage',
+             projectId: projectId,
+             newStageId: newStageId,
+             details: 'API call failed during stage update.'
+           });
+           // --- END Log error ---
            uiStore.removeNotification(loadingNotificationId);
            uiStore.addNotification({ type: 'error', message: `Failed to move project. Reverting to ${originalStageTitle}.`, title: 'Update Error' });
            // Revert optimistic update
@@ -475,6 +514,14 @@ export const useProjectsStore = defineStore('projects', {
             uiStore.addNotification({ type: 'success', message: `Project moved to ${newTrancheDisplay}` });
         } catch (error) {
             console.error("Projects Store (Pinia): Failed to update project tranche:", error);
+            // --- ADD Log error to Zoho --- 
+            logErrorToZoho(error, { 
+              operation: 'updateProjectTranche',
+              projectId: projectId,
+              newTrancheId: newTrancheId, // Log the target ID (could be null)
+              details: 'API call failed during tranche update.'
+            });
+            // --- END Log error --- 
             uiStore.removeNotification(loadingNotificationId);
             uiStore.addNotification({ type: 'error', message: `Failed to move project. Reverting to ${originalTrancheDisplay}.`, title: 'Update Error' });
             // Revert optimistic update
@@ -482,21 +529,441 @@ export const useProjectsStore = defineStore('projects', {
         }
     },
 
+    // Fetch Details still needed here as it fetches PROJECT details
     async fetchProjectDetails(projectId) {
         const uiStore = useUiStore();
         if (!projectId) throw new Error('Project ID is required.');
-        // console.log(`Projects Store (Pinia): Fetching details for project ID: ${projectId}`);
         try {
-            const projectDetails = await ZohoAPIService.getRecordById(REPORT_PROJECTS, projectId);
-            const contactCriteria = `(Project == ${projectId})`; 
-            const contactsResponse = await ZohoAPIService.getRecords(REPORT_CONTACTS, contactCriteria);
-            const relatedContacts = contactsResponse.data || [];
+            const projectDetails = await ZohoAPIService.getRecordById(REPORT_PROJECT_DETAILS, projectId);
+            // *** Need REPORT_CONTACTS constant back or passed in? For now, hardcode report name ***
+            // *** Or make fetchProjectDetails only fetch project, and contacts are fetched separately? ***
+            // *** Let's keep it simple for now: fetch contacts here but use constant defined below ***
+            const REPORT_CONTACTS_LOCAL = "PM_Kanban_Contacts"; // Define locally for now
+            const FIELD_CONTACT_PROJECT_LOOKUP_LOCAL = "Project"; // Define locally for now
+
+            const contactCriteria = `(${FIELD_CONTACT_PROJECT_LOOKUP_LOCAL} == ${projectId})`; 
+            const contactsResponse = await ZohoAPIService.getRecords(REPORT_CONTACTS_LOCAL, contactCriteria);
+            
+            // Check the response code for contacts
+            let relatedContacts = [];
+            if (contactsResponse.code === 3000) {
+                relatedContacts = contactsResponse.data || [];
+                console.log(`Projects Store (Pinia): Found ${relatedContacts.length} contacts for ${projectId}.`);
+            } else if (contactsResponse.code === 9280) {
+                console.warn(`Projects Store (Pinia): No contacts found for project ${projectId} (Code 9280). Proceeding without contacts.`);
+                relatedContacts = []; // Ensure it's an empty array
+            } else {
+                // Handle unexpected non-3000/9280 codes as an error
+                console.error(`Projects Store (Pinia): Unexpected API response fetching contacts for ${projectId}:`, contactsResponse);
+                throw new Error(contactsResponse.message || `API Error Code ${contactsResponse.code} fetching contacts`);
+            }
+
+            // Combine project details with the (potentially empty) contacts list
             return { ...projectDetails, Contacts: relatedContacts };
         } catch (error) {
             console.error(`Projects Store (Pinia): Error fetching details for ${projectId}:`, error);
             uiStore.addNotification({ type: 'error', title: 'Load Error', message: `Failed to load details for project ${projectId}. ${error.message}` });
             throw error;
         }
+    },
+
+    // *** ADD Action to update project tags ***
+    async updateProjectTags({ projectId, tagIds }) {
+        const modalStore = useModalStore();
+        const uiStore = useUiStore();
+
+        if (!projectId) {
+            throw new Error('Project ID is required to update tags.');
+        }
+        // Ensure tagIds is an array, even if empty
+        const payloadTagIds = Array.isArray(tagIds) ? tagIds : [];
+        
+        const payload = {
+            data: {
+                [FIELD_PROJECT_TAGS]: payloadTagIds
+            }
+        };
+
+        console.log(`Projects Store (Pinia): Updating Tags for Project ${projectId} Payload:`, payload);
+        const notificationId = `update-tags-${projectId}-${Date.now()}`;
+        uiStore.addNotification({ id: notificationId, type: 'info', message: 'Updating tags...', duration: 0 });
+
+        try {
+            const response = await ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, payload);
+            uiStore.removeNotification(notificationId); // Remove loading
+            uiStore.addNotification({ type: 'success', message: 'Tags updated successfully!' });
+            
+            // Log activity for adding/removing might be complex here, 
+            // Log is now handled by the component for specificity
+            // logActivity(projectId, `Project tags updated.`);
+
+            return response.data; // Return updated project data slice if needed
+        } catch (error) {
+            uiStore.removeNotification(notificationId); // Remove loading on error
+            console.error(`Projects Store (Pinia): Error updating tags for project ${projectId}:`, error);
+            // --- ADD Log error to Zoho --- 
+            logErrorToZoho(error, { 
+              operation: 'updateProjectTags',
+              projectId: projectId,
+              tagIds: tagIds, // Log the attempted tag IDs
+              details: 'API call failed during tag update.'
+            });
+            // --- END Log error --- 
+            uiStore.addNotification({ type: 'error', title: 'Error', message: `Failed to update tags: ${error.message}` });
+            throw error;
+        }
+    },
+
+    // *** ADD Action to update Funded By Redball status ***
+    async updateProjectFundedStatus({ projectId, isFunded }) {
+        const uiStore = useUiStore();
+        
+        if (!projectId) {
+            throw new Error('Project ID is required to update funded status.');
+        }
+        
+        const payload = {
+            data: {
+                [FIELD_PROJECT_FUNDED_REDBALL]: isFunded ? 'true' : 'false' // Zoho expects string boolean
+            }
+        };
+        
+        const statusText = isFunded ? 'Funded By Redball' : 'NOT Funded By Redball';
+        const notificationId = `update-funded-${projectId}-${Date.now()}`;
+        uiStore.addNotification({ id: notificationId, type: 'info', message: `Updating status to ${statusText}...`, duration: 0 });
+
+        try {
+            const response = await ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, payload);
+            uiStore.removeNotification(notificationId); // Remove loading
+            uiStore.addNotification({ type: 'success', message: `Status updated: ${statusText}` });
+
+            // Log Activity (Fire and Forget)
+            logActivity(projectId, `Funding status updated: ${statusText}`);
+
+            // Refresh modal data to reflect change (important if other computed props depend on it)
+            const modalStore = useModalStore();
+            await modalStore.refreshModalData(); 
+
+            return response.data;
+        } catch (error) {
+            uiStore.removeNotification(notificationId); // Remove loading on error
+            console.error(`Projects Store (Pinia): Error updating funded status for project ${projectId}:`, error);
+             // --- ADD Log error to Zoho --- 
+            logErrorToZoho(error, { 
+              operation: 'updateProjectFundedStatus',
+              projectId: projectId,
+              isFunded: isFunded, 
+              details: 'API call failed during funded status update.'
+            });
+            // --- END Log error --- 
+            uiStore.addNotification({ type: 'error', title: 'Error', message: `Failed to update funding status: ${error.message}` });
+            throw error;
+        }
+    },
+
+    // --- ADD Action for Weekly Email Opt-In ---
+    async updateWeeklyEmailOptIn({ projectId, optInStatus }) {
+        const uiStore = useUiStore();
+        const modalStore = useModalStore();
+
+        if (!projectId) {
+            throw new Error('Project ID is required to update weekly email opt-in status.');
+        }
+
+        const payload = {
+            data: {
+                // Assuming the field API name is exactly this
+                Weekly_Email_Opt_In: optInStatus ? 'true' : 'false' // Send string boolean
+            }
+        };
+
+        const statusText = optInStatus ? 'Opted In' : 'Opted Out';
+        const notificationId = `update-optin-${projectId}-${Date.now()}`;
+        uiStore.addNotification({ id: notificationId, type: 'info', message: `Updating weekly email status to ${statusText}...`, duration: 0 });
+
+        try {
+            const response = await ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, payload);
+            
+            if (response.code !== 3000) {
+                 throw new Error(response.message || 'Failed to update weekly email opt-in status.');
+            }
+
+            uiStore.removeNotification(notificationId); // Remove loading
+            uiStore.addNotification({ type: 'success', message: `Weekly email status updated: ${statusText}` });
+
+            // Log Activity (Fire and Forget)
+            logActivity(projectId, `Weekly email status updated to: ${statusText}`);
+
+            // Refresh modal data to reflect changes
+            // No await needed if we don't need to wait for refresh before proceeding
+            modalStore.refreshModalData(); 
+
+            return response.data; // Return updated slice if needed
+        } catch (error) {
+            uiStore.removeNotification(notificationId); // Remove loading on error
+            console.error(`Projects Store (Pinia): Error updating weekly email opt-in for project ${projectId}:`, error);
+             // --- ADD Log error to Zoho --- 
+            logErrorToZoho(error, { 
+              operation: 'updateWeeklyEmailOptIn',
+              projectId: projectId,
+              optInStatus: optInStatus, 
+              details: 'API call failed during weekly email opt-in update.'
+            });
+            // --- END Log error --- 
+            uiStore.addNotification({ type: 'error', title: 'Error', message: `Failed to update weekly email status: ${error.message}` });
+            throw error; // Re-throw so the component can potentially handle it
+        }
+    },
+
+    // --- REMOVE Contact Management Actions --- 
+    // async addProjectContact(...) { ... },
+    // async updateProjectContact(...) { ... },
+    // async deleteProjectContact(...) { ... },
+    // async setProjectMainOwner(...) { ... }
+    
+    // --- ADD Action to update System Overview --- 
+    async updateSystemOverview({ projectId, systemData }) {
+        const uiStore = useUiStore();
+        const modalStore = useModalStore(); // Need modalStore to refresh
+
+        if (!projectId || !systemData) {
+            throw new Error('Project ID and system data are required.');
+        }
+
+        // Validate/sanitize numeric inputs (ensure they are numbers, not NaN)
+        const kW_STC = Number(systemData.kW_STC);
+        const Annual_Output_kWh = Number(systemData.Annual_Output_kWh);
+        const Annual_Usage = Number(systemData.Annual_Usage);
+
+        if (isNaN(kW_STC) || isNaN(Annual_Output_kWh) || isNaN(Annual_Usage)) {
+             uiStore.addNotification({ type: 'error', message: 'System size, output, and usage must be valid numbers.', duration: 4000 });
+             throw new Error('Invalid numeric system data.');
+        }
+        if (kW_STC < 0 || Annual_Output_kWh < 0 || Annual_Usage < 0) {
+             uiStore.addNotification({ type: 'error', message: 'System size, output, and usage cannot be negative.', duration: 4000 });
+             throw new Error('Negative numeric system data.');
+        }
+        
+        const payload = {
+            data: {
+                kW_STC: kW_STC, 
+                Annual_Output_kWh: Annual_Output_kWh,
+                Annual_Usage: Annual_Usage,
+                // Confirmed API field name
+                Is_Approved: systemData.Is_Approved ? 'true' : 'false' // Convert boolean to Zoho string
+            }
+        };
+        
+        console.log(`Projects Store (Pinia): Updating System Overview for Project ${projectId} Payload:`, payload);
+        const notificationId = `update-system-${projectId}-${Date.now()}`;
+        uiStore.addNotification({ id: notificationId, type: 'info', message: 'Updating system overview...', duration: 0 });
+
+        try {
+            const response = await ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, payload);
+            
+            if (response.code !== 3000) {
+                 throw new Error(response.message || 'Failed to update system overview.');
+            }
+
+            uiStore.removeNotification(notificationId); // Remove loading
+            uiStore.addNotification({ type: 'success', message: 'System overview updated successfully!' });
+
+            // Log Activity (Fire and Forget)
+            const statusText = systemData.Is_Approved ? 'Approved' : 'Not Approved';
+            logActivity(projectId, `System overview updated: Size=${kW_STC}kW, Output=${Annual_Output_kWh}kWh, Usage=${Annual_Usage}kWh, Status=${statusText}`);
+
+            // Refresh modal data to reflect changes
+            await modalStore.refreshModalData(); 
+
+            return response.data;
+        } catch (error) {
+            uiStore.removeNotification(notificationId); // Remove loading on error
+            console.error(`Projects Store (Pinia): Error updating system overview for project ${projectId}:`, error);
+             // --- ADD Log error to Zoho --- 
+            logErrorToZoho(error, { 
+              operation: 'updateSystemOverview',
+              projectId: projectId,
+              systemData: systemData, // Log the data attempted
+              details: 'API call failed during system overview update.'
+            });
+            // --- END Log error --- 
+            uiStore.addNotification({ type: 'error', title: 'Error', message: `Failed to update system overview: ${error.message}` });
+            throw error;
+        }
+    },
+
+    // *** ADDED: Trigger Folder Creation Action ***
+    async triggerFolderCreation({ projectId }) {
+        const uiStore = useUiStore();
+        const modalStore = useModalStore();
+
+        if (!projectId) {
+            uiStore.addNotification({ type: 'error', message: 'Project ID is required to create folders.'});
+            return { success: false, error: 'Missing Project ID' };
+        }
+
+        const loadingNotificationId = `create-folders-${projectId}-${Date.now()}`;
+        uiStore.addNotification({ id: loadingNotificationId, type: 'info', message: 'Initiating folder creation...', duration: 0 });
+
+        try {
+            const payload = { data: { [FIELD_PROJECT_TRIG_CREATE_FOLDERS]: "true" } };
+            console.log(`Projects Store: Triggering folder creation for Project ${projectId}`);
+            const response = await ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, payload);
+
+            if (response.code !== 3000) {
+                console.error('Zoho API Error (triggerFolderCreation):', response);
+                throw new Error(response.message || 'Failed to trigger folder creation.');
+            }
+
+            uiStore.removeNotification(loadingNotificationId);
+            // Use a slightly different message, as creation happens in the backend
+            uiStore.addNotification({ type: 'success', message: 'Folder creation initiated. Links will appear shortly after refresh.', duration: 6000 }); 
+            logActivity(projectId, 'Triggered WorkDrive folder creation');
+
+            // Refresh modal data - links might not be there yet, but good to refresh state
+            await modalStore.refreshModalData(); 
+            return { success: true };
+
+        } catch (error) {
+             console.error(`Error triggering folder creation for project ${projectId}:`, error);
+             // --- ADD Log error to Zoho --- 
+            logErrorToZoho(error, { 
+              operation: 'triggerFolderCreation',
+              projectId: projectId, 
+              details: 'API call failed when triggering folder creation.'
+            });
+            // --- END Log error --- 
+             uiStore.removeNotification(loadingNotificationId);
+             uiStore.addNotification({ type: 'error', title: 'Action Failed', message: `Folder creation trigger failed: ${error.message || 'Unknown error'}` });
+             return { success: false, error: error.message || 'Unknown error' };
+        }
+    },
+
+    // *** ADDED: Add Project Issue Action ***
+    async addProjectIssue({ projectId, issueContent, notifySales, taggedUserIds = [] }) {
+        const uiStore = useUiStore();
+        const { useUserStore } = await import('./userStore.js'); // Dynamic import for userStore
+        const userStore = useUserStore();
+        
+        if (!projectId || !issueContent) {
+            uiStore.addNotification({ type: 'error', message: 'Project ID and issue description are required.'});
+            throw new Error('Missing required fields for adding issue.');
+        }
+
+        const currentUser = userStore.currentUser;
+        if (!currentUser?.id) {
+             uiStore.addNotification({ type: 'error', message: 'Could not identify current user to add issue.'});
+             throw new Error('Current user not found.');
+        }
+        
+        const payload = {
+            data: {
+                [FIELD_ISSUE_CONTENT]: issueContent,
+                [FIELD_ISSUE_PROJECT_LOOKUP]: projectId,
+                // Set both Author text and User lookup for redundancy/compatibility
+                [FIELD_ISSUE_AUTHOR_TEXT]: currentUser.name || 'Unknown Portal User',
+                [FIELD_ISSUE_USER_LOOKUP]: currentUser.id,
+                [FIELD_ISSUE_NOTIFY_SALES]: notifySales ? 'true' : 'false',
+                // Tagged_Users expects an array of User IDs
+                [FIELD_ISSUE_TAGGED_USERS]: taggedUserIds 
+            }
+        };
+
+        const loadingNotificationId = `add-issue-${projectId}-${Date.now()}`;
+        uiStore.addNotification({ id: loadingNotificationId, type: 'info', message: 'Adding issue...', duration: 0 });
+
+        try {
+            const response = await ZohoAPIService.addRecord(FORM_ISSUES, payload);
+            if (response.code !== 3000) {
+                 console.error('Zoho API Error (addProjectIssue):', response);
+                 throw new Error(response.message || 'Failed to add issue.');
+            }
+            uiStore.removeNotification(loadingNotificationId);
+            uiStore.addNotification({ type: 'success', message: 'Issue added successfully!' });
+            logActivity(projectId, `Issue raised: "${issueContent.substring(0, 50)}..."`);
+            return response.data; // Return the ID of the newly created issue record
+        } catch (error) {
+             console.error(`Error adding issue for project ${projectId}:`, error);
+              // --- ADD Log error to Zoho --- 
+            logErrorToZoho(error, { 
+              operation: 'addProjectIssue',
+              projectId: projectId, 
+              issueContent: issueContent, // Log the content
+              notifySales: notifySales,
+              taggedUserIds: taggedUserIds,
+              details: 'API call failed when adding project issue.'
+            });
+            // --- END Log error --- 
+             uiStore.removeNotification(loadingNotificationId);
+             uiStore.addNotification({ type: 'error', title: 'Action Failed', message: `Failed to add issue: ${error.message || 'Unknown error'}` });
+             throw error; // Re-throw error so component can handle it
+        }
+    },
+
+    // *** ADDED: Resolve Project Issue Action ***
+    async resolveProjectIssue({ issueId }) {
+        const uiStore = useUiStore();
+        const { useUserStore } = await import('./userStore.js'); // Dynamic import for userStore
+        const userStore = useUserStore();
+
+        if (!issueId) {
+            uiStore.addNotification({ type: 'error', message: 'Issue ID is required to resolve.'});
+            throw new Error('Missing required fields for resolving issue.');
+        }
+
+        const currentUser = userStore.currentUser;
+        if (!currentUser?.id) {
+             uiStore.addNotification({ type: 'error', message: 'Could not identify current user to resolve issue.'});
+             throw new Error('Current user not found.');
+        }
+        
+        const { REPORT_ISSUES, FIELD_ISSUE_IS_RESOLVED, FIELD_ISSUE_RESOLVED_BY } = await import('../config/constants.js');
+
+        const payload = {
+            data: {
+                [FIELD_ISSUE_IS_RESOLVED]: 'true',
+                [FIELD_ISSUE_RESOLVED_BY]: currentUser.id // Assuming Resolved_By is a lookup field
+            }
+        };
+        
+        const loadingNotificationId = `resolve-issue-${issueId}-${Date.now()}`;
+        uiStore.addNotification({ id: loadingNotificationId, type: 'info', message: 'Marking issue as resolved...', duration: 0 });
+        
+        try {
+            // Use REPORT_ISSUES for updating
+            const response = await ZohoAPIService.updateRecordById(REPORT_ISSUES, issueId, payload);
+            if (response.code !== 3000) {
+                 console.error('Zoho API Error (resolveProjectIssue):', response);
+                 // Handle nested error structure if necessary (based on API behavior)
+                 const nestedResult = response.result?.[0];
+                 if (nestedResult && nestedResult.code !== 3000) {
+                     throw new Error(nestedResult.message || `Nested API Error Code ${nestedResult.code}`);
+                 }
+                 throw new Error(response.message || 'Failed to resolve issue.');
+            }
+            uiStore.removeNotification(loadingNotificationId);
+            uiStore.addNotification({ type: 'success', message: 'Issue marked as resolved!' });
+            // Log activity? Might be redundant if the UI just hides it.
+            // logActivity(projectId, `Issue resolved (ID: ${issueId})`); // Need projectId here if logging
+            return response.data; // Return updated data slice if needed
+        } catch (error) {
+             console.error(`Error resolving issue ${issueId}:`, error);
+              // --- ADD Log error to Zoho --- 
+            logErrorToZoho(error, { 
+              operation: 'resolveProjectIssue',
+              issueId: issueId, 
+              details: 'API call failed when resolving project issue.'
+            });
+            // --- END Log error --- 
+             uiStore.removeNotification(loadingNotificationId);
+             uiStore.addNotification({ type: 'error', title: 'Action Failed', message: `Failed to resolve issue: ${error.message || 'Unknown error'}` });
+             throw error; // Re-throw error so component can handle it
+        }
+    },
+
+    // *** ADDED: Toggle Duplicate Filter Action ***
+    toggleDuplicateFilter() {
+        this.filterOnlyDuplicates = !this.filterOnlyDuplicates;
     }
   }
 }); 

@@ -12,6 +12,8 @@ import {
     SORT_BY_OPTIONS,
     STAGE_VIEW_OPTIONS
 } from '../../config/options.js';
+// --- ADD App Build Info Constant --- 
+import { APP_BUILD_INFO } from '../../config/constants.js';
 
 // --- Pinia Store Import ---
 import { useUiStore } from '../../store/uiStore.js';
@@ -101,7 +103,8 @@ const KanbanToolbar = {
       timeAgo,
       searchResults,
       showResults,
-      debouncedUpdateSearchResults
+      debouncedUpdateSearchResults,
+      APP_BUILD_INFO // Expose to template
     };
   },
   data() {
@@ -146,7 +149,9 @@ const KanbanToolbar = {
         // REMOVE mapping for lastUpdatedRelative getter
         // 'lastUpdatedRelative' 
         // --- ADD Mapping for lastUpdatedTimestamp state ---
-        'lastUpdatedTimestamp'
+        'lastUpdatedTimestamp',
+        // --- ADD Mapping for duplicate filter state ---
+        'filterOnlyDuplicates'
     ]),
 
     // Sync local search term with store on initial load or reset
@@ -294,7 +299,8 @@ const KanbanToolbar = {
         'setFilter',
         'setSort',
         'resetFiltersAndSort',
-        'fetchInitialProjects' // Map fetch action for refresh button
+        'fetchInitialProjects', // Map fetch action for refresh button
+        'toggleDuplicateFilter' // --- ADDED: Map the new action ---
     ]),
 
     // --- Local Component Methods ---
@@ -349,8 +355,10 @@ const KanbanToolbar = {
             default:              return null;
         }
     },
-    handleFilterTypeChange(selectedType) {
-        this.selectedFilterType = selectedType; 
+    handleFilterTypeChange(selectedValue) {
+        // Find the full option object corresponding to the selected value
+        const selectedTypeObject = this.filterTypeOptions.find(opt => opt.value === selectedValue);
+        this.selectedFilterType = selectedTypeObject || null; 
         // Value dropdown will update via computed prop
         // Resetting the old filter value happens in the watcher
     },
@@ -380,18 +388,26 @@ const KanbanToolbar = {
     // Individual Toggle Filters
     toggleCashDealFilter() {
         const currentVal = this.currentFilters.cashDeal;
-        const newVal = currentVal === null ? true : (currentVal === true ? false : null);
+        // Change to 2-state toggle: null -> true -> null
+        const newVal = currentVal === true ? null : true;
         this.setFilter({ key: 'cashDeal', value: newVal });
     },
     toggleNeedHelpFilter() {
         const currentVal = this.currentFilters.needHelp;
-        this.setFilter({ key: 'needHelp', value: currentVal === null ? true : (currentVal === true ? false : null) });
+        // Change to 2-state toggle: null -> true -> null
+        const newVal = currentVal === true ? null : true; 
+        this.setFilter({ key: 'needHelp', value: newVal });
+    },
+
+    // --- ADDED: Method to handle duplicate filter toggle ---
+    handleToggleDuplicateFilter() {
+        this.toggleDuplicateFilter(); // Call the mapped action
     },
 
     // Sort Methods
     handleSortFieldChange(selectedOption) {
-        // Extract the value from the selected option object
-        const newSortField = selectedOption?.value;
+        // Directly use the selectedOption which is the primitive value
+        const newSortField = selectedOption; 
         console.log(`KanbanToolbar: Sort field change - Field: ${newSortField}`);
         if (newSortField) { 
             this.setSort({ field: newSortField, direction: this.currentSortDirection });
@@ -490,9 +506,9 @@ const KanbanToolbar = {
                     <!-- Search Results Dropdown -->
                     <div v-if="showResults && searchResults.length > 0" class="absolute z-20 mt-1 w-full max-h-80 overflow-y-auto rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
                        <ul class="divide-y divide-gray-100">
-                           <li v-for="result in searchResults" :key="result.ID" @mousedown.prevent="selectSearchResult(result)" class="px-3 py-2 hover:bg-indigo-600 hover:text-white cursor-pointer group">
+                           <li v-for="result in searchResults" :key="result.ID" @mousedown.prevent="selectSearchResult(result)" class="px-3 py-2 hover:bg-blue-600 hover:text-white cursor-pointer group">
                                <p class="font-medium truncate text-gray-900 group-hover:text-white">{{ result.Owner_Name_Display || 'No Name'}}</p>
-                               <p class="text-xs text-gray-500 group-hover:text-indigo-200 truncate">
+                               <p class="text-xs text-gray-500 group-hover:text-blue-200 truncate">
                                    {{ result.addressLine1 || 'No Address' }} - <span class="font-medium">{{ result.New_Stage?.title || 'No Stage' }}</span>
                                </p>
                            </li>
@@ -559,15 +575,16 @@ const KanbanToolbar = {
                  />
                  <!-- Dynamic Filter Value Dropdown -->
                  <base-select-menu
-                    :modelValue="currentDynamicFilterValue" 
-                    @update:modelValue="handleFilterValueChange" 
-                    :options="filterValueOptions" 
-                    :disabled="!selectedFilterType" 
-                    :placeholder="filterValuePlaceholder" 
-                    class="w-auto min-w-[150px]"
-                    optionValueKey="value" 
-                    optionLabelKey="label" 
+                    :modelValue="currentDynamicFilterValue"
+                    @update:modelValue="handleFilterValueChange"
+                    :options="filterValueOptions"
+                    :disabled="!selectedFilterType"
+                    :placeholder="filterValuePlaceholder"
+                    class="w-48 min-w-[150px]"  
+                    optionValueKey="value"
+                    optionLabelKey="label"
                     :attrs="{ id: 'filter-value' }"
+                    :show-clear-button="true"
                  />
                  <!-- Cash Deal Toggle Button -->
                 <base-button 
@@ -575,9 +592,9 @@ const KanbanToolbar = {
                     :variant="currentFilters.cashDeal === true ? 'success' : (currentFilters.cashDeal === false ? 'secondary' : 'secondary')" 
                     size="md"
                     class="px-3 py-1.5 text-sm"
+                    :show-focus-ring="false" 
                 >
                     Cash Deal
-                    <span v-if="currentFilters.cashDeal !== null" class="ml-1 font-normal opacity-75">{{ currentFilters.cashDeal ? 'Yes' : 'No' }}</span>
                 </base-button>
                 <!-- Need Help Toggle Button -->
                 <base-button 
@@ -586,9 +603,21 @@ const KanbanToolbar = {
                     size="md"
                     class="px-3 py-1.5 text-sm"
                     :class="{'ring-2 ring-red-500 ring-offset-1': currentFilters.needHelp === true}"
+                    :show-focus-ring="false" 
                 >
                     Need Help
-                    <span v-if="currentFilters.needHelp !== null" class="ml-1 font-normal opacity-75">{{ currentFilters.needHelp ? 'On' : 'Off' }}</span>
+                </base-button>
+                <!-- ADDED: Duplicate Filter Toggle Button -->
+                <base-button 
+                    @click="handleToggleDuplicateFilter" 
+                    :variant="filterOnlyDuplicates ? 'warning' : 'secondary'" 
+                    size="md"
+                    class="px-3 py-1.5 text-sm"
+                    :class="{'ring-2 ring-yellow-500 ring-offset-1': filterOnlyDuplicates}"
+                    :show-focus-ring="false" 
+                    title="Show only potential duplicates based on Lat/Long"
+                >
+                    Duplicates
                 </base-button>
                  <!-- Work Required Filter (Button Group) -->
                  <base-button-group
@@ -623,6 +652,7 @@ const KanbanToolbar = {
                         size="md" 
                         class="p-1.5" 
                         :title="currentSortDirection === 'asc' ? 'Ascending' : 'Descending'"
+                        :show-focus-ring="false" 
                     >
                         <span class="sr-only">Toggle Sort Direction</span>
                         <i :class="['fas', currentSortDirection === 'asc' ? 'fa-sort-amount-up-alt' : 'fa-sort-amount-down-alt','text-gray-600 text-base']" aria-hidden="true"></i>
@@ -630,17 +660,34 @@ const KanbanToolbar = {
                  </div>
                  
                  <!-- Reset Button -->
-                 <base-button @click="resetAll" variant="secondary" size="md" class="px-3 py-1.5 text-sm flex-shrink-0">
+                 <base-button 
+                     @click="resetAll" 
+                     variant="secondary" 
+                     size="md" 
+                     class="px-3 py-1.5 text-sm flex-shrink-0"
+                     :show-focus-ring="false"
+                 >
                     Reset
                  </base-button>
                  <!-- Refresh Button -->
-                 <base-button @click="handleRefresh" variant="secondary" size="md" class="px-3 py-1.5 text-sm flex-shrink-0">
+                 <base-button 
+                     @click="handleRefresh" 
+                     variant="secondary" 
+                     size="md" 
+                     class="px-3 py-1.5 text-sm flex-shrink-0"
+                      :show-focus-ring="false"
+                 >
                      <i class="fas fa-sync-alt mr-1"></i> Refresh
                  </base-button>
                  <!-- Last Updated -->
                  <div class="text-xs text-gray-500 flex items-center gap-1 flex-shrink-0">
                      <i class="fas fa-clock text-gray-400"></i>
                      <span v-if="lastUpdatedTimestamp" class="flex-shrink-0" :title="lastUpdatedTimestamp ? new Date(lastUpdatedTimestamp).toLocaleString() : 'Never'">{{ timeAgo }}</span>
+                 </div>
+                 <!-- Version Info -->
+                 <div class="text-xs text-gray-500 flex items-center gap-1 flex-shrink-0" :title="APP_BUILD_INFO">
+                     <i class="fas fa-info-circle text-gray-400"></i>
+                     <span>{{ APP_BUILD_INFO }}</span>
                  </div>
             </div>
         </div>

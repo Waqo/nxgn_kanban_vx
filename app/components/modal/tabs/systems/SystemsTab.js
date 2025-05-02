@@ -1,32 +1,98 @@
-// app/components/modal/tabs/SystemsTab.js
+// app/components/modal/tabs/systems/SystemsTab.js
 
-// Vuex no longer needed
-// if (typeof Vuex === 'undefined') { ... }
+// Imports
+import BaseCard from '../../../common/BaseCard.js';
+import BaseButton from '../../../common/BaseButton.js';
+import BaseStats from '../../../common/BaseStats.js';
+import BaseTextInput from '../../../common/BaseTextInput.js';
+import BaseStackedList from '../../../common/BaseStackedList.js';
+import BaseEmptyStates from '../../../common/BaseEmptyStates.js';
+import { formatNumber, formatCurrency } from '../../../../utils/helpers.js'; // Assuming these exist
+import { useUiStore } from '../../../../store/uiStore.js';
+import { useLookupsStore } from '../../../../store/lookupsStore.js';
+import { useMaterialStore } from '../../../../store/materialStore.js';
+import { useProjectsStore } from '../../../../store/projectsStore.js';
+import MaterialForm from './MaterialForm.js';
+import MaterialItem from './MaterialItem.js';
 
-const SystemsTab = {
+const { ref, computed, reactive, watch } = Vue;
+
+// Placeholder for mapping material category to icon
+const getMaterialCategoryIcon = (category) => {
+    switch (category) {
+        case 'Module':           return 'fas fa-solar-panel';
+        case 'Inverter':       return 'fas fa-plug';
+        case 'Battery':        return 'fas fa-battery-full';
+        case 'Other Component': 
+        default:              return 'fas fa-box';
+    }
+};
+
+export default {
     name: 'SystemsTab',
-    components: {},
-    // Define the project prop
+  components: {
+      BaseCard,
+      BaseButton,
+      BaseStats,
+      BaseTextInput,
+      BaseStackedList,
+      BaseEmptyStates,
+      MaterialForm,
+      MaterialItem
+  },
     props: {
         project: { 
             type: Object, 
             required: true 
         }
     },
-    computed: {
-        // Remove Vuex mapState
-        // ...(typeof Vuex !== 'undefined' ? Vuex.mapState('modal', { ... }) : { ... }),
+  setup(props) {
+    const uiStore = useUiStore();
+    const lookupsStore = useLookupsStore();
+    const materialStore = useMaterialStore();
+    const projectsStore = useProjectsStore();
+    const project = computed(() => props.project);
 
-        // Access Bill_of_Materials via prop
-        materials() {
-            return this.project?.Bill_of_Materials || [];
-        },
+    // --- State for Material Form (Add/Edit) ---
+    const isAddingMaterial = ref(false);
+    const editingMaterialId = ref(null);
 
-        // Grouped materials uses this.materials - OK
-        groupedMaterials() {
-            if (!this.materials) return {};
-            return this.materials.reduce((acc, material) => {
-                // Use API field name 'Category'
+    // --- State for Delete Confirmation ---
+    const confirmingDeleteMaterialId = ref(null);
+
+    // --- State for Inline System Editing ---
+    const isEditingSystem = ref(false);
+    const isSavingSystemEdit = ref(false);
+    const systemEditForm = reactive({ // Keep for inline system edit
+        kW_STC: 0,
+        Annual_Output_kWh: 0,
+        Annual_Usage: 0,
+        Is_Approved: false
+    });
+
+    // --- System Overview Computed --- 
+    const systemSizeKw = computed(() => formatNumber(project.value?.kW_STC, 2));
+    const annualOutputKwh = computed(() => formatNumber(project.value?.Annual_Output_kWh));
+    const annualUsageKwh = computed(() => formatNumber(project.value?.Annual_Usage));
+    const systemYield = computed(() => formatNumber(project.value?.Yield, 0));
+    const offsetPercentage = computed(() => `${formatNumber(project.value?.Offset || 0, 1)}%`);
+    const isApproved = computed(() => project.value?.Is_Approved === true);
+
+    // --- Computed for BaseStats --- 
+    const overviewStats = computed(() => [
+        { id: 'size', name: 'Size (kW)', stat: systemSizeKw.value },
+        { id: 'output', name: 'Output (kWh)', stat: annualOutputKwh.value },
+        { id: 'usage', name: 'Usage (kWh)', stat: annualUsageKwh.value },
+        { id: 'yield', name: 'Yield (kWh/kW)', stat: systemYield.value },
+        { id: 'offset', name: 'Offset', stat: offsetPercentage.value }
+    ]);
+
+    // --- Bill of Materials Computed ---
+    const materials = computed(() => project.value?.Bill_of_Materials || []);
+
+    const groupedMaterials = computed(() => {
+        if (!materials.value) return {};
+        return materials.value.reduce((acc, material) => {
                 const category = material.Category || 'Other Component';
                 if (!acc[category]) {
                     acc[category] = [];
@@ -34,119 +100,318 @@ const SystemsTab = {
                 acc[category].push(material);
                 return acc;
             }, {});
-        },
+    });
+    
+    const orderedCategories = computed(() => {
+        const order = ['Module', 'Inverter', 'Battery', 'Other Component'];
+        return Object.keys(groupedMaterials.value).sort((a, b) => {
+            let indexA = order.indexOf(a);
+            let indexB = order.indexOf(b);
+            if (indexA === -1) indexA = order.length; // Put unknown categories last
+            if (indexB === -1) indexB = order.length;
+            return indexA - indexB;
+        });
+    });
 
-        // Total cost uses this.materials - OK
-        totalMaterialCost() {
-            if (!this.materials) return 0;
-            // Use API field name 'Total_Price'
-            return this.materials.reduce((sum, material) => 
+    const totalMaterialCost = computed(() => {
+        if (!materials.value) return 0;
+        const total = materials.value.reduce((sum, material) => 
                 sum + (parseFloat(material.Total_Price) || 0), 0
             );
-        },
-        
-        // Other overview fields use this.project - OK
-        systemSizeKw() { return this.project?.kW_STC || 0; },
-        annualOutputKwh() { return this.project?.Annual_Output_kWh || 0; },
-        annualUsageKwh() { return this.project?.Annual_Usage || 0; },
-        systemYield() { return this.project?.Yield || '0'; },
-        offsetPercentage() { return this.project?.Offset || '0%'; },
-        isApproved() { return this.project?.Is_Approved; } 
-    },
-    methods: {
-         formatCurrency(amount) {
-            return new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD'
-            }).format(amount || 0);
-        },
-        formatNumber(value, decimals = 0) {
-            if (value === null || value === undefined || value === '') return 'N/A';
-            const num = Number(value);
-            if (isNaN(num)) return 'Invalid';
-            // Basic comma formatting for integers
-            const fixedNum = num.toFixed(decimals);
-             if (decimals === 0) {
-                 return fixedNum.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-             } else {
-                 // Avoid adding commas to decimals for simplicity for now
-                 return fixedNum;
-             }
-        },
-        // Placeholders for later functionality
-        addMaterial() {
-            alert('Add Material functionality not implemented yet.');
-        },
-        editSystem() {
-            alert('Edit System functionality not implemented yet.');
+        return formatCurrency(total);
+    });
+
+    // --- Helper to get initial data for MaterialForm ---
+    const getMaterialForEditing = computed(() => {
+        if (!editingMaterialId.value) return {};
+        return materials.value.find(m => m.ID === editingMaterialId.value) || {};
+    });
+
+    const equipmentData = computed(() => lookupsStore.equipmentData || {});
+
+    // --- ADD computed to track if any form is open --- 
+    const isAnyMaterialFormOpen = computed(() => isAddingMaterial.value || !!editingMaterialId.value);
+
+    // --- Methods ---
+    const editSystem = () => {
+      startEditingSystem(); // Call the function to show the form
+    };
+    const addMaterial = () => { // Renamed from toggleAddMaterialForm
+      isAddingMaterial.value = true;
+      editingMaterialId.value = null;
+      confirmingDeleteMaterialId.value = null; // Close delete confirm
+    };
+    const startEditingMaterial = (material) => {
+        if (!material || !material.ID) {
+            console.error("SystemsTab: Attempted to edit material without a valid ID:", material);
+            // Optionally add UI notification here if uiStore is injected or accessible
+            return;
         }
+        console.log("SystemsTab: startEditingMaterial called with material ID:", material.ID); 
+        isAddingMaterial.value = false; 
+        confirmingDeleteMaterialId.value = null; 
+        editingMaterialId.value = material.ID; 
+        console.log("SystemsTab: editingMaterialId set to:", editingMaterialId.value);
+    };
+    const cancelMaterialForm = () => {
+        isAddingMaterial.value = false;
+        editingMaterialId.value = null;
+    };
+    const handleMaterialFormSubmit = () => {
+         console.log("Material form submitted (add/edit successful)");
+         cancelMaterialForm(); // Close the form
+    };
+    const requestDeleteMaterial = (materialId) => {
+        isAddingMaterial.value = false; // Close add form
+        editingMaterialId.value = null; // Close edit form
+        confirmingDeleteMaterialId.value = materialId; 
+    };
+    const cancelDeleteMaterial = () => {
+         confirmingDeleteMaterialId.value = null;
+    };
+    const confirmDeleteMaterial = async (materialId) => {
+        if (confirmingDeleteMaterialId.value !== materialId) return; // Prevent accidental double-click
+        
+        console.log("Confirming delete for material:", materialId);
+        try {
+            await materialStore.deleteMaterial({ materialId });
+            confirmingDeleteMaterialId.value = null; // Clear confirmation on success
+        } catch (error) {
+             console.error("SystemsTab: Failed to delete material", error);
+        } 
+    };
+
+    // --- Method for System Editing ---
+    const startEditingSystem = () => {
+        if (!project.value) return;
+        systemEditForm.kW_STC = project.value.kW_STC || 0;
+        systemEditForm.Annual_Output_kWh = project.value.Annual_Output_kWh || 0;
+        systemEditForm.Annual_Usage = project.value.Annual_Usage || 0;
+        systemEditForm.Is_Approved = project.value.Is_Approved === true; // Ensure boolean
+        isEditingSystem.value = true;
+    };
+    const cancelEditingSystem = () => {
+        isEditingSystem.value = false;
+    };
+    const handleSaveSystemEdit = async () => {
+        if (!project.value) return;
+        isSavingSystemEdit.value = true;
+        console.log("Saving system overview data:", systemEditForm);
+        try {
+            await projectsStore.updateSystemOverview({
+                projectId: project.value.ID,
+                systemData: { ...systemEditForm } 
+            });
+            cancelEditingSystem(); 
+        } catch (error) {
+            console.error("SystemsTab: Failed to save system overview edit", error);
+        } finally {
+            isSavingSystemEdit.value = false;
+        }
+    };
+
+    return {
+        // Overview
+        isApproved,
+        overviewStats,
+        editSystem,
+        isEditingSystem,
+        isSavingSystemEdit,
+        systemEditForm,
+        cancelEditingSystem,
+        handleSaveSystemEdit,
+        // Materials
+        materials,
+        groupedMaterials,
+        orderedCategories,
+        totalMaterialCost,
+        addMaterial,
+        startEditingMaterial,
+        requestDeleteMaterial,
+        formatCurrency,
+        getMaterialCategoryIcon,
+        // --- Add/Edit Form State & Handlers ---
+        isAddingMaterial, 
+        editingMaterialId, 
+        getMaterialForEditing,
+        cancelMaterialForm,
+        handleMaterialFormSubmit,
+        // --- Delete Confirmation ---
+        confirmingDeleteMaterialId,
+        cancelDeleteMaterial,
+        confirmDeleteMaterial,
+        // --- Expose Form Open State ---
+        isAnyMaterialFormOpen
+    };
     },
     template: `
-        <div class="system-tab-content space-y-6">
+    <div class="system-tab-content space-y-6 p-1">
             <!-- System Overview Section -->
-            <div class="p-4 border border-gray-200 rounded-md bg-white shadow-sm">
-                <div class="flex justify-between items-center mb-4 pb-2 border-b">
+        <base-card>
+             <template #header>
+                <div class="flex justify-between items-center">
                     <h3 class="text-lg font-medium text-gray-900">System Overview</h3>
                     <div class="flex items-center gap-2">
-                        <span :class="['px-2 py-0.5 text-xs font-medium rounded-full', isApproved ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800']">
-                            {{ isApproved ? 'Approved' : 'Not Approved' }}
-                        </span>
-                         <button @click="editSystem" class="text-xs text-blue-600 hover:text-blue-800">Edit</button>
+                        <!-- NEW: Status Pill (only shown when not editing system) -->
+                         <span v-if="!isEditingSystem" 
+                               :class="[
+                                   'px-3 py-1 rounded-full text-xs font-medium',
+                                   isApproved ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                               ]">
+                             {{ isApproved ? 'Approved' : 'Not Approved' }}
+                         </span>
+                         
+                        <!-- Edit/Cancel button -->
+                        <base-button 
+                            @click="isEditingSystem ? cancelEditingSystem() : editSystem()" 
+                            size="xs" 
+                            variant="secondary"
+                            :disabled="isSavingSystemEdit"
+                        >
+                            {{ isEditingSystem ? 'Cancel' : 'Edit' }}
+                        </base-button>
                     </div>
                 </div>
-                <dl class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
-                    <div class="text-center p-2 bg-gray-50 rounded">
-                        <dt class="text-gray-500">Size (kW)</dt>
-                        <dd class="text-gray-900 font-semibold text-lg">{{ formatNumber(systemSizeKw, 2) }}</dd>
+            </template>
+             <template #default>
+                <!-- Display Mode: Use BaseStats -->
+                 <base-stats 
+                    v-if="!isEditingSystem"
+                    :stats="overviewStats"
+                    variant="shared-borders"
+                    :smColumns="3" 
+                    :lgColumns="5"
+                    :rounded="false" 
+                    :withShadow="false"
+                    :withDividers="true"
+                 />
+                 
+                 <!-- Edit Mode Form -->
+                 <form v-else @submit.prevent="handleSaveSystemEdit" class="space-y-4">
+                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                         <base-text-input
+                             label="System Size (kW STC)"
+                             type="number"
+                             step="0.01"
+                             v-model.number="systemEditForm.kW_STC"
+                             id="system-edit-kw"
+                             :attrs="{ min: 0 }"
+                             required
+                         />
+                         <base-text-input
+                             label="Annual Output (kWh)"
+                             type="number"
+                             step="1"
+                             v-model.number="systemEditForm.Annual_Output_kWh"
+                             id="system-edit-output"
+                             :attrs="{ min: 0 }"
+                             required
+                         />
+                         <base-text-input
+                             label="Annual Usage (kWh)"
+                             type="number"
+                             step="1"
+                             v-model.number="systemEditForm.Annual_Usage"
+                             id="system-edit-usage"
+                             :attrs="{ min: 0 }"
+                             required
+                         />
                     </div>
-                    <div class="text-center p-2 bg-gray-50 rounded">
-                        <dt class="text-gray-500">Output (kWh)</dt>
-                        <dd class="text-gray-900 font-semibold text-lg">{{ formatNumber(annualOutputKwh) }}</dd>
+                    <div class="flex items-center space-x-3">
+                         <label for="system-edit-approved" class="text-sm font-medium text-gray-900">System Approved:</label>
+                         <input
+                             type="checkbox"
+                             v-model="systemEditForm.Is_Approved"
+                             id="system-edit-approved"
+                             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                          />
                     </div>
-                    <div class="text-center p-2 bg-gray-50 rounded">
-                        <dt class="text-gray-500">Usage (kWh)</dt>
-                        <dd class="text-gray-900 font-semibold text-lg">{{ formatNumber(annualUsageKwh) }}</dd>
+                    <div class="flex justify-end border-t pt-4">
+                         <base-button 
+                             type="submit" 
+                             variant="primary" 
+                             size="sm" 
+                             :disabled="isSavingSystemEdit"
+                         >
+                             <span v-if="isSavingSystemEdit"><i class="fas fa-spinner fa-spin mr-1"></i>Saving...</span>
+                             <span v-else>Save Changes</span>
+                         </base-button>
                     </div>
-                     <div class="text-center p-2 bg-gray-50 rounded">
-                        <dt class="text-gray-500">Yield (kWh/kW)</dt>
-                        <dd class="text-gray-900 font-semibold text-lg">{{ formatNumber(systemYield, 0) }}</dd>
-                    </div>
-                     <div class="text-center p-2 bg-gray-50 rounded">
-                        <dt class="text-gray-500">Offset</dt>
-                        <dd class="text-gray-900 font-semibold text-lg">{{ offsetPercentage }}</dd> 
-                    </div>
-                     <!-- Add more overview fields if needed -->
-                 </dl>
-            </div>
+                 </form>
+             </template>
+        </base-card>
 
              <!-- Components Section -->
-             <div>
-                 <div class="flex justify-between items-center mb-4">
+         <div class="space-y-4">
+             <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-medium text-gray-900">System Components</h3>
                     <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-gray-700">Total Cost: {{ formatCurrency(totalMaterialCost) }}</span>
-                        <button @click="addMaterial" class="text-xs text-blue-600 hover:text-blue-800">+ Add Material</button>
+                    <span class="text-sm font-medium text-gray-700">Total Cost: {{ totalMaterialCost }}</span>
+                     <!-- Modify Add Material Button -->
+                    <base-button @click="isAddingMaterial ? cancelMaterialForm() : addMaterial()" size="sm" variant="secondary">
+                         <i :class="['mr-2', isAddingMaterial ? 'fas fa-times' : 'fas fa-plus']"></i>
+                         {{ isAddingMaterial ? 'Cancel Add' : 'Add Material' }}
+                    </base-button>
                     </div>
                 </div>
 
+                 <!-- ADD Inline Add/Edit Material Form -->
+                 <material-form
+                     v-if="isAddingMaterial || editingMaterialId"
+                     :is-editing="!!editingMaterialId"
+                     :initial-data="getMaterialForEditing"
+                     :project-id="project.ID"
+                     @submit="handleMaterialFormSubmit"
+                     @cancel="cancelMaterialForm"
+                     class="mb-6" 
+                 />
+
                  <div v-if="materials.length > 0" class="space-y-4">
-                    <div v-for="(items, category) in groupedMaterials" :key="category">
-                        <h4 v-if="items.length > 0" class="text-md font-semibold text-gray-800 mb-2 p-2 bg-gray-100 rounded-t-md border-b">{{ category }}</h4>
-                        <ul v-if="items.length > 0" class="divide-y divide-gray-200 border border-t-0 border-gray-200 rounded-b-md bg-white">
-                             <li v-for="material in items" :key="material.ID" class="px-4 py-3 grid grid-cols-4 gap-4 text-sm">
-                                 <div class="col-span-2 font-medium text-gray-900">{{ material.Manufacturer }} - {{ material.Model }}</div>
-                                 <div class="text-gray-600">Qty: {{ material.Quantity }}</div>
-                                 <div class="text-gray-700 text-right font-medium">{{ formatCurrency(material.Total_Price) }}</div>
-                             </li>
-                        </ul>
-                    </div>
+                     <base-card v-for="category in orderedCategories" :key="category" :no-body-padding="true">
+                         <template #header>
+                            <div class="flex justify-between items-center">
+                                <h4 class="text-md font-medium text-gray-900 flex items-center">
+                                    <i :class="[getMaterialCategoryIcon(category), 'mr-2 text-blue-500']"></i>
+                                    {{ category }}
+                                </h4>
+                            </div>
+                        </template>
+                        <template #default>
+                            <!-- Use BaseListContainer for structure, iterate inside default slot -->
+                             <base-list-container 
+                                v-if="groupedMaterials[category]?.length > 0" 
+                                itemKey="ID" 
+                                :dividers="true"
+                                variant="simple"
+                                >
+                                <!-- Iterate within the default slot -->
+                                <ul> <!-- Add ul wrapper for li elements -->
+                                    <li v-for="item in groupedMaterials[category]" :key="item.ID"> 
+                                         <material-item 
+                                            :material="item"
+                                            :is-confirming-delete="confirmingDeleteMaterialId === item.ID"
+                                            :is-any-form-open="isAnyMaterialFormOpen"
+                                            @edit="startEditingMaterial"
+                                            @delete-request="requestDeleteMaterial"
+                                            @confirm-delete="confirmDeleteMaterial"
+                                            @cancel-delete="cancelDeleteMaterial"
+                                         />
+                                    </li>
+                                </ul>
+                             </base-list-container>
+                             <p v-else class="text-sm text-gray-500 italic p-4 text-center">No components in this category.</p>
+                        </template>
+                     </base-card>
                  </div>
-                 <div v-else class="text-center text-gray-500 py-6 border border-dashed border-gray-300 rounded-md">
-                    No system components added yet.
-                 </div>
+                 <!-- Use BaseEmptyStates -->
+                 <base-empty-states 
+                    v-else-if="!isAnyMaterialFormOpen" 
+                    icon="fas fa-box-open"
+                    title="No System Components"
+                    description="Add materials using the button above."
+                    class="py-8"
+                 />
             </div>
         </div>
     `
 };
-
-export default SystemsTab; 

@@ -51,16 +51,39 @@ const ZohoAPIService = {
       const response = await ZOHO.CREATOR.DATA.getRecords(config);
       // console.log(`ZohoAPIService: Records received for ${reportName}:`, response);
 
-      if (response.code !== 3000) {
-        // Handle potential API errors indicated by non-3000 codes
+      // Allow success (3000) or no records found (9280) to pass through
+      if (response.code !== 3000 && response.code !== 9280) { 
+        // Handle potential API errors indicated by other non-3000/9280 codes
         console.error(`ZohoAPIService: API Error fetching records for ${reportName}:`, response);
         throw new Error(response.message || `API Error Code ${response.code}`);
       }
-      // Success: response structure is { code: 3000, data: [...], more_records?: "cursor_string" }
-      return response;
+      // Success or No Records Found: return the response object
+      // Structure for success: { code: 3000, data: [...], more_records?: "cursor_string" }
+      // Structure for no records: { code: 9280, message: "...", ... } (data might be missing or empty)
+      return response; 
     } catch (error) {
-      console.error(`ZohoAPIService: Error in getRecords for ${reportName}:`, error);
-      throw error;
+      console.error(`ZohoAPIService: Caught error in getRecords for ${reportName}:`, error);
+      // Check if the caught error is the specific "No records found" case (code 9280)
+      let isNoRecordsError = false;
+      if (error?.status === 400 && error?.responseText) {
+          try {
+              const errorData = JSON.parse(error.responseText);
+              if (errorData?.code === 9280) {
+                  isNoRecordsError = true;
+              }
+          } catch (parseError) {
+              // Ignore JSON parsing errors, proceed to re-throw
+          }
+      }
+      
+      if (isNoRecordsError) {
+          console.warn(`ZohoAPIService: Handling 'No records found' (9280) for ${reportName}. Returning simulated response.`);
+          // Return a response object similar to what Zoho would send for 'no records'
+          return { code: 9280, message: "No records found matching the given criteria.", data: [] }; 
+      } else {
+          // Re-throw other errors
+          throw error;
+      }
     }
   },
 
@@ -87,7 +110,7 @@ const ZohoAPIService = {
     try {
       // console.log(`ZohoAPIService: Fetching record by ID: ${recordId} from report: ${reportName}`, config);
       const response = await ZOHO.CREATOR.DATA.getRecordById(config);
-      // console.log(`ZohoAPIService: Record received for ID ${recordId}:`, response);
+       console.log(`ZohoAPIService: Record received for ID ${recordId}:`, response);
 
       if (response.code !== 3000) {
           console.error(`ZohoAPIService: API Error fetching record ${recordId}:`, response);

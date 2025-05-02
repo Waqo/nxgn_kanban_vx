@@ -69,6 +69,7 @@ export const useUserStore = defineStore('user', {
       this._setIsImpersonating(false);
 
       let initialUser = null;
+      const lookupsStore = useLookupsStore();
 
       try {
         const initParams = await ZohoAPIService.getInitParams();
@@ -79,31 +80,18 @@ export const useUserStore = defineStore('user', {
         }
         console.log(`User Store (Pinia): Found user email: ${userEmail}`);
 
-        // --- Fetch user record directly via API ---
         let loggedInUserRecord = null;
-        try {
-            const criteria = `(${FIELD_USER_EMAIL} == "${userEmail}")`;
-            console.log(`User Store (Pinia): Fetching user record with criteria: ${criteria}`);
-            const response = await ZohoAPIService.getRecords(REPORT_USERS, criteria);
-            
-            if (response.code !== 3000) {
-                throw new Error(response.message || `API Error Code ${response.code}`);
-            }
-            
-            if (response.data && response.data.length === 1) {
-                loggedInUserRecord = response.data[0];
-            } else if (response.data && response.data.length > 1) {
-                console.warn(`User Store (Pinia): Multiple user records found for email ${userEmail}. Using the first one.`);
-                loggedInUserRecord = response.data[0];
-            } else {
-                // No record found, handled below by the fallback mechanism
-                console.warn(`User Store (Pinia): No user record found via API for email ${userEmail}.`);
-            }
-        } catch (apiError) {
-            console.error(`User Store (Pinia): API error fetching user record for ${userEmail}:`, apiError);
-            // Let the fallback mechanism handle this case
+        if (lookupsStore.users && lookupsStore.users.length > 0) {
+             loggedInUserRecord = lookupsStore.users.find(user => user.Email?.toLowerCase() === userEmail.toLowerCase());
+             if (loggedInUserRecord) {
+                 console.log(`User Store (Pinia): Found user record for ${userEmail} in lookupsStore.`);
+             } else {
+                 console.warn(`User Store (Pinia): User record for ${userEmail} NOT found in lookupsStore. Will create fallback.`);
+             }
+        } else {
+            console.warn(`User Store (Pinia): lookupsStore.users is empty or not yet populated. Cannot find user ${userEmail}. Will create fallback.`);
+            // This case should ideally not happen if initService runs correctly, but good to handle.
         }
-        // --- End API Fetch ---
 
         if (!loggedInUserRecord) {
            console.warn(`User Store (Pinia): User record not found for email ${userEmail}. Creating fallback.`);

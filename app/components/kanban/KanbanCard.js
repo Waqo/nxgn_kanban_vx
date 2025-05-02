@@ -1,7 +1,11 @@
 // app/components/kanban/KanbanCard.js
 
 // Import helper function
-import { formatDateMMDDYY } from '../../utils/helpers.js';
+// Remove old helper
+// import { formatDateMMDDYY } from '../../utils/helpers.js';
+// Import VueUse
+const { useDateFormat } = VueUse;
+
 // Import Cancelled Stage ID constant
 import { FIELD_PROJECT_CANCELLED_STAGE_ID, REPORT_USERS } from '../../config/constants.js';
 
@@ -11,7 +15,9 @@ import { useProjectsStore } from '../../store/projectsStore.js'; // Import proje
 import { useModalStore } from '../../store/modalStore.js'; // Import modal store
 const { mapState } = Pinia; // Use alias for clarity
 
-
+// Import Vue/VueUse Imports (assuming VueUse is global via CDN) ---
+const { computed, watch, ref, getCurrentInstance } = Vue; // ADD getCurrentInstance
+const { useTimeAgo, useDebounceFn } = VueUse;
 
 const KanbanCard = {
     name: 'KanbanCard',
@@ -27,265 +33,297 @@ const KanbanCard = {
       }
     },
     emits: ['dragstart', 'dragend'], // Emits events handled by KanbanColumn
-    computed: {
-      // Map user state
-      ...mapState(useUserStore, {
-           currentUserId: (store) => store.currentUser?.id
-      }),
-      formattedAddress() {
-        if (!this.project.address) return 'No Address';
-        return `${this.project.addressLine1 || ''}, ${this.project.city || ''}, ${this.project.state || ''}`.replace(/^, |, $/g, '');
-      },
-      contactNameDisplay() {
-          return this.project.Owner_Name_Display || 'No Contact Name';
-      },
-      systemSizeDisplay() {
-          const size = parseFloat(this.project.kW_STC);
-          return !isNaN(size) && size > 0 ? `${size} kW` : 'N/A';
-      },
-      workBadges() {
-          const badges = [];
-          const project = this.project;
-  
-          // Tree Work
-          if (project.Tree_Work_Required) {
-              const isCompleted = project.Tree_Work_Status === 'Completed';
-              badges.push({
-                  text: 'Tree',
-                  color: isCompleted ? 'gray' : 'green'
-              });
-          }
-  
-          // Roof Work
-          if (project.Roof_Work_Required) {
-              const isCompleted = project.Roof_Work_Status === 'Completed';
-              badges.push({
-                  text: 'Roof',
-                  color: isCompleted ? 'gray' : 'red'
-              });
-          }
-  
-          // Panel Upgrade Work
-          if (project.Panel_Upgrade_Required) {
-              const isCompleted = project.PU_Work_Status === 'Completed';
-              badges.push({
-                  text: 'PU',
-                  color: isCompleted ? 'gray' : 'blue'
-              });
-          }
-  
-          return badges;
-      },
-      showSurveyBadge() {
-          return Array.isArray(this.project.Survey_Results) && this.project.Survey_Results.length > 0;
-      },
-      systemSizeBadgeColor() {
-          return this.project.Is_Approved ? 'green' : 'gray';
-      },
-      isCashDeal() {
-          return this.project.Is_Cash_Finance;
-      },
-      // *** REMOVED: headerBorderClasses computed property is no longer needed ***
-      projectTypeBadge() {
-           const isCommercial = this.project.Commercial;
-           return {
-               text: isCommercial ? 'COM' : 'RES',
-               color: isCommercial ? 'purple' : 'blue',
-               title: isCommercial ? 'Commercial' : 'Residential'
-           };
-      },
-      roofTypeBadge() {
-           const roofType = this.project.Roof_Type || '';
-           if (!roofType) return null; // Don't show badge if no data
-           const truncatedText = roofType.length > 15 ? roofType.substring(0, 15) + '...' : roofType;
-           return {
-               text: truncatedText,
-               title: roofType, // Full text for tooltip
-               color: 'gray'
-           };
-      },
-      permitBadge() {
-           const status = this.project.Permit_Status || '';
-           if (!status || status === 'No Record') return null;
-           const isApproved = ["Approved", "Projectdox Accepted"].includes(status);
-           return {
-               text: isApproved ? 'Permit: Y' : 'Permit: N',
-               color: isApproved ? 'green' : 'red',
-               title: status // Full status for tooltip
-           };
-      },
-      interconnectBadge() {
-           const status = this.project.Interconnection_Status || '';
-           if (!status || status === 'No Record') return null;
-           const isApproved = [
-               "Approval to Install", 
-               "Upgrades Rqd: Approval",
-               "In Service",
-               "Conditionally Approved",
-               "Approval To Install Upgrades Required"
-           ].includes(status);
-           return {
-               text: isApproved ? 'IC: Y' : 'IC: N',
-               color: isApproved ? 'green' : 'red',
-               title: status // Full status for tooltip
-           };
-      },
-      formattedDateSold() {
-          return formatDateMMDDYY(this.project.Date_Sold);
-      },
-      daysSinceSold() {
-          if (!this.project.Date_Sold) return null;
-          try {
-              const soldDate = new Date(this.project.Date_Sold);
-              const today = new Date();
-              // Reset time part for accurate day difference
-              soldDate.setHours(0, 0, 0, 0);
-              today.setHours(0, 0, 0, 0);
-              const diffTime = Math.abs(today - soldDate);
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              return diffDays;
-          } catch (e) {
-              console.error("Error calculating days since sold:", e);
-              return null;
-          }
-      },
-      installDateBadge() {
-          const installDate = this.project.Installation_Date_Time;
-          if (!installDate) return null;
-          const formattedDate = formatDateMMDDYY(installDate);
-          if (!formattedDate) return null;
-          return {
-              text: `Inst: ${formattedDate}`,
-              color: 'green'
-          };
-      },
-      salesRepDisplay() {
-          const name = this.project.Sales_Rep_Name || 'Unassigned';
-          const limit = 15;
-          return name.length > limit ? name.substring(0, limit) + '...' : name;
-      },
-      yieldBadge() {
-          const yieldVal = parseFloat(this.project.Yield);
-          if (isNaN(yieldVal) || yieldVal === 0) return null;
-          const formattedYield = yieldVal.toFixed(2);
-          let color = 'gray';
-          if (yieldVal < 1000) {
-              color = 'red';
-          } else if (yieldVal <= 1100) {
-              color = 'yellow';
-          } else {
-              color = 'green';
-          }
-          return {
-              text: formattedYield,
-              color: color,
-              title: `${yieldVal} kWh/kWp`
-          };
-      },
-      // isPossibleDuplicate - Access store directly
-      isPossibleDuplicate() {
-          const projectsStore = useProjectsStore(); // Get store instance
-          const duplicateIds = projectsStore.duplicateLatLongProjectIds; // Access getter directly
-          
-          // Add safety check in case getter isn't ready immediately
-          if (!duplicateIds || typeof duplicateIds.has !== 'function') { 
-              // console.warn('KanbanCard: duplicateProjectIds Set not yet available.');
-              return false; // Default to false if Set is not ready
-          }
-          
-          const isDuplicate = duplicateIds.has(this.project.ID);
-          const isCancelled = this.project.New_Stage?.ID === FIELD_PROJECT_CANCELLED_STAGE_ID;
-          return isDuplicate && !isCancelled;
-      },
-    },
-    methods: {
-      handleDragStart(event) {
-        console.log(`KanbanCard: Drag Start - Project ID: ${this.project.ID}`);
-        event.dataTransfer.setData('text/plain', this.project.ID);
-        event.dataTransfer.effectAllowed = 'move';
-        this.$emit('dragstart');
-      },
-      handleDragEnd(event) {
-        console.log(`KanbanCard: Drag End - Project ID: ${this.project.ID}`);
-        this.$emit('dragend');
-      },
-      handlePhoneClick() { 
-          const phoneToCall = this.project.Owner_Phone;
-          const contactName = this.project.Owner_Name_Display || 'Unknown Contact';
-          const agentUserId = this.currentUserId; 
+    setup(props, { emit }) {
+        // --- Destructure from global Vue ---
+        const { computed } = Vue;
+        // --- Get Current Instance --- ADD THIS
+        const instance = getCurrentInstance();
+        const api = instance.appContext.config.globalProperties.$api;
 
-          if (!phoneToCall || !agentUserId) {
-               // Use combined check and single alert/log for brevity
-               const missing = !phoneToCall ? 'phone number' : 'user ID';
-               console.warn(`KanbanCard: Cannot initiate call, missing ${missing}.`);
-               alert(`Cannot initiate call: Missing ${missing}.`);
-               return;
-          }
-          
-          const cleanedPhone = phoneToCall.replace(/[^+\d]/g, '');
-          const payload = {
-              data: { In_Call: true, Calling_Number: cleanedPhone, Calling_Name: contactName }
-          };
-          
-          console.log(`KanbanCard: INFO - Initiating call to ${contactName}...`); 
-          console.log(`KanbanCard: Updating user ${agentUserId} call status in ${REPORT_USERS}`);
+        // --- Get Stores ---
+        const userStore = useUserStore();
+        const projectsStore = useProjectsStore();
+        const modalStore = useModalStore();
 
-          this.$api.updateRecordById(REPORT_USERS, agentUserId, payload)
-              .then(response => {
-                  console.log(`KanbanCard: SUCCESS - User call status updated for ${agentUserId}.`);
-                  console.log(`KanbanCard: Triggering parent page reload.`);
-                  // Reload the parent page after successful update.
-                  // NOTE: This reload is REQUIRED by the Zoho integration to properly handle the call initiation process.
-                  try {
-                     if (this.$api && typeof this.$api.navigateParentUrl === 'function') {
-                         this.$api.navigateParentUrl({ action: "reload" }); // Call with reload action
-                     } else {
-                         console.warn('$api.navigateParentUrl not available, attempting direct reload.');
-                         window.location.reload(); // Fallback reload
-                     }
-                  } catch(reloadError) {
-                       console.error('Error attempting to reload page:', reloadError);
-                       alert('Call initiated, but failed to reload page.');
-                  }
-              })
-              .catch(error => {
-                  console.error(`KanbanCard: Failed to update user call status for ${agentUserId}:`, error);
-                  alert(`Failed to initiate call: ${error.message || 'Unknown error'}`); 
-              });
-      },
-      handleEmailClick() {
-          const email = this.project.Owner_Email;
-          if (!email) {
-              console.warn('KanbanCard: No email address available.');
-              alert('No email address available for this contact.');
-              return;
-          }
-          const mailtoUrl = `mailto:${email}`;
-          console.log(`KanbanCard: Calling API service navigateParentUrl for email: ${mailtoUrl}`);
-           try {
-             if (this.$api && typeof this.$api.navigateParentUrl === 'function') {
-                // Call with config object for opening mailto link (defaults to new window/tab)
-                this.$api.navigateParentUrl({ action: 'open', url: mailtoUrl }); 
-             } else {
-                 console.error('$api.navigateParentUrl not available on this component.');
-                 window.location.href = mailtoUrl; // Keep direct fallback
-             }
-          } catch (error) {
-              console.error('Error invoking $api.navigateParentUrl for email:', error);
-               try {
-                  window.location.href = mailtoUrl; // Keep direct fallback
-              } catch (fallbackError) {
-                  console.error("Error opening mailto link as fallback:", fallbackError);
-                  alert("Could not open email client. Please check browser settings or copy the email address manually.");
-              }
-          }
-      },
-      // --- ADD Method to handle card click ---
-      handleCardClick() {
-          const modalStore = useModalStore(); // Get instance
-          console.log(`KanbanCard: Card clicked, calling modalStore.openModal for Project ID: ${this.project.ID}`);
-          modalStore.openModal(this.project.ID); // Call Pinia action
-      },
+        // --- Computed Properties using Composition API ---
+        const project = computed(() => props.project);
+        const draggedCardId = computed(() => props.draggedCardId);
+        const currentUserId = computed(() => userStore.currentUser?.id);
+
+        const formattedAddress = computed(() => {
+            if (!project.value.address) return 'No Address';
+            return `${project.value.addressLine1 || ''}, ${project.value.city || ''}, ${project.value.state || ''}`.replace(/^, |, $/g, '');
+        });
+        const contactNameDisplay = computed(() => project.value.Owner_Name_Display || 'No Contact Name');
+        const systemSizeDisplay = computed(() => {
+            const size = parseFloat(project.value.kW_STC);
+            return !isNaN(size) && size > 0 ? `${size} kW` : 'N/A';
+        });
+        const workBadges = computed(() => {
+            const badges = [];
+            const projectData = project.value;
+    
+            // Tree Work
+            if (projectData.Tree_Work_Required) {
+                const isCompleted = projectData.Tree_Work_Status === 'Completed';
+                badges.push({
+                    text: 'Tree',
+                    color: isCompleted ? 'gray' : 'green'
+                });
+            }
+    
+            // Roof Work
+            if (projectData.Roof_Work_Required) {
+                const isCompleted = projectData.Roof_Work_Status === 'Completed';
+                badges.push({
+                    text: 'Roof',
+                    color: isCompleted ? 'gray' : 'red'
+                });
+            }
+    
+            // Panel Upgrade Work
+            if (projectData.Panel_Upgrade_Required) {
+                const isCompleted = projectData.PU_Work_Status === 'Completed';
+                badges.push({
+                    text: 'PU',
+                    color: isCompleted ? 'gray' : 'blue'
+                });
+            }
+    
+            return badges;
+        });
+        const showSurveyBadge = computed(() => Array.isArray(project.value.Survey_Results) && project.value.Survey_Results.length > 0);
+        const systemSizeBadgeColor = computed(() => project.value.Is_Approved ? 'green' : 'gray');
+        const isCashDeal = computed(() => project.value.Is_Cash_Finance);
+        const projectTypeBadge = computed(() => {
+            const isCommercial = project.value.Commercial;
+            return {
+                text: isCommercial ? 'COM' : 'RES',
+                color: isCommercial ? 'purple' : 'blue',
+                title: isCommercial ? 'Commercial' : 'Residential'
+            };
+        });
+        const roofTypeBadge = computed(() => {
+            const roofType = project.value.Roof_Type || '';
+            if (!roofType) return null; // Don't show badge if no data
+            const truncatedText = roofType.length > 15 ? roofType.substring(0, 15) + '...' : roofType;
+            return {
+                text: truncatedText,
+                title: roofType, // Full text for tooltip
+                color: 'gray'
+            };
+        });
+        const permitBadge = computed(() => {
+            const status = project.value.Permit_Status || '';
+            if (!status || status === 'No Record') return null;
+            const isApproved = ["Approved", "Projectdox Accepted"].includes(status);
+            return {
+                text: isApproved ? 'Permit: Y' : 'Permit: N',
+                color: isApproved ? 'green' : 'red',
+                title: status // Full status for tooltip
+            };
+        });
+        const interconnectBadge = computed(() => {
+            const status = project.value.Interconnection_Status || '';
+            if (!status || status === 'No Record') return null;
+            const isApproved = [
+                "Approval to Install", 
+                "Upgrades Rqd: Approval",
+                "In Service",
+                "Conditionally Approved",
+                "Approval To Install Upgrades Required"
+            ].includes(status);
+            return {
+                text: isApproved ? 'IC: Y' : 'IC: N',
+                color: isApproved ? 'green' : 'red',
+                title: status // Full status for tooltip
+            };
+        });
+
+        // --- Date Formatting with useDateFormat ---
+        const soldDateRef = computed(() => project.value?.Date_Sold || '');
+        const formattedDateSold = computed(() => {
+            // Add fallback for empty date
+            return soldDateRef.value ? useDateFormat(soldDateRef, 'MM/DD/YY').value : 'N/A';
+        });
+        
+        const installDateRef = computed(() => project.value?.Installation_Date_Time || '');
+        const formattedInstallDate = computed(() => {
+            // Add fallback for empty date
+            return installDateRef.value ? useDateFormat(installDateRef, 'MM/DD/YY').value : 'N/A';
+        });
+
+        const daysSinceSold = computed(() => {
+            if (!soldDateRef.value) return null;
+            try {
+                const soldDate = new Date(soldDateRef.value);
+                const today = new Date();
+                // Reset time part for accurate day difference
+                soldDate.setHours(0, 0, 0, 0);
+                today.setHours(0, 0, 0, 0);
+                const diffTime = Math.abs(today - soldDate);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays;
+            } catch (e) {
+                console.error("Error calculating days since sold:", e);
+                return null;
+            }
+        });
+        const installDateBadge = computed(() => {
+            if (!installDateRef.value) return null;
+            const formattedDate = formattedInstallDate.value;
+            if (!formattedDate || formattedDate === 'N/A') return null;
+            return { text: `Inst: ${formattedDate}`, color: 'green' };
+        });
+        const salesRepDisplay = computed(() => {
+            const name = project.value.Sales_Rep_Name || 'Unassigned';
+            const limit = 15;
+            return name.length > limit ? name.substring(0, limit) + '...' : name;
+        });
+        const yieldBadge = computed(() => {
+            const yieldVal = parseFloat(project.value.Yield);
+            if (isNaN(yieldVal) || yieldVal === 0) return null;
+            const formattedYield = yieldVal.toFixed(2);
+            let color = 'gray';
+            if (yieldVal < 1000) {
+                color = 'red';
+            } else if (yieldVal <= 1100) {
+                color = 'yellow';
+            } else {
+                color = 'green';
+            }
+            return {
+                text: formattedYield,
+                color: color,
+                title: `${yieldVal} kWh/kWp`
+            };
+        });
+        const isPossibleDuplicate = computed(() => {
+            const duplicateIds = projectsStore.duplicateLatLongProjectIds; // Access getter directly
+            
+            // Add safety check in case getter isn't ready immediately
+            if (!duplicateIds || typeof duplicateIds.has !== 'function') { 
+                // console.warn('KanbanCard: duplicateProjectIds Set not yet available.');
+                return false; // Default to false if Set is not ready
+            }
+            
+            const isDuplicate = duplicateIds.has(project.value.ID);
+            const isCancelled = project.value.New_Stage?.ID === FIELD_PROJECT_CANCELLED_STAGE_ID;
+            return isDuplicate && !isCancelled;
+        });
+
+        // --- Methods --- 
+        const handleDragStart = (event) => {
+            console.log(`KanbanCard: Drag Start - Project ID: ${project.value.ID}`);
+            event.dataTransfer.setData('text/plain', project.value.ID);
+            event.dataTransfer.effectAllowed = 'move';
+            emit('dragstart');
+        };
+        const handleDragEnd = (event) => {
+            console.log(`KanbanCard: Drag End - Project ID: ${project.value.ID}`);
+            emit('dragend');
+        };
+        const handlePhoneClick = () => { 
+            const phoneToCall = project.value.Owner_Phone;
+            const contactName = contactNameDisplay.value;
+            const agentUserId = currentUserId.value; 
+
+            if (!phoneToCall || !agentUserId) {
+                 // Use combined check and single alert/log for brevity
+                 const missing = !phoneToCall ? 'phone number' : 'user ID';
+                 console.warn(`KanbanCard: Cannot initiate call, missing ${missing}.`);
+                 alert(`Cannot initiate call: Missing ${missing}.`);
+                 return;
+            }
+            
+            const cleanedPhone = phoneToCall.replace(/[^+\d]/g, '');
+            const payload = {
+                data: { In_Call: true, Calling_Number: cleanedPhone, Calling_Name: contactName }
+            };
+            
+            console.log(`KanbanCard: INFO - Initiating call to ${contactName}...`); 
+            console.log(`KanbanCard: Updating user ${agentUserId} call status in ${REPORT_USERS}`);
+
+            api.updateRecordById(REPORT_USERS, agentUserId, payload) // USE api instead of this.$api
+                .then(response => {
+                    console.log(`KanbanCard: SUCCESS - User call status updated for ${agentUserId}.`);
+                    console.log(`KanbanCard: Triggering parent page reload.`);
+                    // Reload the parent page after successful update.
+                    // NOTE: This reload is REQUIRED by the Zoho integration to properly handle the call initiation process.
+                    try {
+                       if (api && typeof api.navigateParentUrl === 'function') { // USE api
+                           api.navigateParentUrl({ action: "reload" }); // Call with reload action
+                       } else {
+                           console.warn('api.navigateParentUrl not available, attempting direct reload.');
+                           window.location.reload(); // Fallback reload
+                       }
+                    } catch(reloadError) {
+                         console.error('Error attempting to reload page:', reloadError);
+                         alert('Call initiated, but failed to reload page.');
+                    }
+                })
+                .catch(error => {
+                    console.error(`KanbanCard: Failed to update user call status for ${agentUserId}:`, error);
+                    alert(`Failed to initiate call: ${error.message || 'Unknown error'}`); 
+                });
+        };
+        const handleEmailClick = () => {
+            const email = project.value.Owner_Email;
+            if (!email) {
+                console.warn('KanbanCard: No email address available.');
+                alert('No email address available for this contact.');
+                return;
+            }
+            const mailtoUrl = `mailto:${email}`;
+            console.log(`KanbanCard: Calling API service navigateParentUrl for email: ${mailtoUrl}`);
+             try {
+               if (api && typeof api.navigateParentUrl === 'function') { // USE api instead of this.$api
+                  // Call with config object for opening mailto link (defaults to new window/tab)
+                  api.navigateParentUrl({ action: 'open', url: mailtoUrl }); // USE api
+               } else {
+                   console.error('api.navigateParentUrl not available on this component.');
+                   window.location.href = mailtoUrl; // Keep direct fallback
+               }
+            } catch (error) {
+                console.error('Error invoking api.navigateParentUrl for email:', error);
+                 try {
+                    window.location.href = mailtoUrl; // Keep direct fallback
+                } catch (fallbackError) {
+                    console.error("Error opening mailto link as fallback:", fallbackError);
+                    alert("Could not open email client. Please check browser settings or copy the email address manually.");
+                }
+            }
+        };
+        const handleCardClick = () => {
+            console.log(`KanbanCard: Card clicked, calling modalStore.openModal for Project ID: ${project.value.ID}`);
+            modalStore.openModal(project.value.ID); // Call Pinia action
+        };
+
+        return {
+            // Return all computed props and methods needed by the template
+            formattedAddress,
+            contactNameDisplay,
+            systemSizeDisplay,
+            workBadges,
+            showSurveyBadge,
+            systemSizeBadgeColor,
+            isCashDeal,
+            projectTypeBadge,
+            roofTypeBadge,
+            permitBadge,
+            interconnectBadge,
+            formattedDateSold,
+            daysSinceSold,
+            installDateBadge,
+            salesRepDisplay,
+            yieldBadge,
+            isPossibleDuplicate,
+            handleDragStart,
+            handleDragEnd,
+            handlePhoneClick,
+            handleEmailClick,
+            handleCardClick
+        };
     },
     template: `
         <div
@@ -365,7 +403,7 @@ const KanbanCard = {
               <!-- Row 1: Dates -->
               <div class="flex items-center justify-between gap-2">
                   <!-- Sold Date & Days Ago -->
-                  <div v-if="formattedDateSold" class="flex items-center gap-1 text-gray-600">
+                  <div v-if="formattedDateSold && formattedDateSold !== 'N/A'" class="flex items-center gap-1 text-gray-600">
                       <span>Sold: {{ formattedDateSold }}</span>
                       <base-badge 
                            v-if="daysSinceSold !== null"

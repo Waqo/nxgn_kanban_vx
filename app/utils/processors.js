@@ -31,6 +31,10 @@ import {
 // --- ADD Import for EVENT_TYPES ---
 import { EVENT_TYPES } from '../config/options.js';
 
+
+// Import constants needed for DocTypes
+import { REPORT_DOC_TYPES } from '../config/constants.js'; 
+
 const DataProcessors = {
 
   /**
@@ -42,7 +46,7 @@ const DataProcessors = {
    *                           Shape: [{ id: String, title: String, view: String, description: String, order: Number }, ...]
    */
   processStagesData(stagesResponse) {
-    // console.log('DataProcessors: Processing Stages Response:', stagesResponse);
+    // // console.log('DataProcessors: Processing Stages Response:', stagesResponse);
     if (!stagesResponse || stagesResponse.code !== 3000 || !Array.isArray(stagesResponse.data)) {
       console.warn('DataProcessors: Invalid or empty stages response received.', stagesResponse);
       return [];
@@ -64,7 +68,7 @@ const DataProcessors = {
         }))
         .sort((a, b) => a.order - b.order); // Sort by order ascending
 
-      // console.log('DataProcessors: Processed Stages:', processedStages);
+      // // console.log('DataProcessors: Processed Stages:', processedStages);
       return processedStages;
     } catch (error) {
       console.error('DataProcessors: Error processing stages data:', error);
@@ -271,9 +275,91 @@ const DataProcessors = {
     }
   },
 
+  /**
+   * Processes the raw API response for fetching Document Types.
+   * @param {object} docTypesResponse - The raw response object or just the data array.
+   * @returns {Array<object>} Array of processed doc type objects: [{ ID, Name, Include_In_Checklist }, ...]
+   */
+  processDocTypesData(docTypesResponse) {
+    // Handle receiving either the full response object or just the data array
+    const data = Array.isArray(docTypesResponse?.data) 
+        ? docTypesResponse.data 
+        : (Array.isArray(docTypesResponse) ? docTypesResponse : []);
+        
+    if (docTypesResponse?.code && docTypesResponse.code !== 3000 && !Array.isArray(docTypesResponse)) {
+         console.warn('DataProcessors: Invalid doc types response object received.', docTypesResponse);
+         return [];
+    }
+    if (!Array.isArray(data)) {
+        console.warn('DataProcessors: Invalid doc types data received.', data);
+        return [];
+    }
+
+    try {
+        return data.map(type => ({
+            ID: type.ID,
+            Name: type.Name || 'Unnamed Type',
+            Include_In_Checklist: type.Include_In_Checklist === 'true' // Convert string to boolean
+        }));
+    } catch (error) {
+        console.error('DataProcessors: Error processing document types data:', error);
+        return [];
+    }
+  },
+
+  // --- ADD Processor for Email Templates ---
+  processEmailTemplatesData(emailTemplatesResponse) {
+    // Handle receiving either the full response object or just the data array
+    const data = Array.isArray(emailTemplatesResponse?.data) 
+        ? emailTemplatesResponse.data 
+        : (Array.isArray(emailTemplatesResponse) ? emailTemplatesResponse : []);
+
+    if (emailTemplatesResponse?.code && emailTemplatesResponse.code !== 3000 && !Array.isArray(emailTemplatesResponse)) {
+         console.warn('DataProcessors: Invalid email templates response object received.', emailTemplatesResponse);
+         return [];
+    }
+    if (!Array.isArray(data)) {
+        console.warn('DataProcessors: Invalid email templates data received.', data);
+        return [];
+    }
+
+  // console.log(`DataProcessors: Processing ${data.length} raw email templates.`);
+    try {
+        const processedTemplates = data
+            .filter(template => 
+                template.Active_Status === 'true' && 
+                template.Template_Type === 'Manual'
+            )
+            .map(template => {
+                // Determine recipient description based on Send_to_Sales_Rep
+                const sendToRep = template.Send_to_Sales_Rep === 'true';
+                const recipientDesc = sendToRep 
+                    ? 'Sent to project contact and sales rep' 
+                    : 'Sent to project contact';
+                
+                return {
+                    id: template.ID,
+                    name: template.Template_Name || 'Unnamed Template',
+                    description: recipientDesc, // Use dynamic description
+                    subject: template.Template_Subject || '',
+                    // --- ADD Title and Body for Preview ---
+                    title: template.Title || '', 
+                    body: template.Preliminary_Body || '' 
+                };
+            });
+            
+      // console.log(`DataProcessors: Found ${processedTemplates.length} active manual email templates after processing.`);
+        return processedTemplates;
+
+    } catch (error) {
+        console.error('DataProcessors: Error processing email templates data:', error);
+        return [];
+    }
+  },
+
   // --- Placeholder for other processing functions ---
   processProjectDetailsData(projectResponse, contactsResponse) {
-    // console.log('DataProcessors: Project Data Received for Processing):', projectResponse);
+    console.log('DataProcessors: Starting detailed processing for:', projectResponse?.ID);
     if (!projectResponse) {
       console.warn('DataProcessors: processProjectDetailsData called without projectResponse.');
       return null;
@@ -282,13 +368,15 @@ const DataProcessors = {
     try {
         // Start with the raw project details
         const processedData = { ...projectResponse };
+        const rawNotes = processedData.Notes || [];
+        const rawAttachments = processedData.Note_Attachments || []; // Get attachments
 
-        // --- 1. Ensure Related Lists are Arrays --- 
+        // --- 1. Ensure Related Lists are Arrays (Keep Existing) --- 
         const relatedListKeys = [
             'Activities', 'Communication', 'Documents', 'Bill_of_Materials', 
-            'Notes', 'Permitting', 'Survey_Results', 'Issues', 'Tags', 'Contacts1', // Contacts1 is the grid in Project form
-            'Tasks' // Added Tasks
-            // Add other related list API names as needed
+            'Permitting', 'Survey_Results', 'Issues', 'Tags', 'Contacts1',
+            'Tasks',
+            // Remove Notes/Note_Attachments from here if handled separately below
         ];
         relatedListKeys.forEach(key => {
             if (!(key in processedData) || processedData[key] === null || processedData[key] === undefined) {
@@ -298,11 +386,14 @@ const DataProcessors = {
                  processedData[key] = [];
             }
         });
+        // Ensure Notes and Attachments are arrays even if not in the list above
+        processedData.Notes = Array.isArray(rawNotes) ? rawNotes : [];
+        processedData.Note_Attachments = Array.isArray(rawAttachments) ? rawAttachments : [];
 
-        // --- 2. Add Separately Fetched Contacts --- 
+        // --- 2. Add Separately Fetched Contacts (Keep Existing) --- 
         processedData.Contacts = Array.isArray(contactsResponse) ? contactsResponse : [];
 
-        // --- 3. Process Specific Fields (Booleans, Numbers, Ensure Lookups) --- 
+        // --- 3. Process Specific Project Fields (Keep Existing) --- 
         const fieldsToProcess = {
             // Booleans (from checkbox strings)
             Is_Cash_Finance: val => val === 'true',
@@ -347,40 +438,257 @@ const DataProcessors = {
             }
         }
         
-        // --- 4. Specific Related List Processing (Example: Sort Notes) ---
+        // --- 4. Process Notes, Attachments, and Threading --- 
+      // console.log(`DataProcessors: Processing ${processedData.Notes.length} notes and ${processedData.Note_Attachments.length} attachments.`);
+        const attachmentsByNoteId = new Map();
+        const notesById = new Map();
+
+        // 4a. Process and Group Attachments
+        processedData.Note_Attachments.forEach(att => {
+            const noteId = att.Note?.ID;
+            if (!noteId) return; // Skip attachments without a parent note ID
+
+            const fileName = att.Name || '';
+            const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+            const fileType = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExtension) ? 'image' : 'file';
+            
+            // Prioritize Image field for URL if it exists, otherwise use File_field
+            const rawUrl = att.Image || att.File_field;
+
+            // --- Process URL: Prepend domain if it's a relative path --- 
+            let processedUrl = rawUrl;
+            if (rawUrl && typeof rawUrl === 'string' && rawUrl.startsWith('/api/')) {
+                processedUrl = `https://creator.zoho.com${rawUrl}`;
+              // console.log(`DataProcessors: Prepended domain to relative URL: ${processedUrl}`); // Keep commented
+            } else if (!rawUrl) {
+                // Log warning if BOTH fields are empty/missing
+                // console.warn(`Could not get URL for attachment ${att.ID} (${fileName}). Image: '${att.Image || ''}', File_field: '${att.File_field || ''}'`); // REMOVE Warning
+            }
+            // --- End URL Processing ---
+
+            const processedAttachment = {
+                id: att.ID,
+                name: fileName,
+                url: processedUrl || null, // Use processed URL or null if still empty
+                type: fileType,
+                addedTime: att.Added_Time // Keep original timestamp if needed
+            };
+
+            // --- Only add attachment if it has a valid URL --- 
+            if (processedAttachment.url) {
+                if (!attachmentsByNoteId.has(noteId)) {
+                    attachmentsByNoteId.set(noteId, []);
+                }
+                attachmentsByNoteId.get(noteId).push(processedAttachment);
+            } else {
+                 // Optionally log skipped attachments (but without the warning)
+                 // console.log(`Skipping attachment ${att.ID} (${fileName}) due to missing URL.`);
+            }
+        });
+        
+        // 4b. Process Notes (First Pass: Cleanup, Add Attachments)
+        processedData.Notes.forEach(note => {
+            const processedNote = {
+                ...note, // Spread original fields
+                id: note.ID, // Ensure consistent id field
+                // Basic field cleanup
+                content: note.Note || '',
+                author: note.User_Lookup?.zc_display_value?.trim() || note.Author || 'Unknown User',
+                addedTime: note.Added_Time,
+                department: note.Department || null,
+                context: note.Context || 'General', // Default context if empty
+                teamOnly: note.Team_Only === 'true',
+                notifySales: note.Notify_Sales === 'true',
+                repliedTo: note.Replied_To?.ID || null,
+                taggedUsers: Array.isArray(note.Tagged_Users) ? note.Tagged_Users : [],
+                // Add processed attachments
+                attachments: attachmentsByNoteId.get(note.ID) || [],
+                // Initialize replies array
+                replies: [],
+                isReply: !!(note.Replied_To?.ID) // Flag if it's a reply
+            };
+            notesById.set(note.ID, processedNote);
+        });
+
+        // 4c. Build Reply Threads
+        const topLevelNotes = [];
+        notesById.forEach(note => {
+            if (note.repliedTo) {
+                const parentNote = notesById.get(note.repliedTo);
+                if (parentNote) {
+                    parentNote.replies.push(note);
+                } else {
+                    // Orphaned reply? Add to top level for visibility
+                    console.warn(`Note ${note.id} is a reply to non-existent parent ${note.repliedTo}. Adding as top-level.`);
+                    topLevelNotes.push(note);
+                }
+            } else {
+                topLevelNotes.push(note);
+            }
+        });
+
+        // 4d. Sort Replies within each thread
+        notesById.forEach(note => {
+            if (note.replies.length > 0) {
+                note.replies.sort((a, b) => new Date(b.addedTime) - new Date(a.addedTime)); // Descending for replies
+            }
+        });
+
+        // 4e. Sort Top-Level Notes (Descending)
+        topLevelNotes.sort((a, b) => new Date(b.addedTime) - new Date(a.addedTime));
+
+        // 4f. Split into Context Arrays
+        processedData.General_Notes = [];
+        processedData.Commission_Notes = [];
+        processedData.Investor_Notes = [];
+        processedData.Other_Notes = []; // For notes with other/empty contexts
+
+        topLevelNotes.forEach(note => {
+            switch (note.context) {
+                case 'General':
+                    processedData.General_Notes.push(note);
+                    break;
+                case 'Commissions':
+                    processedData.Commission_Notes.push(note);
+                    break;
+                case 'Investor':
+                    processedData.Investor_Notes.push(note);
+                    break;
+                default:
+                    // Add notes with empty or unknown context to Other_Notes
+                    processedData.Other_Notes.push(note);
+                    break;
+            }
+        });
+        
+      // console.log(`DataProcessors: Finished note processing. General: ${processedData.General_Notes.length}, Commission: ${processedData.Commission_Notes.length}, Investor: ${processedData.Investor_Notes.length}, Other: ${processedData.Other_Notes.length}`);
+        // --- End Note Processing --- 
+        
+        // --- 5. Other Related List Processing (e.g., Sorting Activities) ---
         if (Array.isArray(processedData.Activities) && processedData.Activities.length > 0) {
              processedData.Activities.sort((a, b) => {
                 const timeA = a.Added_Time ? new Date(a.Added_Time).getTime() : 0;
                 const timeB = b.Added_Time ? new Date(b.Added_Time).getTime() : 0;
-                // Handle potential invalid dates by treating them as earliest (0)
                 const validTimeA = isNaN(timeA) ? 0 : timeA;
                 const validTimeB = isNaN(timeB) ? 0 : timeB;
                 return validTimeB - validTimeA; // Descending order
              });
-             console.log("DataProcessors: Sorted Activities by Added_Time (desc)");
+             // console.log("DataProcessors: Sorted Activities by Added_Time (desc)");
+        }
+        // Add sorting for Communication, Documents etc. if needed
+        if (Array.isArray(processedData.Communications) && processedData.Communications.length > 0) {
+            processedData.Communications.sort((a, b) => {
+                // Helper to get a valid timestamp or 0
+                const getTime = (comm) => {
+                    const timeStr = comm.SMS_Sent_Time || comm.Email_Sent_Time || comm.Call_Start_Time || comm.Added_Time;
+                    if (!timeStr) return 0;
+                    try {
+                        const time = new Date(timeStr).getTime();
+                        return isNaN(time) ? 0 : time;
+                    } catch (e) {
+                        return 0;
+                    }
+                };
+                return getTime(a) - getTime(b); // Ascending order (oldest first)
+            });
+            // console.log("DataProcessors: Sorted Communications by time (asc)");
         }
         
-        if (processedData.Notes) {
-             processedData.Notes.sort((a, b) => {
-                const timeA = a.Added_Time ? new Date(a.Added_Time).getTime() : 0;
-                const timeB = b.Added_Time ? new Date(b.Added_Time).getTime() : 0;
-                return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
-             });
-             // TODO: Further note processing (attachments, replies) if needed later
-        }
+        // --- Process Bill of Materials --- 
+        processedData.Bill_of_Materials = Array.isArray(processedData.Bill_of_Materials) ? 
+            processedData.Bill_of_Materials.map(mat => ({
+                ID: mat.ID,
+                Category: mat.Category || 'Other Component',
+                Manufacturer: mat.Manufacturer || 'Unknown',
+                Model: mat.Model || 'Unknown',
+                Quantity: parseInt(mat.Quantity, 10) || 0, // Parse as integer
+                Unit_Price: parseFloat(mat.Unit_Price) || 0, // Parse as float
+                Total_Price: parseFloat(mat.Total_Price) || 0, // Parse as float
+                // Keep other fields if needed, e.g., for display or future use
+                // Added_Time: mat.Added_Time,
+                // Added_User: mat.Added_User
+            })) 
+            : [];
+        // --- End Bill of Materials Processing ---
         
-        // TODO: Process Tags using tagMap lookup from store state (requires passing lookup state)
-        // Example structure:
-        // const tagMap = rootGetters['lookups/tagsMap']; // Need to pass rootGetters
-        // processedData.processedTags = (processedData.Tags || [])
-        //    .map(rawTag => tagMap.get(rawTag.ID))
-        //    .filter(Boolean); // Filter out tags not found in the map
-        processedData.processedTags = []; // Placeholder for now
+        // --- ADD Survey Results Processing and Sorting ---
+        processedData.Survey_Results = Array.isArray(processedData.Survey_Results) ? 
+            processedData.Survey_Results.map(survey => {
+                const reportId = survey.Report_PDF_ID;
+                const reportUrl = reportId ? `https://workdrive.zoho.com/file/${reportId}` : null; // Construct URL
 
-  
+                // Helper to safely parse MM/DD/YY or return 0 for sorting
+                const parseDateForSort = (dateString) => {
+                    if (!dateString) return 0;
+                    try {
+                        // Handle potential MM/DD/YY format from Zoho
+                        const parts = dateString.split('/');
+                        if (parts.length === 3) {
+                           // Construct YYYY-MM-DD for reliable parsing
+                           const year = parseInt(parts[2], 10);
+                           const fullYear = year < 70 ? 2000 + year : 1900 + year; // Basic 2-digit year assumption
+                           const month = parts[0].padStart(2, '0');
+                           const day = parts[1].padStart(2, '0');
+                           const isoDateString = `${fullYear}-${month}-${day}`;
+                           const date = new Date(isoDateString + 'T00:00:00'); // Avoid timezone shifts
+                           return isNaN(date.getTime()) ? 0 : date.getTime();
+                        }
+                        // Try parsing directly if not MM/DD/YY
+                        const directDate = new Date(dateString);
+                        return isNaN(directDate.getTime()) ? 0 : directDate.getTime();
+                    } catch (e) {
+                         console.warn(`Could not parse date string for sorting: ${dateString}`, e);
+                        return 0;
+                    }
+                };
 
-        // --- Construct Events Array (based on old EventsSection logic) ---
+                return {
+                    // Keep original fields needed in the component
+                    ID: survey.ID,
+                    Assessment_Date: survey.Assessment_Date, // Keep raw string for display formatting
+                    Main_Service_Panel_Size: survey.Main_Service_Panel_Size || '',
+                    Modified_Time: survey.Modified_Time || '', // Keep for last updated display & sorting fallback
+                    Panel_Upgrade_Required: survey.Panel_Upgrade_Required || 'No', // Keep string value for select binding
+                    Report_PDF_ID: reportId, // Keep the ID if needed elsewhere
+                    Roof_Condition: survey.Roof_Condition || '',
+                    Roof_Type: survey.Roof_Type || '',
+                    Roof_Work_Required: survey.Roof_Work_Required || 'No', // Keep string value
+                    Send_Final_Summary: survey.Send_Final_Summary === 'true', // Convert string to boolean
+                    Summary_Notes: survey.Summary_Notes || '',
+                    Summary_Sent: survey.Summary_Sent || null, // Keep raw string/null date for display check
+                    Tree_Trimming_Required: survey.Tree_Trimming_Required || 'No', // Keep raw string value
+                    Tree_Work_Required: survey.Tree_Work_Required || 'No', // Keep string value
+                    
+                    // Add derived/processed fields
+                    Report_URL: reportUrl, // The constructed URL
+                    hasReport: !!reportId, // Boolean flag
+                    requiresWork: survey.Tree_Work_Required === 'Yes' || 
+                                  survey.Roof_Work_Required === 'Yes' || 
+                                  survey.Panel_Upgrade_Required === 'Yes', // Boolean flag for quick checks
+                    // Add parsed timestamps for reliable sorting
+                    _assessmentTimestamp: parseDateForSort(survey.Assessment_Date),
+                    _modifiedTimestamp: survey.Modified_Time ? new Date(survey.Modified_Time).getTime() : 0,
+                };
+            }).sort((a, b) => {
+                // Sort by Assessment_Date descending, fallback to Modified_Time descending
+                if (b._assessmentTimestamp !== a._assessmentTimestamp) {
+                    return b._assessmentTimestamp - a._assessmentTimestamp;
+                }
+                if (b._modifiedTimestamp !== a._modifiedTimestamp) {
+                    return b._modifiedTimestamp - a._modifiedTimestamp;
+                }
+                 // Final fallback sort by ID descending
+                return (b.ID || '').localeCompare(a.ID || '');
+              }) 
+            : [];
+        // --- END Survey Results Processing ---
+
+        // --- 6. Process Tags (Keep Existing Placeholder or Implement) ---
+        processedData.processedTags = []; // Placeholder
+
+        // --- 7. Construct Events Array (Keep Existing) ---
         processedData.Events = EVENT_TYPES.map(eventType => {
+           // ... existing event construction logic ...
             const bookingValue = processedData[eventType.bookingField];
             const statusValue = processedData[eventType.statusField] || 'TBD'; // Default to TBD
             return {
@@ -395,9 +703,11 @@ const DataProcessors = {
             };
         });
 
-        // TODO: Process other related lists (Documents, Surveys etc.) as needed
+        // --- Clean up raw fields --- 
+        delete processedData.Notes; // Remove original Notes array
+        delete processedData.Note_Attachments; // Remove original Attachments array
 
-         console.log('DataProcessors: Finished processing details (Minimal Transformations): ', processedData);
+        console.log('DataProcessors: Finished processing project details: ', processedData.ID);
         return processedData;
 
     } catch (error) {

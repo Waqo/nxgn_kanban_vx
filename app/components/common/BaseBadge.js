@@ -1,5 +1,7 @@
 // app/components/common/BaseBadge.js
 
+const { computed } = Vue;
+
 export default {
   name: 'BaseBadge',
   props: {
@@ -14,18 +16,18 @@ export default {
     },
     // Add props for size (sm, md), dot, removable later if needed
   },
-  computed: {
-    badgeClasses() {
+  setup(props) {
+    const badgeClasses = computed(() => {
       // Add justify-start for left align, justify-center for center align
-      const alignmentClasses = this.align === 'center' 
+      const alignmentClasses = props.align === 'center' 
           ? 'justify-center text-center' 
           : 'justify-start text-left';
 
       const baseClasses = `inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${alignmentClasses}`;
       let colorClasses = '';
 
-      // Map color prop to Tailwind classes based on examples
-      switch (this.color?.toLowerCase()) {
+      // Determine color classes based on color prop
+      switch (props.color?.toLowerCase()) {
         case 'red': colorClasses = 'bg-red-50 text-red-700 ring-red-600/10'; break;
         case 'yellow': colorClasses = 'bg-yellow-50 text-yellow-800 ring-yellow-600/20'; break;
         case 'green': colorClasses = 'bg-green-50 text-green-700 ring-green-600/20'; break;
@@ -38,8 +40,13 @@ export default {
           colorClasses = 'bg-gray-50 text-gray-600 ring-gray-500/10';
           break;
       }
+      
       return `${baseClasses} ${colorClasses}`;
-    }
+    });
+
+    return {
+      badgeClasses
+    };
   },
   // Define template inline
   template: `

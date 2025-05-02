@@ -114,12 +114,14 @@ const WidgetView = {
                  <base-notification
                     v-for="notification in activeNotifications"
                     :key="notification.id"
+                    :id="notification.id"
                     :type="notification.type"
                     :title="notification.title"
-                    :message="notification.message"
                     :duration="notification.duration"
-                    @close="removeNotification(notification.id)"
-                />
+                    @dismiss="removeNotification(notification.id)"
+                 >
+                    {{ notification.message }} 
+                 </base-notification>
             </transition-group>
         </div>
 

@@ -13,8 +13,8 @@ export const FILTER_TYPE_OPTIONS = [
 
 // Options for Project Type Filter (KanbanToolbar - used when FILTER_TYPE_OPTIONS selects 'projectType')
 export const PROJECT_TYPE_OPTIONS = [
-    { value: 'commercial', label: 'Commercial' },
     { value: 'residential', label: 'Residential' },
+    { value: 'commercial', label: 'Commercial' },
 ];
 
 // Options for Work Required Filter (KanbanToolbar - now a button group)
@@ -27,29 +27,32 @@ export const WORK_REQUIRED_OPTIONS = [
 // Sort By Dropdown Options (KanbanToolbar)
 // Raw options without the "Sort By " prefix, which is added in the component computed prop
 export const SORT_BY_OPTIONS = [
-    { value: 'Owner_Name_Display', label: 'Contact Name' },
+    { value: 'Owner_Name_Display', label: 'Owner Name' },
+    { value: 'address', label: 'Address' },
+    { value: 'Sales_Rep_Name', label: 'Sales Rep' },
+    { value: 'kW_STC', label: 'System Size (kW)' },
+    { value: 'Yield', label: 'Yield (kWh/kWp)' },
     { value: 'Date_Sold', label: 'Date Sold' },
-    { value: 'Added_Time', label: 'Added Time' },
-    { value: 'Modified_Time', label: 'Modified Time' },
-    { value: 'kW_STC', label: 'System Size' },
-    { value: 'Yield', label: 'Yield' },
-    { value: 'installationBooking', label: 'Install Date' }
+    { value: 'Installation_Date_Time', label: 'Install Date' },
+    { value: 'Added_Time', label: 'Date Added' },
+    { value: 'Modified_Time', label: 'Last Modified' },
+    // Add other sortable fields as needed
 ];
 
 // Stage View Toggle Options (KanbanToolbar)
 export const STAGE_VIEW_OPTIONS = [
-    { value: 'all', label: 'All' },
-    { value: 'sales', label: 'Sales' },
-    { value: 'install', label: 'Install' }
+    { value: 'all', label: 'All Stages' },
+    { value: 'sales', label: 'Sales View' },
+    { value: 'install', label: 'Install View' }
 ];
 
 // --- ADD Event Types Definition (based on old EventsSection.js) ---
 export const EVENT_TYPES = [
     {
         type: "Site Survey",
-        bookingField: "Survey_Date_Time",       // API Name for booking date/time
+        bookingField: "Survey_Booking",       // API Name for booking date/time
         statusField: "Survey_Status",         // API Name for status picklist
-        possibleStatuses: ["Needs Scheduling", "Scheduled", "Completed", "TBD"]
+        possibleStatuses: ["TBD", "Needs Scheduling", "Scheduled", "Completed", "Not Required"]
     },
     {
         type: "Tree Work",
@@ -73,19 +76,98 @@ export const EVENT_TYPES = [
         type: "Installation",
         bookingField: "Installation_Date_Time",
         statusField: "Installation_Status",
-        possibleStatuses: ["Needs Scheduling", "Scheduled", "Completed", "TBD"]
+        possibleStatuses: ["TBD", "Needs Scheduling", "Scheduled", "In Progress", "Completed", "Cancelled"]
     },
     {
         type: "Final Inspection",
-        bookingField: "Final_Inspection_Date_Time",
+        bookingField: "Final_Inspection_Booking",
         statusField: "Final_Inspection_Status",
-        possibleStatuses: ["Needs Scheduling", "Scheduled", "Completed", "TBD"]
+        possibleStatuses: ["TBD", "Needs Scheduling", "Scheduled", "Completed", "Not Required", "Failed"]
+    },
+    {
+        type: "Utility Interconnection",
+        bookingField: "PTO_Booking",
+        statusField: "PTO_Status",
+        possibleStatuses: ["TBD", "Submitted", "Approved", "PTO Granted", "Not Required"]
+    },
+    {
+        type: "System Activation",
+        bookingField: "Activation_Booking",
+        statusField: "Activation_Status",
+        possibleStatuses: ["TBD", "Scheduled", "Completed", "Not Required"]
     }
 ];
 
 // Roles allowed for user lists (e.g., impersonation, tagging)
-export const TEAM_USER_ROLES = ['Project Manager', 'Admin'];
+export const TEAM_USER_ROLES = ['Project Manager', 'Admin', 'Executive', 'Installer'];
 
 // Add other sets of static options as needed
 // Example:
 // export const DEFAULT_NOTIFICATION_DURATION = 5000; 
+
+// --- ADD Contact Type Options ---
+export const CONTACT_TYPE_OPTIONS = [
+    'Owner 1',
+    'Owner 2',
+    'Other Project Contact'
+]; 
+
+// --- REMOVE Static Email Template Options ---
+/*
+export const EMAIL_TEMPLATES = [
+    {
+        id: 'contract',
+        name: 'Info Request: Contract',
+        description: 'Request information needed for contract',
+        template: 'Info Request: Contract' // This is the Email_Subject value sent to Zoho
+    },
+    {
+        id: 'utility',
+        name: 'Info Request: Utility Bill',
+        description: 'Request utility bill from customer',
+        template: 'Info Request: Utility Bill'
+    },
+    {
+        id: 'finance',
+        name: 'Info Request: Finance',
+        description: 'Request financial information',
+        template: 'Info Request: Finance'
+    },
+    {
+        id: 'permit',
+        name: 'Permit/Interconnection Submitted',
+        description: 'Notify customer of permit submission',
+        template: 'Permit/Interconnection Submitted'
+    },
+    {
+        id: 'install-booking',
+        name: 'Ready For Installation Booking',
+        description: 'Schedule installation appointment',
+        template: 'Ready For Installation Booking'
+    },
+    {
+        id: 'install-complete',
+        name: 'Install Complete',
+        description: 'Confirm installation completion',
+        template: 'Install Complete'
+    },
+    {
+        id: 'pto',
+        name: 'PTO',
+        description: 'Permission to Operate notification',
+        template: 'PTO'
+    },
+    {
+        id: 'survey-reminder',
+        name: 'Site Survey Reminder',
+        description: 'Remind customer to schedule their site survey appointment',
+        template: 'Site Survey Reminder'
+    },
+    {
+        id: 'not-viable',
+        name: 'Project Not Viable',
+        description: 'Notify customer that their project is not viable',
+        template: 'Project Not Viable'
+    }
+]; 
+*/ 

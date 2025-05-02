@@ -2,7 +2,11 @@
 
 // Import Pinia store and helpers
 import { useModalStore } from '../../store/modalStore.js';
-const { mapState, mapActions } = Pinia;
+import { useUserStore } from '../../store/userStore.js';
+// --- REMOVE mapState, mapActions ---
+// const { mapState, mapActions } = Pinia;
+// --- ADD Vue Composition API imports ---
+const { computed, watch } = Vue;
 
 // Component Imports (Assumed needed based on old code)
 import ModalHeader from './ModalHeader.js';
@@ -18,6 +22,10 @@ import PropertyInfoTab from './tabs/propertyInfo/PropertyInfoTab.js';
 import ActivityTab from './tabs/activity/ActivityTab.js';
 import CommunicationsTab from './tabs/communications/CommunicationsTab.js';
 import InvestorsTab from './tabs/investors/InvestorsTab.js';
+// *** ADD Import for Skeleton ***
+import ProjectDetailModalSkeleton from './ProjectDetailModalSkeleton.js';
+import FilePreview from './FilePreview.js';
+import FileComparison from './FileComparison.js';
 // Add other tab component imports as needed...
 
 const ProjectDetailModal = {
@@ -38,21 +46,29 @@ const ProjectDetailModal = {
     ActivityTab,
     CommunicationsTab,
     InvestorsTab,
+    // *** ADD Registration for Skeleton ***
+    ProjectDetailModalSkeleton,
+    FilePreview,
+    FileComparison,
     // ... other tabs
   },
-  computed: {
-    // Map required state/getters from the modal store
-    ...mapState(useModalStore, [
-        'isVisible', // Though visibility is controlled by v-if in WidgetView
-        'isLoading', 
-        'error', 
-        'projectData', 
-        'activeTab'
-    ]),
-    
-    // Define tabs based on modal plan (or dynamically later)
-    tabs() {
-      return [
+  // --- ADD setup function ---
+  setup() {
+    // Instantiate stores
+    const modalStore = useModalStore();
+    const userStore = useUserStore();
+
+    // --- Replicate State/Getters as Computed --- 
+    const isVisible = computed(() => modalStore.isVisible);
+    const isLoading = computed(() => modalStore.isLoading);
+    const error = computed(() => modalStore.error);
+    const projectData = computed(() => modalStore.projectData);
+    const activeTab = computed(() => modalStore.activeTab);
+    const currentUser = computed(() => userStore.currentUser);
+    const isPreviewVisible = computed(() => modalStore.isPreviewVisible);
+
+    // --- Replicate Computed: tabs ---
+    const tabs = computed(() => [
         { id: 'overview', name: 'Overview' },
         { id: 'contacts', name: 'Contacts' },
         { id: 'documents', name: 'Documents' },
@@ -65,19 +81,11 @@ const ProjectDetailModal = {
         { id: 'activity', name: 'Activity' },
         { id: 'communications', name: 'Communications' },
         { id: 'investors', name: 'Investors' },
-        // Add other tabs from plan...
-        // { id: 'permitting', name: 'Permitting' },
-        // { id: 'salesRep', name: 'Sales Rep' },
-        // { id: 'propertyInfo', name: 'Property Info' },
-        // { id: 'activity', name: 'Activity' },
-        // { id: 'communications', name: 'Communications' },
-        // { id: 'investors', name: 'Investors' },
-      ];
-    },
-    
-    // Determine the component to render based on activeTab
-    activeTabComponent() {
-        switch(this.activeTab) {
+    ]);
+
+    // --- Replicate Computed: activeTabComponent ---
+    const activeTabComponent = computed(() => {
+        switch(activeTab.value) { // Use .value for computed refs
             case 'overview': return 'OverviewTab';
             case 'contacts': return 'ContactsTab';
             case 'documents': return 'DocumentsTab';
@@ -90,85 +98,137 @@ const ProjectDetailModal = {
             case 'activity': return 'ActivityTab';
             case 'communications': return 'CommunicationsTab';
             case 'investors': return 'InvestorsTab';
-            default: return null; // Or a default tab component
+            default: return null;
         }
-    }
-  },
-  methods: {
-    // Map actions needed from the modal store
-    ...mapActions(useModalStore, [
-        'closeModal',
-        'setActiveTab'
-    ]),
-  },
-  template: `
-    <base-modal 
-        :show="isVisible" 
-        @close="closeModal" 
-        :size="'6xl'"
-    >
-      <template #header>
-        <!-- Pass necessary data down to ModalHeader -->
-        <modal-header 
-            :project-data="projectData"
-            :is-loading="isLoading" 
-            :error="error"
-            @close="closeModal"
-        />
-      </template>
+    });
 
-      <template #default>
-        <div v-if="isLoading" class="p-6 text-center">
-          Loading project details...
-          <!-- Add a spinner or more elaborate loading indicator -->
-        </div>
-        <div v-else-if="error" class="p-6 bg-red-100 text-red-700 rounded-md">
-           Error loading details: {{ error }}
-        </div>
-        <div v-else-if="!projectData" class="p-6 text-center text-gray-500">
-            No project data available.
-        </div>
-        <div v-else class="modal-content-area">
-            <!-- Tab Navigation -->
-            <base-tabs 
-                :tabs="tabs" 
-                :modelValue="activeTab"
-                @update:modelValue="setActiveTab"
-                class="px-6 pt-2 border-b border-gray-200"
+    // --- Replicate Methods (using store actions) ---
+    const closeModal = () => {
+        modalStore.closeModal();
+    };
+
+    const setActiveTab = (tabId) => {
+        modalStore.setActiveTab(tabId);
+    };
+
+    const handleRefresh = () => {
+        if (modalStore.refreshModalData) {
+             modalStore.refreshModalData();
+        } else {
+             console.warn('refreshModalData action not found in modalStore');
+        }
+    };
+
+    const handleHelp = () => {
+        alert('Help requested! (Functionality not implemented)');
+    };
+
+    // *** ADDED: Watcher for Logging Preview Modal Render ***
+    watch(isPreviewVisible, (newValue, oldValue) => {
+        if (newValue) {
+            console.log('ProjectDetailModal: Detected change in isPreviewVisible. Rendering preview modal.'); // LOG 8a
+        } else if (oldValue && !newValue) {
+             console.log('ProjectDetailModal: Detected change in isPreviewVisible. Hiding preview modal.'); // LOG 8b (for closing)
+        }
+    });
+
+    // --- Return values needed by template ---
+    return {
+        // Computed State/Getters
+        isVisible,
+        isLoading,
+        error,
+        projectData,
+        activeTab,
+        currentUser,
+        // Other Computed
+        tabs,
+        activeTabComponent,
+        // Methods
+        closeModal,
+        setActiveTab,
+        handleRefresh,
+        handleHelp
+    };
+  },
+  // --- REMOVE Options API blocks ---
+  // computed: { ... }, 
+  // methods: { ... },
+  
+  // --- Template Remains the Same (bindings now use returned values from setup) ---
+  template: `
+    <!-- Use fragment to hold both modals -->
+    <>
+        <!-- Main Project Detail Modal -->
+        <base-modal 
+            :show="isVisible" 
+            @close="closeModal" 
+            :size="'6xl'"
+            scrollBehavior="outside"
+            :hideScrollbar="true"
+            :no-header-padding="true"
+        >
+          <template #header>
+            <!-- Pass necessary data down to ModalHeader -->
+            <modal-header 
+                :project-data="projectData"
+                :is-loading="isLoading" 
+                :error="error"
+                @close="closeModal"
+                @refresh-data="handleRefresh"
+                @request-help="handleHelp"
             />
-            
-            <!-- Tab Content Area -->
-            <div class="p-6 tab-content">
-                 <!-- Dynamically render the active tab component -->
-                 <!-- Pass projectData down as a prop -->
-                 <component 
-                     :is="activeTabComponent" 
-                     v-if="activeTabComponent"
-                     :project="projectData"
-                 />
-                 <div v-else-if="activeTab === 'tasks'" class="mt-4">
-                    <tasks-tab :project="projectData"></tasks-tab>
-                 </div>
-                 <div v-else-if="activeTab === 'permitting'" class="mt-4">
-                     <permitting-tab :project="projectData"></permitting-tab>
-                 </div>
-                 <!-- Add other v-else-if blocks for other tabs -->
-                 <div v-else class="mt-4">
-                    Select a tab.
-                 </div>
+          </template>
+
+          <template #default>
+            <div v-if="isLoading">
+              <project-detail-modal-skeleton />
             </div>
-        </div>
-      </template>
-      
-      <!-- Footer (Optional) -->
-      <!-- 
-      <template #footer>
-        <div class="flex justify-end px-4 py-3 bg-gray-50">
-            <base-button @click="closeModal" variant="secondary">Close</base-button>
-        </div>
-      </template> 
-      -->
-    </base-modal>
+            <div v-else-if="error" class="p-6 bg-red-100 text-red-700 rounded-md">
+               Error loading details: {{ error }}
+            </div>
+            <div v-else-if="!projectData" class="p-6 text-center text-gray-500">
+                No project data available.
+            </div>
+            <div v-else class="modal-content-area">
+                <!-- Tab Navigation -->
+                <base-tabs 
+                    :tabs="tabs" 
+                    :modelValue="activeTab"
+                    @update:modelValue="setActiveTab"
+                    class="px-6 border-b border-gray-200"
+                />
+                
+                <!-- Tab Content Area -->
+                <div class="p-6 tab-content">
+                     <!-- Dynamically render the active tab component -->
+                     <!-- Pass projectData down as a prop -->
+                     <component 
+                         :is="activeTabComponent" 
+                         v-if="activeTabComponent"
+                         :project="projectData"
+                         :currentUser="currentUser"
+                     />
+                     <div v-else class="mt-4 text-center text-gray-500">
+                        Select a tab or component not found for '{{ activeTab }}'.
+                     </div>
+                </div>
+            </div>
+          </template>
+          
+          <!-- *** ADD Empty Footer Template to Remove Default Button *** -->
+          <template #footer></template>
+        </base-modal>
+        
+        <!-- *** ADDED: File Preview Component *** -->
+        <file-preview />
+        
+        <!-- *** UPDATED: File Comparison Component Rendering *** -->
+        <file-comparison 
+            v-if="projectData?.Documents" 
+            :all-documents="projectData.Documents"
+        />
+    </>
   `
 };
 

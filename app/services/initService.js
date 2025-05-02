@@ -17,6 +17,8 @@ import {
 
 // --- CORRECT Import ZohoAPIService ---
 import ZohoAPIService from './zohoCreatorAPI.js';
+// --- ADD Error Log Service Import ---
+import { logErrorToZoho } from './errorLogService.js';
 
 /**
  * Initializes the application by fetching essential data for initial display
@@ -91,19 +93,23 @@ export async function initializeApp() {
     if (queryParamsFromUrl && queryParamsFromUrl.projectId) {
         const urlProjectId = queryParamsFromUrl.projectId;
         console.log(`App Init Service: Found projectId=${urlProjectId} in URL. Opening modal...`);
-        modalStore.openModal(urlProjectId); // Open modal using ID from URL
+        modalStore.openModal(urlProjectId);
         openedModalFromUrl = true;
         // Clear any potentially conflicting saved modal state from previous sessions
         localStorage.removeItem(LS_KEYS.ACTIVE_MODAL);
-        console.log("App Init Service: Removed potentially conflicting saved modal state.");
+        console.log("App Init Service: Removed potentially conflicting saved modal state (due to URL param).");
     }
 
     // --- Restore Modal State from localStorage (only if not opened from URL) ---
     if (!openedModalFromUrl) {
         const savedModalState = loadSetting(LS_KEYS.ACTIVE_MODAL, null);
         if (savedModalState && savedModalState.expiresAt && savedModalState.expiresAt > Date.now()) {
-          console.log("App Init Service: Found valid saved modal state, restoring...");
-          modalStore.openModal(savedModalState.projectId);
+          console.log("App Init Service: Found valid saved modal state, restoring...", savedModalState);
+          await modalStore.openModal(savedModalState.projectId); 
+          if (savedModalState.activeTab) {
+              console.log(`App Init Service: Restoring active tab to: ${savedModalState.activeTab}`);
+              modalStore.setActiveTab(savedModalState.activeTab);
+          }
         } else if (savedModalState) {
           console.log("App Init Service: Found expired modal state. Clearing...");
           localStorage.removeItem(LS_KEYS.ACTIVE_MODAL);
@@ -123,7 +129,15 @@ export async function initializeApp() {
 
   } catch (error) {
     // Catch errors from Promise.all or fetchCurrentUser if they re-throw
-    console.error("App Init Service: CRITICAL ERROR during initialization sequence:", error);
+    console.error("App Init Service: CRITICAL ERROR during initialization sequence:", error); 
+
+    // --- ADD Log error to Zoho --- 
+    logErrorToZoho(error, { 
+      operation: 'initializeApp',
+      details: 'Critical error during widget initialization sequence.'
+    });
+    // --- END Log error --- 
+
     // Use the error already set in the specific store action if possible,
     // or set a generic one.
     if (!uiStore.globalError) { // Don't overwrite specific errors if stores set them

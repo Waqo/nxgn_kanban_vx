@@ -24,17 +24,18 @@ export async function logActivity(projectId, activityText) {
 
     const userStore = useUserStore();
     const currentUser = userStore.currentUser;
-    let who = 'Unknown User'; // Default value
+    // Determine the value for the Is_Who text field
+    let whoValue = 'Unknown User'; // Default
 
     if (currentUser?.name) {
-        who = currentUser.name;
+        whoValue = currentUser.name; // Prioritize name
     } else {
-        // If user name isn't available, try getting email from initParams
-        console.log("ActivityLogService: User name not found, fetching email from initParams...");
+        // Fallback to email if name is unavailable
+        console.warn("ActivityLogService: User name not found, trying email fallback...");
         try {
             const params = await ZohoAPIService.getInitParams();
             if (params?.loginUser) {
-                who = `Unknown (${params.loginUser})`;
+                whoValue = `Unknown (${params.loginUser})`;
             } else {
                 console.warn("ActivityLogService: Could not get loginUser email from initParams for unknown user log.");
             }
@@ -47,13 +48,15 @@ export async function logActivity(projectId, activityText) {
     const payload = {
         data: {
             [FIELD_ACTIVITY_DESCRIPTION]: activityText,
-            [FIELD_ACTIVITY_WHO]: who,
+            [FIELD_ACTIVITY_WHO]: whoValue, // Send Name string (or fallback)
             [FIELD_ACTIVITY_WHERE]: ACTIVITY_SOURCE_PORTAL,
-            [FIELD_ACTIVITY_PROJECT_LOOKUP]: projectId
+            [FIELD_ACTIVITY_PROJECT_LOOKUP]: projectId,
+             // Optionally set the User lookup field if it exists and is needed
+            // 'User': currentUser?.id // Uncomment if 'User' lookup should be set
         }
     };
 
-    console.log(`ActivityLogService: Logging activity for project ${projectId}: "${activityText}" by ${who}`);
+    console.log(`ActivityLogService: Logging activity for project ${projectId}: "${activityText}" by ${whoValue}`);
 
     try {
         // Fire and forget - no await here
