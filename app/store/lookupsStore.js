@@ -85,9 +85,13 @@ export const useLookupsStore = defineStore('lookups', {
     getTagById: (state) => (id) => state.tags.get(id),
     getUserById: (state) => (id) => state.users.find(u => u.ID === id),
     
-    // Format Sales Reps for BaseSelectMenu {value, label}
-    salesRepsForFilter: (state) => {
-        return state.salesReps.map(rep => ({ value: rep.name, label: rep.name }));
+    // Format Sales Reps for BaseSelectMenu {value, label} - USED BY CommissionsTab
+    salesRepsForAssignmentFilter: (state) => { // RENAMED from salesRepsForFilter
+        return state.salesReps.map(rep => ({ value: rep.id, label: rep.name })); // Use rep.id for value
+    },
+    // NEW: Format Sales Reps for Toolbar Filter {value, label}
+    salesRepsForToolbarFilter: (state) => {
+        return state.salesReps.map(rep => ({ value: rep.name, label: rep.name })); // Use rep.name for value
     },
     // Format Sales Orgs for BaseSelectMenu {value, label}
     salesOrgsForFilter: (state) => {
@@ -228,6 +232,19 @@ export const useLookupsStore = defineStore('lookups', {
               }
               // --- END Team Users Processing ---
               
+              if (initData.Sales_Reps && Array.isArray(initData.Sales_Reps)) {
+                  try {
+                      // --- REMOVED DEBUG LOG ---
+                      // console.log("Lookups Store DEBUG: Attempting to process initData.Sales_Reps:", initData.Sales_Reps);
+                      // Use the existing processor, passing the data in the expected format
+                      this.salesReps = DataProcessors.processSalesRepsData({ data: initData.Sales_Reps, code: 3000 });
+                      console.log(`Lookups Store (Pinia): Sales Reps (${this.salesReps.length}) processed from init data.`);
+                  } catch (error) {
+                      console.error("Lookups Store (Pinia): Error processing init Sales Reps data:", error);
+                      this.error = this.error ? `${this.error}; SalesReps: ${error.message}` : `SalesReps: ${error.message}`;
+                      throw error; // Re-throw to signal failure in Promise.all
+                  }
+              }
           } catch (processingError) {
               console.error("Lookups Store (Pinia): Error processing init data:", processingError);
               this.error = `Failed to process init data: ${processingError.message}`;
@@ -407,24 +424,14 @@ export const useLookupsStore = defineStore('lookups', {
      * Fetches Sales Reps data on demand.
      */
     async fetchSalesReps() {
-        if (this.salesReps.length > 0 || this.isLoadingSalesReps) return;
-        console.log("Lookups Store (Pinia): Starting fetchSalesReps...");
-        this.isLoadingSalesReps = true;
-        this.error = null;
-        try {
-            const response = await ZohoAPIService.getRecords(REPORT_SALES_REPS);
-            if (response.code !== 3000) {
-                throw new Error(response.message || `API Error Code ${response.code}`);
-            }
-            this.salesReps = DataProcessors.processSalesRepsData(response);
-            console.log("Lookups Store (Pinia): Sales Reps fetched successfully.");
-        } catch (error) {
-            console.error("Lookups Store (Pinia): Error fetching Sales Reps:", error);
-            this.error = error.message || 'Failed to fetch Sales Reps.';
-            // Potentially clear: this.salesReps = [];
-        } finally {
-            this.isLoadingSalesReps = false;
+        // --- MODIFIED: Check if already loaded or loading ---
+        if (this.salesReps.length > 0 || this.isLoadingSalesReps) {
+            console.log("Lookups Store (Pinia): Skipping fetchSalesReps (already loaded or loading).");
+            return;
         }
+        // --- Use the fallback logic for the actual fetch ---
+        console.log("Lookups Store (Pinia): Triggering fetchSalesReps (will use fallback)...");
+        await this.fetchSalesRepsFallback();
     },
 
     /**
@@ -448,6 +455,26 @@ export const useLookupsStore = defineStore('lookups', {
             // Potentially clear: this.salesOrgs = [];
         } finally {
             this.isLoadingSalesOrgs = false;
+        }
+    },
+
+    // --- ADD Sales Reps Fallback Fetch ---
+    async fetchSalesRepsFallback() {
+        console.log("Lookups Store (Pinia): Fetching Sales Reps (Fallback)..." );
+        this.isLoadingSalesReps = true;
+        try {
+            const response = await ZohoAPIService.getRecords(REPORT_SALES_REPS);
+            if (response.code !== 3000) {
+                throw new Error(response.message || `API Error Code ${response.code}`);
+            }
+            this.salesReps = DataProcessors.processSalesRepsData(response);
+            console.log(`Lookups Store (Pinia): Sales Reps (${this.salesReps.length}) fetched via fallback.`);
+        } catch (error) {
+            console.error("Lookups Store (Pinia): Error fetching Sales Reps (Fallback):", error);
+            this.error = this.error ? `${this.error}; SalesReps: ${error.message}` : `SalesReps: ${error.message}`;
+            throw error; // Re-throw to signal failure in Promise.all
+        } finally {
+            this.isLoadingSalesReps = false;
         }
     },
   }

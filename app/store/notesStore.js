@@ -41,12 +41,14 @@ export const useNotesStore = defineStore('notes', {
          * @param {string} params.userId - ID of the user creating the note (for User_Lookup).
          * @param {string} params.userName - Name of the user creating the note (for Author text field).
          * @param {boolean} params.teamOnly - Whether the note is team-only.
+         * @param {string} [params.context='General'] - The context of the note (e.g., 'General', 'Commissions').
          * @param {string} [params.parentNoteId=null] - Optional ID of the note being replied to.
+         * @param {string} [params.parentNoteAuthor=null] - Optional name of the parent note's author.
          * @param {Array<File>} [params.attachments=[]] - Optional array of File objects to attach.
          * @param {Array<string>} [params.taggedUserIds=[]] - Optional array of user IDs to tag.
          * @returns {Promise<boolean>} - True if successful, false otherwise.
          */
-        async addNewNote({ projectId, noteContent, userId, userName, teamOnly, parentNoteId = null, attachments = [], taggedUserIds = [] }) {
+        async addNewNote({ projectId, noteContent, userId, userName, teamOnly, context = 'General', parentNoteId = null, parentNoteAuthor = null, attachments = [], taggedUserIds = [] }) {
             const uiStore = useUiStore();
             const modalStore = useModalStore();
 
@@ -87,7 +89,7 @@ export const useNotesStore = defineStore('notes', {
                         [FIELD_NOTE_USER_LOOKUP]: userId,
                         [FIELD_NOTE_AUTHOR_TEXT]: userName, // Set Author text field
                         [FIELD_NOTE_TEAM_ONLY]: teamOnly ? 'true' : 'false',
-                        [FIELD_NOTE_CONTEXT]: 'General', // Default context
+                        [FIELD_NOTE_CONTEXT]: context || 'General', // Use passed context, fallback to General
                         [FIELD_NOTE_DEPARTMENT]: 'Project Management', // Default department
                         [FIELD_NOTE_TAGGED_USERS]: taggedUserIds
                     }
@@ -110,6 +112,63 @@ export const useNotesStore = defineStore('notes', {
 
                 newNoteId = noteResponse.data.ID;
                 console.log(`[notesStore] ${operationType} record created successfully: ID ${newNoteId}`);
+
+                // --- BEGIN Optimistic Update --- 
+                /*
+                try {
+                    const now = new Date();
+                    const processedNote = {
+                        // Mimic structure from DataProcessors.js
+                        id: newNoteId,
+                        ID: newNoteId, // Include original ID field too if needed
+                        content: hasContent ? noteContent.trim() : (hasAttachments ? '[Attachment(s) only]' : ' '),
+                        Note: hasContent ? noteContent.trim() : (hasAttachments ? '[Attachment(s) only]' : ' '), // Match potential field name
+                        author: userName,
+                        Author: userName, // Match potential field name
+                        addedTime: now.toISOString(), // Use current time as approximation
+                        Added_Time: now.toISOString(),
+                        department: 'Project Management', // Match default
+                        Department: 'Project Management',
+                        context: context || 'General',
+                        Context: context || 'General',
+                        teamOnly: teamOnly,
+                        Team_Only: teamOnly ? 'true' : 'false',
+                        repliedTo: parentNoteId,
+                        Replied_To: parentNoteId ? { ID: parentNoteId } : null, // Structure might differ
+                        taggedUsers: taggedUserIds.map(id => ({ ID: id })), // Assuming array of objects needed
+                        Tagged_Users: taggedUserIds.map(id => ({ ID: id })), 
+                        attachments: [], // Start with empty, attachments added later if needed
+                        replies: [],
+                        isReply: !!parentNoteId,
+                        User_Lookup: { ID: userId, zc_display_value: userName } // Approximate lookup object
+                    };
+
+                    console.log("[notesStore] Optimistically adding processed note:", processedNote);
+                    
+                    if (modalStore.currentProjectDetails) {
+                        let targetArray = null;
+                        switch (processedNote.context) {
+                            case 'General':     targetArray = modalStore.currentProjectDetails.General_Notes; break;
+                            case 'Commissions': targetArray = modalStore.currentProjectDetails.Commission_Notes; break;
+                            case 'Investor':    targetArray = modalStore.currentProjectDetails.Investor_Notes; break;
+                            default:            targetArray = modalStore.currentProjectDetails.Other_Notes; break;
+                        }
+                        
+                        if (targetArray && Array.isArray(targetArray)) {
+                            targetArray.unshift(processedNote); // Add to beginning
+                            console.log(`[notesStore] Note optimistically added to ${processedNote.context}_Notes.`);
+                        } else {
+                            console.warn(`[notesStore] Could not find or push to target array for context: ${processedNote.context}`);
+                        }
+                    } else {
+                        console.warn("[notesStore] Cannot optimistically update: modalStore.currentProjectDetails is null.");
+                    }
+                } catch (optimisticError) {
+                     console.error("[notesStore] Error during optimistic note update:", optimisticError);
+                     // Don't stop the process, just log the error
+                }
+                */
+                // --- END Optimistic Update --- 
 
                 if (hasAttachments) {
                     console.log(`[notesStore] Entering attachment loop for ${attachments.length} files.`);
@@ -199,11 +258,21 @@ export const useNotesStore = defineStore('notes', {
                     });
                 }
 
-                const logMessage = parentNoteId ? `Replied to note (ID: ${parentNoteId})` : 'Added note';
+                // Construct improved log message
+                let logMessage = 'Added note'; // Default
+                if (parentNoteId && parentNoteAuthor) {
+                    logMessage = `Replied to ${parentNoteAuthor}'s note`;
+                } else if (parentNoteId) { // Fallback if author wasn't passed for some reason
+                    logMessage = `Replied to note (ID: ${parentNoteId})`;
+                }
+                // --- End log message construction ---
+
                 const logDetails = hasContent ? noteContent.trim().substring(0, 100) + '...' : '';
                 const attachmentLog = hasAttachments ? ` (${attachmentsAddedCount}/${attachments.length} attachments)` : '';
                 logActivity(projectId, `${logMessage}${attachmentLog}`, logDetails);
 
+                // --- Refresh AFTER optimistic update --- 
+                console.log("[notesStore] Triggering modal data refresh AFTER optimistic update.");
                 await modalStore.refreshModalData();
 
                 // Introduce a delay ONLY if attachments were processed, to allow Zoho backend time

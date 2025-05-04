@@ -50,7 +50,7 @@ export const STAGE_VIEW_OPTIONS = [
 export const EVENT_TYPES = [
     {
         type: "Site Survey",
-        bookingField: "Survey_Booking",       // API Name for booking date/time
+        bookingField: "Survey_Date_Time",       // API Name for booking date/time
         statusField: "Survey_Status",         // API Name for status picklist
         possibleStatuses: ["TBD", "Needs Scheduling", "Scheduled", "Completed", "Not Required"]
     },
@@ -80,26 +80,14 @@ export const EVENT_TYPES = [
     },
     {
         type: "Final Inspection",
-        bookingField: "Final_Inspection_Booking",
+        bookingField: "Final_Inspection_Date_Time",
         statusField: "Final_Inspection_Status",
         possibleStatuses: ["TBD", "Needs Scheduling", "Scheduled", "Completed", "Not Required", "Failed"]
     },
-    {
-        type: "Utility Interconnection",
-        bookingField: "PTO_Booking",
-        statusField: "PTO_Status",
-        possibleStatuses: ["TBD", "Submitted", "Approved", "PTO Granted", "Not Required"]
-    },
-    {
-        type: "System Activation",
-        bookingField: "Activation_Booking",
-        statusField: "Activation_Status",
-        possibleStatuses: ["TBD", "Scheduled", "Completed", "Not Required"]
-    }
 ];
 
 // Roles allowed for user lists (e.g., impersonation, tagging)
-export const TEAM_USER_ROLES = ['Project Manager', 'Admin', 'Executive', 'Installer'];
+export const TEAM_USER_ROLES = ['Project Manager', 'Admin', 'Executive'];
 
 // Add other sets of static options as needed
 // Example:

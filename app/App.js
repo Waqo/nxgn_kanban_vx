@@ -67,8 +67,6 @@ const pinia = createPinia();
 app.use(pinia); // Ensure Pinia is registered BEFORE initialization call
 // console.log('Pinia Instance Registered:', pinia);
 
-
-
 // --- CALL INITIALIZATION SERVICE ---
 initializeApp(); // Call the initialization function
 
@@ -106,6 +104,8 @@ app.component('BaseTable', BaseTable);
 app.component('BaseStackedList', BaseStackedList);
 app.component('BaseDescriptionList', BaseDescriptionList);
 app.component('BaseTextInput', BaseTextInput);
+// --- CORRECT VueDatePicker Registration (Uses Global from CDN) ---
+app.component('VueDatePicker', VueDatePicker);
 // Keep Base* components registered
 
 // 5. --- GLOBAL PROPERTIES ---

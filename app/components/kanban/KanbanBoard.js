@@ -69,17 +69,17 @@ const KanbanBoard = {
 
     // New getter to filter stages based on current view
     displayedStages() {
-        console.log(`[Board] displayedStages computed. currentStageView = ${this.currentStageView}`); // Log evaluation
+       // console.log(`[Board] displayedStages computed. currentStageView = ${this.currentStageView}`); // Log evaluation
         if (!Array.isArray(this.stages)) return [];
         if (this.currentStageView === 'all') {
-            console.log("[Board] displayedStages returning all.");
+           // console.log("[Board] displayedStages returning all.");
             return this.stages; // Show all if 'all' is selected
         }
         // Filter stages based on the view property (case-insensitive comparison)
         const filtered = this.stages.filter(stage => 
             stage.view?.toLowerCase() === this.currentStageView || stage.view?.toLowerCase() === 'both'
         );
-        console.log(`[Board] displayedStages returning ${filtered.length} stages.`);
+       // console.log(`[Board] displayedStages returning ${filtered.length} stages.`);
         return filtered;
     },
 
@@ -99,7 +99,7 @@ const KanbanBoard = {
              console.warn("KanbanBoard: Skipping stage due to missing id:", stage);
         }
       });
-      console.log('KanbanBoard: Projects grouped by stage:', grouped);
+     // console.log('KanbanBoard: Projects grouped by stage:', grouped);
       return grouped;
     },
     // Group projects by tranche
@@ -129,7 +129,7 @@ const KanbanBoard = {
         // Group unassigned projects
         grouped['unassigned'] = projectsToGroup.filter(p => !assignedProjectIds.has(p.ID)); // Check using ID
         
-        console.log('KanbanBoard: Projects grouped by tranche (with unassigned):', grouped);
+       // console.log('KanbanBoard: Projects grouped by tranche (with unassigned):', grouped);
         return grouped;
     },
   },
@@ -137,21 +137,21 @@ const KanbanBoard = {
       // Watch displayedStages (covers stage view changes)
       displayedStages: {
           handler(newStages) {
-              console.log("[Board Watcher] displayedStages updated."); // Keep log for debugging if needed
+             // console.log("[Board Watcher] displayedStages updated."); // Keep log for debugging if needed
           },
           immediate: true 
       },
       // Watch projectsByStage (covers filtering changes)
       projectsByStage: {
           handler(newGroups) {
-              console.log("[Board Watcher] projectsByStage updated."); // Keep log for debugging if needed
+             // console.log("[Board Watcher] projectsByStage updated."); // Keep log for debugging if needed
           },
           deep: true 
       },
        // ADD Watcher specifically for projectsByTranche
        projectsByTranche: {
             handler(newGroups) {
-                console.log("[Board Watcher] projectsByTranche updated.");
+               // console.log("[Board Watcher] projectsByTranche updated.");
                 // Use this.tranches for initialization key matching if in tranche mode
                  if (this.boardViewMode === 'tranches') {
                      const columnList = [{id: 'unassigned'}, ...(this.tranches || [])]; // Include unassigned
@@ -170,18 +170,18 @@ const KanbanBoard = {
 
     // Drag and Drop Handlers
     handleDragStart(cardId, columnId) { // Use generic columnId
-      console.log(`KanbanBoard: Drag started - Card: ${cardId}, Source Column: ${columnId}`);
+     // console.log(`KanbanBoard: Drag started - Card: ${cardId}, Source Column: ${columnId}`);
       this.draggedCardId = cardId;
       this.sourceColumnId = columnId; // Store source column ID
     },
     handleDragEnd() {
-      console.log('KanbanBoard: Drag ended');
+     // console.log('KanbanBoard: Drag ended');
       this.resetDragState(); 
     },
     handleDrop(targetColumnId) { // Use generic targetColumnId
-      console.log(`KanbanBoard: Drop detected - Card: ${this.draggedCardId}, Target Column: ${targetColumnId}`);
+     // console.log(`KanbanBoard: Drop detected - Card: ${this.draggedCardId}, Target Column: ${targetColumnId}`);
       if (!this.draggedCardId || this.sourceColumnId === targetColumnId) {
-        console.log('KanbanBoard: Drop ignored (no card dragged or same column).');
+       // console.log('KanbanBoard: Drop ignored (no card dragged or same column).');
         this.resetDragState(); 
         return;
       }
@@ -200,12 +200,12 @@ const KanbanBoard = {
 
       // --- Call mapped Pinia actions directly --- 
       if (this.boardViewMode === 'tranches') {
-          console.log(`KanbanBoard: Calling Pinia updateProjectTranche...`);
+         // console.log(`KanbanBoard: Calling Pinia updateProjectTranche...`);
           // Call mapped action
           this.updateProjectTranche({ projectId: cardIdToMove, newTrancheId: targetColId })
               .catch(error => console.error("KanbanBoard: Error calling updateProjectTranche:", error));
       } else { // Default to stage view
-          console.log(`KanbanBoard: Calling Pinia updateProjectStage...`);
+         // console.log(`KanbanBoard: Calling Pinia updateProjectStage...`);
           // Call mapped action
           this.updateProjectStage({ projectId: cardIdToMove, newStageId: targetColId })
               .catch(error => console.error("KanbanBoard: Error calling updateProjectStage:", error));
@@ -217,7 +217,7 @@ const KanbanBoard = {
     },
     // Method to handle the toggle event from KanbanColumn
     handleToggleCollapse(columnId) { // Use generic columnId
-        console.log(`KanbanBoard: Toggling collapse for column ${columnId}`);
+       // console.log(`KanbanBoard: Toggling collapse for column ${columnId}`);
         const newCollapsedState = { ...this.collapsedColumns };
         newCollapsedState[columnId] = !newCollapsedState[columnId];
         this.collapsedColumns = newCollapsedState;
@@ -225,13 +225,13 @@ const KanbanBoard = {
     },
     // Method to set initial/updated collapsed state (NOW CALLED ONLY ONCE during setup)
     initializeCollapsedState() { // Removed parameters as they are no longer needed here
-         console.log('KanbanBoard: Initializing collapsed state from localStorage...');
+        // console.log('KanbanBoard: Initializing collapsed state from localStorage...');
          // Directly load from local storage. No need to merge with defaults based on current columns here.
          // The KanbanColumn component will simply read its state from collapsedColumns.
          // If a column ID isn't in the loaded object, it will default to not collapsed.
          const loadedState = loadSetting(LS_KEYS.COLLAPSED_COLUMNS, {});
          this.collapsedColumns = loadedState;
-         console.log('KanbanBoard: Collapsed state initialized:', this.collapsedColumns);
+        // console.log('KanbanBoard: Collapsed state initialized:', this.collapsedColumns);
     }
     // Other methods like handling card clicks/double-clicks for modal
   },

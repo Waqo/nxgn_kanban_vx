@@ -5,6 +5,10 @@
 
 // --- Application Identification ---
 export const APP_NAME = "nexgen-portal"; // Replace if needed
+// --- App Version Info ---
+export const APP_VERSION = '3.0.0-beta.4';
+export const APP_BUILD_DATE_STR = 'May 3, 2025 5:56 AM';
+export const APP_BUILD_INFO = `v${APP_VERSION} (${APP_BUILD_DATE_STR})`; 
 
 
 // --- Startup / Debug Flags ---
@@ -32,6 +36,7 @@ export const REPORT_NOTES = "PM_Kanban_Notes"; // Added for fetching/updating no
 export const REPORT_NOTE_ATTACHMENTS = "PM_Kanban_Note_Attachments"; // Added for fetching/updating note attachments if needed separately
 export const REPORT_PUBLISHED_NOTE_ATTACHMENTS = "Published_Note_Attachments"; // Added for fetching/updating published note attachments if needed separately
 export const REPORT_PUBLISHED_DOCUMENTS = "Published_Documents"; // Added for fetching/updating published documents if needed separately
+export const REPORT_TASKS = "All_Tasks"; // *** ADDED for Tasks (Assumption) ***
 // Add other report names as needed
 
 // --- Form Link Names ---
@@ -46,6 +51,7 @@ export const FORM_BILL_OF_MATERIALS = "Add_Bill_of_Material"; // Add BOM form
 export const FORM_PERMITTING = "Add_Permitting"; // Assuming form name
 export const FORM_COMMUNICATION = "Add_Communication"; // *** ADDED for Comms Tab ***
 export const FORM_LOGS = "Add_Logs"; // *** ADDED for Error Logging ***
+export const FORM_TASKS = "Add_Task";     // *** ADDED for Tasks Tab ***
 
 // Add other form names as needed (e.g., for adding notes, issues)
 
@@ -82,6 +88,19 @@ export const FIELD_PROJECT_FOLDER_LINK = 'Project_Folder_Link';
 export const FIELD_PROJECT_INVESTOR_FOLDER_LINK = 'Project_Investor_Folder_Link';
 export const FIELD_PROJECT_NEED_HELP = 'Need_Help';
 export const FIELD_PROJECT_TRIG_CREATE_FOLDERS = 'TRIG_Create_Project_Folders'; // *** ADDED (Assumption) ***
+export const FIELD_PROJECT_ACTIVE_COMMISSION_RATE = 'Active_Commission_Rate'; // *** ADDED ***
+export const FIELD_PROJECT_M1_AMOUNT = 'M1_Amount'; // *** ADDED ***
+export const FIELD_PROJECT_M1_STATUS = 'M1_Status'; // *** ADDED ***
+export const FIELD_PROJECT_M1_PAID_DATE = 'M1_Paid_Date'; // *** ADDED ***
+export const FIELD_PROJECT_M2_AMOUNT = 'M2_Amount'; // *** ADDED ***
+export const FIELD_PROJECT_M2_STATUS = 'M2_Status'; // *** ADDED ***
+export const FIELD_PROJECT_M2_PAID_DATE = 'M2_Paid_Date'; // *** ADDED ***
+export const FIELD_PROJECT_M3_AMOUNT = 'M3_Amount'; // *** ADDED ***
+export const FIELD_PROJECT_M3_STATUS = 'M3_Status'; // *** ADDED ***
+export const FIELD_PROJECT_M3_PAID_DATE = 'M3_Paid_Date'; // *** ADDED ***
+export const FIELD_PROJECT_ADVANCE_AMOUNT = 'Total_Commission_Advance'; // *** ADDED ***
+export const FIELD_PROJECT_ADVANCE_STATUS = 'Commission_Advance_Status'; // *** ADDED ***
+export const FIELD_PROJECT_ADVANCE_PAID_DATE = 'Comm_Advance_Paid_Date'; // *** ADDED ***
 
 // User Fields
 export const FIELD_USER_ID = 'ID'; // System generated
@@ -119,10 +138,7 @@ export const FIELD_TRANCHE_NUMBER = 'Tranche_Number';
 // --- ADD Communication Fields ---
 export const FIELD_COMMUNICATION_EMAIL_TEMPLATE_LOOKUP = 'Email_Template'; // Assumption
 
-// --- App Version Info ---
-export const APP_VERSION = '3.0.0-beta.3';
-export const APP_BUILD_DATE_STR = 'May 1, 2025 11:56 PM';
-export const APP_BUILD_INFO = `v${APP_VERSION} (${APP_BUILD_DATE_STR})`; 
+
 
 // --- Error Logging Constants ---
 // Duplicate removed export const FORM_LOGS = "Add_Logs"; // Assuming form name
@@ -207,3 +223,15 @@ export const FIELD_ISSUE_NOTIFY_SALES = 'Notify_Sales'; // Checkbox
 export const FIELD_ISSUE_TAGGED_USERS = 'Tagged_Users'; // List Lookup to Add_User
 export const FIELD_ISSUE_IS_RESOLVED = 'Is_Resolved'; // Checkbox
 export const FIELD_ISSUE_RESOLVED_BY = 'Resolved_By'; // Lookup to Add_User (or maybe just Text?) - Assume Lookup for now 
+
+// --- ADD Task Fields --- 
+export const FIELD_TASK_ID = 'ID'; // System Generated
+export const FIELD_TASK_PROJECT_LOOKUP = 'Project';
+export const FIELD_TASK_ASSIGNEE_LOOKUP = 'Assignee'; // List Lookup
+export const FIELD_TASK_ASSIGNED_BY_LOOKUP = 'Assigned_By'; // User Lookup
+export const FIELD_TASK_DESCRIPTION = 'Description'; // Text
+export const FIELD_TASK_STATUS = 'Status'; // Picklist
+export const FIELD_TASK_PRIORITY = 'Priority'; // Picklist
+export const FIELD_TASK_DUE_DATE = 'Due_Date'; // Date
+export const FIELD_TASK_COMPLETED_TIME = 'Completed_Time'; // Datetime
+// --- END Task Fields --- 

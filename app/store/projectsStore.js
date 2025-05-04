@@ -26,10 +26,16 @@ import {
   FIELD_ISSUE_AUTHOR_TEXT,
   FIELD_ISSUE_USER_LOOKUP,
   FIELD_ISSUE_NOTIFY_SALES,
-  FIELD_ISSUE_TAGGED_USERS
+  FIELD_ISSUE_TAGGED_USERS,
+  FORM_TASKS,
+  FIELD_TASK_PROJECT_LOOKUP,
+  FIELD_TASK_DESCRIPTION,
+  FIELD_TASK_ASSIGNEE_LOOKUP,
+  FIELD_TASK_ASSIGNED_BY_LOOKUP,
+  FIELD_TASK_PRIORITY,
+  FIELD_TASK_DUE_DATE,
+  FIELD_TASK_STATUS
 } from '../config/constants.js';
-// Import helper function
-// import { formatRelativeTime } from '../utils/helpers.js';
 // Import EVENT_TYPES
 import { EVENT_TYPES } from '../config/options.js';
 
@@ -45,6 +51,9 @@ import { logActivity } from '../services/activityLogService.js';
 import { LS_KEYS, saveSetting, loadSetting } from '../utils/localStorage.js';
 // --- ADD Error Log Service Import ---
 import { logErrorToZoho } from '../services/errorLogService.js';
+
+// Import Formatting Helper
+import { formatDateTimeForZohoAPI } from '../utils/helpers.js';
 
 // Access Pinia global
 const { defineStore } = Pinia;
@@ -964,6 +973,267 @@ export const useProjectsStore = defineStore('projects', {
     // *** ADDED: Toggle Duplicate Filter Action ***
     toggleDuplicateFilter() {
         this.filterOnlyDuplicates = !this.filterOnlyDuplicates;
+    },
+
+    // *** ADDED: Update Assigned Sales Rep Action ***
+    async updateProjectSalesRep({ projectId, newSalesRepId, oldSalesRepName, newSalesRepName }) {
+        const uiStore = useUiStore();
+        const modalStore = useModalStore(); // Needed to refresh modal
+
+        if (!projectId) {
+            uiStore.addNotification({ type: 'error', message: 'Project ID is required.'});
+            throw new Error('Project ID missing');
+        }
+
+        // If newSalesRepId is null/undefined, Zoho expects an empty string to clear a lookup
+        const payload = { data: { Sales_Rep: newSalesRepId || "" } }; 
+
+        const loadingNotificationId = `update-rep-${projectId}-${Date.now()}`;
+        uiStore.addNotification({ id: loadingNotificationId, type: 'info', message: `Assigning Sales Rep to ${newSalesRepName || 'None'}...`, duration: 0 });
+
+        try {
+            const response = await ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, payload);
+
+            if (response.code !== 3000) {
+                console.error('Zoho API Error (updateProjectSalesRep):', response);
+                throw new Error(response.message || 'Failed to update Sales Rep.');
+            }
+
+            uiStore.removeNotification(loadingNotificationId);
+            uiStore.addNotification({ type: 'success', message: `Sales Rep assigned to ${newSalesRepName || 'None'}!` });
+
+            // Log Granular Activity
+            const logMsg = `Changed Sales Rep from '${oldSalesRepName || 'None'}' to '${newSalesRepName || 'None'}'`;
+            logActivity(projectId, logMsg);
+
+            // Refresh modal data
+            await modalStore.refreshModalData();
+
+            return response.data;
+
+        } catch (error) {
+            console.error(`Error updating Sales Rep for project ${projectId}:`, error);
+            logErrorToZoho(error, {
+              operation: 'updateProjectSalesRep',
+              projectId: projectId,
+              newSalesRepId: newSalesRepId,
+              details: 'API call failed during Sales Rep update.'
+            });
+            uiStore.removeNotification(loadingNotificationId);
+            uiStore.addNotification({ type: 'error', title: 'Update Failed', message: `Failed to assign Sales Rep: ${error.message}` });
+            throw error; // Re-throw
+        }
+        // No finally needed here as loading state is managed in the component
+    },
+
+    // *** ADD Action to update a specific Event's Date/Status ***
+    async updateProjectEvent({ projectId, eventType, apiBookingField, apiStatusField, newDateValue, newStatusValue }) {
+         const uiStore = useUiStore();
+         const modalStore = useModalStore();
+
+         if (!projectId || !apiBookingField || !apiStatusField) {
+             throw new Error('Project ID and API field names are required to update event.');
+         }
+
+         const payload = { data: {} };
+         let logParts = [];
+
+         // Format date ONLY if a new value is provided (null or empty string means clear the date)
+         const formattedDate = newDateValue ? formatDateTimeForZohoAPI(newDateValue) : ""; // Use helper, empty string to clear in Zoho?
+         payload.data[apiBookingField] = formattedDate;
+         logParts.push(`Date set to ${formattedDate || 'empty'}`);
+
+
+         // Include status ONLY if provided and not null/undefined AND NOT 'TBD'
+         if (newStatusValue !== null && newStatusValue !== undefined && newStatusValue !== 'TBD') {
+              payload.data[apiStatusField] = newStatusValue;
+              logParts.push(`Status set to ${newStatusValue}`);
+         }
+
+         if (Object.keys(payload.data).length === 0) {
+              console.warn('No changes detected for project event update.');
+              return; // Nothing to update
+         }
+
+         console.log(`Projects Store: Updating Event ${eventType} for Project ${projectId} Payload:`, payload);
+         const notificationId = `update-event-${eventType}-${projectId}-${Date.now()}`;
+         uiStore.addNotification({ id: notificationId, type: 'info', message: `Updating ${eventType}...`, duration: 0 });
+
+         try {
+             // Use REPORT_PROJECTS for update, as most fields reside there
+             const response = await ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, payload);
+
+             if (response.code !== 3000) {
+                 console.error('Zoho API Error (updateProjectEvent): ', response);
+                 throw new Error(response.message || 'Failed to update project event.');
+             }
+
+             uiStore.removeNotification(notificationId); // Remove loading
+             uiStore.addNotification({ type: 'success', message: `${eventType} updated successfully!` });
+
+             // Log Activity (Fire and Forget)
+             logActivity(projectId, `${eventType} updated: ${logParts.join(', ')}`);
+
+             // Refresh modal data to reflect changes
+             await modalStore.refreshModalData();
+
+             return response.data; // Return updated slice if needed
+         } catch (error) {
+             uiStore.removeNotification(notificationId);
+             console.error(`Error updating ${eventType} for project ${projectId}:`, error);
+             logErrorToZoho(error, {
+               operation: 'updateProjectEvent',
+               projectId: projectId,
+               eventType: eventType,
+               payloadAttempted: payload, // Log the payload we tried to send
+               details: 'API call failed during project event update.'
+             });
+             uiStore.addNotification({ type: 'error', title: 'Update Error', message: `Failed to update ${eventType}: ${error.message}` });
+             throw error; // Re-throw so the component knows it failed
+         }
+     },
+
+    // *** ADDED: Add Project Task Action ***
+    async addTask({ projectId, description, assigneeIds, priority, dueDate }) {
+        const uiStore = useUiStore();
+        const modalStore = useModalStore();
+        // Instantiate userStore inside the action
+        const { useUserStore } = await import('./userStore.js'); // Import dynamically or ensure top-level works
+        const userStore = useUserStore();
+
+        if (!projectId || !description || !assigneeIds || assigneeIds.length === 0) {
+            uiStore.addNotification({ type: 'error', message: 'Project, description, and at least one assignee are required.' });
+            throw new Error('Missing required fields for adding task.');
+        }
+        
+        const assignedById = userStore.currentUser?.id;
+        if (!assignedById) {
+             uiStore.addNotification({ type: 'error', message: 'Could not determine assigning user.' });
+             throw new Error('Assigning user ID not found.');
+        }
+
+        // Import constants within the action or at the top if preferred
+        const { 
+            FORM_TASKS,
+            FIELD_TASK_PROJECT_LOOKUP,
+            FIELD_TASK_DESCRIPTION,
+            FIELD_TASK_ASSIGNEE_LOOKUP,
+            FIELD_TASK_ASSIGNED_BY_LOOKUP,
+            FIELD_TASK_PRIORITY,
+            FIELD_TASK_DUE_DATE,
+            FIELD_TASK_STATUS // Need status for default
+         } = await import('../config/constants.js');
+         const { formatDateTimeForZohoAPI } = await import('../utils/helpers.js'); // For date formatting
+
+        // Ensure assigneeIds contains only the primitive IDs
+        const finalAssigneeIds = Array.isArray(assigneeIds) 
+            ? assigneeIds.map(assignee => (typeof assignee === 'object' && assignee !== null) ? assignee.value : assignee).filter(Boolean)
+            : [];
+
+        const payload = {
+            data: {
+                [FIELD_TASK_PROJECT_LOOKUP]: projectId,
+                [FIELD_TASK_DESCRIPTION]: description,
+                [FIELD_TASK_ASSIGNEE_LOOKUP]: finalAssigneeIds, // Use the processed array of IDs
+                [FIELD_TASK_ASSIGNED_BY_LOOKUP]: assignedById,
+                [FIELD_TASK_STATUS]: 'To Do', // Default status
+                // Optional fields:
+                ...(priority && { [FIELD_TASK_PRIORITY]: priority }),
+                ...(dueDate && { [FIELD_TASK_DUE_DATE]: formatDateTimeForZohoAPI(dueDate, true) }) // Format as Date only
+            }
+        };
+
+        console.log(`Projects Store: Adding Task for Project ${projectId} Payload:`, payload);
+        const loadingNotificationId = `add-task-${projectId}-${Date.now()}`;
+        uiStore.addNotification({ id: loadingNotificationId, type: 'info', message: 'Adding task...', duration: 0 });
+
+        try {
+            const response = await ZohoAPIService.addRecord(FORM_TASKS, payload);
+            if (response.code !== 3000) {
+                console.error('Zoho API Error (addTask):', response);
+                throw new Error(response.message || 'Failed to add task.');
+            }
+            uiStore.removeNotification(loadingNotificationId);
+            uiStore.addNotification({ type: 'success', message: 'Task added successfully!' });
+            logActivity(projectId, `Task added: "${description.substring(0, 50)}..."`);
+            
+            // Refresh modal data to show the new task
+            await modalStore.refreshModalData();
+
+            return response.data; // Return the ID of the newly created task record
+        } catch (error) {
+             console.error(`Error adding task for project ${projectId}:`, error);
+            logErrorToZoho(error, {
+              operation: 'addTask',
+              projectId: projectId,
+              payloadAttempted: payload, 
+              details: 'API call failed when adding project task.'
+            });
+             uiStore.removeNotification(loadingNotificationId);
+             uiStore.addNotification({ type: 'error', title: 'Action Failed', message: `Failed to add task: ${error.message || 'Unknown error'}` });
+             throw error; // Re-throw error so component can handle it
+        }
+    },
+
+    // *** ADDED: Update Task Status Action ***
+    async updateTaskStatus({ taskId, newStatus }) {
+        const uiStore = useUiStore();
+        const modalStore = useModalStore(); // To refresh data after update
+
+        if (!taskId || !newStatus) {
+            uiStore.addNotification({ type: 'error', message: 'Task ID and new status are required.'});
+            throw new Error('Missing required fields for updating task status.');
+        }
+        
+        // Import constants dynamically or ensure they are available
+        const { FORM_TASKS, FIELD_TASK_STATUS } = await import('../config/constants.js');
+
+        const payload = {
+            data: {
+                [FIELD_TASK_STATUS]: newStatus
+            }
+        };
+
+        console.log(`Projects Store: Updating Task ${taskId} status to ${newStatus} Payload:`, payload);
+        const loadingNotificationId = `update-task-status-${taskId}-${Date.now()}`;
+        uiStore.addNotification({ id: loadingNotificationId, type: 'info', message: `Updating task status to ${newStatus}...`, duration: 0 });
+
+        try {
+            // Use REPORT_TASKS (Corrected) to update the task record directly
+            const { REPORT_TASKS } = await import('../config/constants.js'); // Ensure REPORT_TASKS is imported
+            const response = await ZohoAPIService.updateRecordById(REPORT_TASKS, taskId, payload);
+            
+            if (response.code !== 3000) {
+                console.error('Zoho API Error (updateTaskStatus):', response);
+                // Handle potential nested error structure if API returns it
+                 const nestedResult = response.result?.[0];
+                 if (nestedResult && nestedResult.code !== 3000) {
+                     throw new Error(nestedResult.message || `Nested API Error Code ${nestedResult.code}`);
+                 }
+                throw new Error(response.message || 'Failed to update task status.');
+            }
+            
+            uiStore.removeNotification(loadingNotificationId);
+            uiStore.addNotification({ type: 'success', message: `Task status updated to ${newStatus}!` });
+            
+            // Refresh modal data to reflect the change
+            // No need to log activity for simple status change? Or maybe log it?
+            // logActivity(projectId, `Task ${taskId} status changed to ${newStatus}`); // Need project ID for this
+            await modalStore.refreshModalData();
+
+            return response.data; // Return updated data slice if needed
+        } catch (error) {
+            console.error(`Error updating status for task ${taskId}:`, error);
+            logErrorToZoho(error, {
+              operation: 'updateTaskStatus',
+              taskId: taskId,
+              newStatus: newStatus,
+              details: 'API call failed when updating task status.'
+            });
+            uiStore.removeNotification(loadingNotificationId);
+            uiStore.addNotification({ type: 'error', title: 'Action Failed', message: `Failed to update task status: ${error.message || 'Unknown error'}` });
+            throw error; // Re-throw error so component can handle it
+        }
     }
   }
 }); 

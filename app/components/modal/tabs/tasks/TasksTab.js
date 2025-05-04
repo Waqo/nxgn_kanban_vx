@@ -1,107 +1,149 @@
 // app/components/modal/tabs/tasks/TasksTab.js
+import BaseButtonGroup from '../../../common/BaseButtonGroup.js';
+import TasksKanbanView from './TasksKanbanView.js';
+import TasksTableView from './TasksTableView.js';
+import TaskForm from './TaskForm.js'; // Import the new inline form
 
-// No base component imports needed currently
+// Pinia Stores
+import { useUserStore } from '../../../../store/userStore.js';
 
-// Pinia imports if needed directly
-// import { useModalStore } from '../../store/modalStore.js';
+// Vue Composition API
+const { ref, computed } = Vue;
 
-// Vuex no longer needed
-// if (typeof Vuex === 'undefined') { ... }
-
-const TasksTab = {
+export default {
     name: 'TasksTab',
-    components: {},
-    // Define the project prop
+    components: {
+        BaseButtonGroup,
+        TasksKanbanView,
+        TasksTableView,
+        TaskForm // Register the inline form
+    },
     props: {
-        project: { 
-            type: Object, 
-            required: true 
+        project: {
+            type: Object,
+            required: true
+        },
+        currentUser: { // Added currentUser prop
+            type: Object,
+            required: true
         }
     },
-    computed: {
-        // Remove Vuex mapState
-        // ...(typeof Vuex !== 'undefined' ? Vuex.mapState('modal', { ... }) : { ... }),
+    setup(props) {
+        const userStore = useUserStore(); // Access store if needed globally, though role comes from prop now
 
-        // Get the tasks array from the prop
-        tasks() {
-            return this.project?.Tasks || []; 
-        },
-    },
-    methods: {
-        // Helper to format date
-        formatDateSimple(dateString) {
-            if (!dateString) return 'N/A';
-            try {
-                return new Date(dateString).toLocaleDateString('en-US', { 
-                    month: 'short', day: 'numeric', year: 'numeric' 
+        const currentView = ref('kanban'); // 'kanban' or 'table'
+        const isAddingTask = ref(false); // Add state for inline form
+
+        const isAdmin = computed(() => props.currentUser?.role === 'Admin');
+
+        const allProjectTasks = computed(() => props.project?.Tasks || []);
+
+        // Filter tasks based on user role
+        const filteredTasks = computed(() => {
+            if (!Array.isArray(allProjectTasks.value)) return [];
+            if (isAdmin.value) {
+                return allProjectTasks.value; // Admins see all tasks for the project
+            } else {
+                // Non-admins see only tasks assigned to them
+                const currentUserId = props.currentUser?.id;
+                if (!currentUserId) return []; // Should not happen if currentUser is passed correctly
+
+                return allProjectTasks.value.filter(task => {
+                    // Assignee is an array of lookup objects { ID, zc_display_value }
+                    return Array.isArray(task.Assignee) && task.Assignee.some(assignee => assignee.ID === currentUserId);
                 });
-            } catch (e) {
-                return 'Invalid Date';
             }
-        },
-        // Placeholder for adding a task later
-        addTask() {
-            alert('Add Task functionality not implemented yet.');
-        },
-        // Helper to get assignee display text
-        getAssigneeDisplay(assigneeList) {
-            if (!Array.isArray(assigneeList) || assigneeList.length === 0) {
-                return 'Unassigned';
-            }
-            // Assuming zc_display_value holds the name
-            return assigneeList.map(a => a.zc_display_value || 'Unknown').join(', ');
-        },
-        // Helper for status badge class
-        getStatusClass(status) {
-            switch(status?.toLowerCase()) {
-                case 'done': return 'bg-green-100 text-green-800';
-                case 'in progress': return 'bg-blue-100 text-blue-800';
-                case 'cancelled': return 'bg-gray-100 text-gray-500';
-                case 'to do':
-                default: return 'bg-yellow-100 text-yellow-800';
-            }
-        },
-         // Helper for priority badge class
-        getPriorityClass(priority) {
-             switch(priority?.toLowerCase()) {
-                case 'critical': return 'bg-red-100 text-red-800 font-bold';
-                case 'high': return 'bg-orange-100 text-orange-800 font-semibold';
-                case 'medium': return 'bg-yellow-100 text-yellow-800';
-                case 'low':
-                default: return 'bg-gray-100 text-gray-700';
-            }
-        }
+        });
+
+        // Define Kanban columns (can be moved to constants if needed)
+        const kanbanColumns = ref([
+            { id: 'To Do', title: 'To Do' },
+            { id: 'In Progress', title: 'In Progress' },
+            { id: 'Done', title: 'Done' },
+            { id: 'Cancelled', title: 'Cancelled' }
+        ]);
+
+        const toggleView = (view) => {
+            currentView.value = view;
+        };
+
+        // Add toggle method for inline form
+        const toggleAddTaskForm = () => {
+            isAddingTask.value = !isAddingTask.value;
+        };
+        
+        // Add handlers for the form component's events
+        const handleTaskFormSubmit = () => {
+            isAddingTask.value = false; // Close form on successful submit
+            // Refresh logic is handled by the store action now
+        };
+        
+        const handleTaskFormCancel = () => {
+             isAddingTask.value = false; // Close form on cancel
+        };
+
+        return {
+            currentView,
+            isAdmin,
+            filteredTasks,
+            kanbanColumns,
+            toggleView,
+            isAddingTask, // Expose inline form state
+            toggleAddTaskForm, // Expose toggle method
+            handleTaskFormSubmit,
+            handleTaskFormCancel
+        };
     },
     template: `
         <div class="tasks-tab-content">
              <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Tasks</h3>
-                <button @click="addTask" class="text-sm text-blue-600 hover:text-blue-800">+ Add Task</button>
+                <h3 class="text-lg font-medium text-gray-900">Tasks ({{ filteredTasks.length }})</h3>
+                <div class="flex items-center gap-2">
+                    <base-button-group
+                        :options="[ { value: 'kanban', label: 'Board', icon: 'fas fa-columns' }, { value: 'table', label: 'Table', icon: 'fas fa-list' } ]"
+                        :modelValue="currentView"
+                        @update:modelValue="toggleView"
+                        size="sm"
+                    />
+                     <button 
+                        v-if="isAdmin" 
+                        @click="toggleAddTaskForm" 
+                        :class="[
+                            'inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white focus:outline-none focus:ring-2 focus:ring-offset-2',
+                            isAddingTask ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500' : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                         ]"
+                        :title="isAddingTask ? 'Cancel Add Task' : 'Add New Task'"
+                    >
+                         <i :class="['-ml-0.5 mr-1.5 h-4 w-4', isAddingTask ? 'fas fa-times' : 'fas fa-plus']" aria-hidden="true"></i>
+                         {{ isAddingTask ? 'Cancel' : 'Add Task' }}
+                     </button>
+                </div>
             </div>
 
-            <div v-if="tasks.length > 0" class="space-y-3">
-                 <div v-for="task in tasks" :key="task.ID" class="p-3 border border-gray-200 rounded-md bg-white shadow-sm">
-                    <div class="flex justify-between items-start gap-4">
-                        <div class="flex-grow">
-                            <p class="text-sm text-gray-800 mb-1">{{ task.Description || 'No description' }}</p>
-                             <div class="flex items-center gap-3 text-xs text-gray-500">
-                                <span>Due: {{ formatDateSimple(task.Due_Date) }}</span>
-                                <span>Assignee(s): {{ getAssigneeDisplay(task.Assignee) }}</span>
-                             </div>
-                        </div>
-                        <div class="flex flex-col items-end flex-shrink-0 space-y-1">
-                             <span :class="['px-2 py-0.5 rounded-full text-xs font-medium', getStatusClass(task.Status)]">{{ task.Status || 'N/A' }}</span>
-                             <span :class="['px-2 py-0.5 rounded-full text-xs', getPriorityClass(task.Priority)]">{{ task.Priority || 'N/A' }}</span>
-                        </div>
-                    </div>
-                     <!-- TODO: Add expand/details/edit later -->
-                 </div>
-            </div>
-             <div v-else class="text-center text-gray-500 py-6 border border-dashed border-gray-300 rounded-md">
-                No tasks found for this project.
+            <!-- ADD Inline Add Task Form -->
+            <div v-if="isAddingTask" class="mb-6">
+                <task-form 
+                    :projectId="project?.ID"
+                    @submit="handleTaskFormSubmit"
+                    @cancel="handleTaskFormCancel"
+                 />
              </div>
+
+            <!-- Container for view components with minimum height -->
+            <div class="min-h-[400px]">
+                <!-- Kanban View -->
+                <tasks-kanban-view 
+                    v-if="currentView === 'kanban'" 
+                    :tasks="filteredTasks" 
+                    :columns="kanbanColumns" 
+                />
+
+                <!-- Table View -->
+                <tasks-table-view 
+                    v-else-if="currentView === 'table'" 
+                    :tasks="filteredTasks" 
+                />
+            </div>
         </div>
     `
-};
-
-export default TasksTab; 
+}; 

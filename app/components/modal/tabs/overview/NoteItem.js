@@ -176,6 +176,7 @@ export default {
                 userName: currentUser.name,      
                 teamOnly: false, // Replies default to not team-only 
                 parentNoteId: note.value.id, // Pass the parent note ID
+                parentNoteAuthor: note.value.author, // Pass the parent note's author name
                 attachments: [], // No attachments for replies in this version
                 taggedUserIds: [] // No tagging for replies in this version
             });

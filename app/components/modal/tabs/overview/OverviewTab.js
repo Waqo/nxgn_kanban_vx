@@ -29,8 +29,6 @@ import NoteItem from './NoteItem.js';
 import IssueItem from './IssueItem.js';
 // --- ADD EventItem Import ---
 import EventItem from './EventItem.js';
-// --- Restore SalesRepInfoCard Import ---
-import SalesRepInfoCard from './SalesRepInfoCard.js';
 // --- ADD LatestActivityPreview Import ---
 import LatestActivityPreview from './LatestActivityPreview.js';
 
@@ -52,7 +50,6 @@ const OverviewTab = {
         NoteItem,
         IssueItem,
         EventItem,
-        SalesRepInfoCard,
         LatestActivityPreview, // --- Register LatestActivityPreview ---
         BaseCombobox // Register BaseCombobox
     },
@@ -352,110 +349,103 @@ const OverviewTab = {
     template: `
         <div class="overview-tab-content space-y-6"> <!-- Add spacing for elements outside the grid -->
             <!-- Grid for top sections -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
                 <!-- Left Column: Events Only -->
-            <div class="lg:col-span-1 space-y-6">
+                <div class="lg:col-span-3 space-y-6">
                     <!-- Events Section -->
-                <base-card>
-                    <template #header>
-                             <h3 class="text-lg font-medium text-gray-900">Events</h3>
-                    </template>
-                    <template #default>
-                             <!-- Events List -->
-                             <ul v-if="events?.length > 0" role="list" class="divide-y divide-gray-200">
-                                 <li v-for="event in events" :key="event.id" class="py-3">
-                                     <event-item :event="event" />
-                            </li>
-                        </ul>
+                    <base-card>
+                        <template #header>
+                            <h3 class="text-lg font-medium text-gray-900">Events</h3>
+                        </template>
+                        <template #default>
+                            <!-- Events List -->
+                            <ul v-if="events?.length > 0" role="list" class="divide-y divide-gray-200">
+                                <li v-for="event in events" :key="event.id" class="py-3">
+                                    <event-item :event="event" />
+                                </li>
+                            </ul>
                             <div v-else class="p-4 text-center text-gray-500">
                                 No events found.
-                        </div>
-                    </template>
-                </base-card>
-
-                     <!-- Issues Section (Removed From Here) -->
+                            </div>
+                        </template>
+                    </base-card>
                 </div>
     
                 <!-- Right Column: SalesRep, Issues & Activity Preview -->
-                <div class="lg:col-span-1 space-y-6">
+                <div class="lg:col-span-2 space-y-6">
                     <!-- Sales Rep Info Card -->
-                    <sales-rep-info-card 
-                        :sales-rep-lookup="project?.Sales_Rep" 
-                        :email="project?.['Sales_Rep.Email']" 
-                        :phone="project?.['Sales_Rep.Phone']" 
-                        :sales-org="project?.['Sales_Rep.Sales_Org']"
-                    />
+                    <!-- SalesRepInfoCard removed from here -->
     
                     <!-- Issues Section (Moved Here) -->
-                 <base-card>
-                    <template #header>
-                        <div class="flex justify-between items-center">
-                            <h3 class="text-lg font-medium text-gray-900">Issues</h3>
-                            <!-- Show "Raise Issue" button only when form is hidden -->
-                            <base-button 
-                                v-if="!showRaiseIssueForm"
-                                @click="showRaiseIssueForm = true"
-                                variant="secondary" 
-                                size="sm"
-                                leading-icon="fas fa-plus"
-                            >
-                                Raise Issue
-                            </base-button>
-                         </div>
-                    </template>
-                    <template #default>
-                        <!-- ADD Inline Raise Issue Form (Conditional) -->
-                        <div v-if="showRaiseIssueForm" class="add-issue-section border-b border-gray-200 pb-4 mb-4">
-                            <base-text-area 
-                                v-model="newIssueContent" 
-                                placeholder="Describe the issue..."
-                                rows="2"
-                                :disabled="isSubmittingIssue"
-                                variant="inline-actions"
-                            >
-                                <!-- Actions Slot -->
-                                <template #actions>
-                                    <!-- Row 1: Tagging Combobox -->
-                                    <div class="w-full mb-2"> 
-                                        <base-combobox
-                                            :multiple="true"
-                                            :options="userTaggingOptions"
-                                            v-model="newIssueSelectedUsers"
-                                            placeholder="Tag users..."
-                                            :disabled="isSubmittingIssue || isLoadingUsersForTagging"
-                                            :loading="isLoadingUsersForTagging"
-                                            labelKey="label"
-                                            valueKey="value"
-                                            :clearable="true"
-                                            class="w-full" // Use full width
-                                        />
-                                    </div>
-                                    <!-- Row 2: Checkbox and Submit Button -->
-                                    <div class="w-full flex items-center justify-between">
-                                        <div class="flex items-center">
-                                            <input id="issueNotifySalesCheckbox" type="checkbox" v-model="newIssueNotifySales" :disabled="isSubmittingIssue" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                                            <label for="issueNotifySalesCheckbox" class="ml-2 block text-sm text-gray-700">Notify Sales</label>
+                    <base-card>
+                        <template #header>
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-lg font-medium text-gray-900">Issues</h3>
+                                <!-- Show "Raise Issue" button only when form is hidden -->
+                                <base-button 
+                                    v-if="!showRaiseIssueForm"
+                                    @click="showRaiseIssueForm = true"
+                                    variant="secondary" 
+                                    size="sm"
+                                    leading-icon="fas fa-plus"
+                                >
+                                    Raise Issue
+                                </base-button>
+                            </div>
+                        </template>
+                        <template #default>
+                            <!-- ADD Inline Raise Issue Form (Conditional) -->
+                            <div v-if="showRaiseIssueForm" class="add-issue-section border-b border-gray-200 pb-4 mb-4">
+                                <base-text-area 
+                                    v-model="newIssueContent" 
+                                    placeholder="Describe the issue..."
+                                    rows="2"
+                                    :disabled="isSubmittingIssue"
+                                    variant="inline-actions"
+                                >
+                                    <!-- Actions Slot -->
+                                    <template #actions>
+                                        <!-- Row 1: Tagging Combobox -->
+                                        <div class="w-full mb-2"> 
+                                            <base-combobox
+                                                :multiple="true"
+                                                :options="userTaggingOptions"
+                                                v-model="newIssueSelectedUsers"
+                                                placeholder="Tag users..."
+                                                :disabled="isSubmittingIssue || isLoadingUsersForTagging"
+                                                :loading="isLoadingUsersForTagging"
+                                                labelKey="label"
+                                                valueKey="value"
+                                                :clearable="true"
+                                                class="w-full" // Use full width
+                                            />
                                         </div>
-                                        <div class="flex-shrink-0 flex items-center gap-2">
-                                            <base-button @click="cancelNewIssue" size="sm" variant="secondary-light">Cancel</base-button>
-                                            <base-button @click="submitNewIssue" size="sm" variant="primary" :disabled="!newIssueContent.trim() || isSubmittingIssue" :loading="isSubmittingIssue">Submit Issue</base-button>
+                                        <!-- Row 2: Checkbox and Submit Button -->
+                                        <div class="w-full flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <input id="issueNotifySalesCheckbox" type="checkbox" v-model="newIssueNotifySales" :disabled="isSubmittingIssue" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                                <label for="issueNotifySalesCheckbox" class="ml-2 block text-sm text-gray-700">Notify Sales</label>
+                                            </div>
+                                            <div class="flex-shrink-0 flex items-center gap-2">
+                                                <base-button @click="cancelNewIssue" size="sm" variant="secondary-light">Cancel</base-button>
+                                                <base-button @click="submitNewIssue" size="sm" variant="primary" :disabled="!newIssueContent.trim() || isSubmittingIssue" :loading="isSubmittingIssue">Submit Issue</base-button>
+                                            </div>
                                         </div>
-                                    </div>
-                                </template>
-                            </base-text-area>
-                        </div>
+                                    </template>
+                                </base-text-area>
+                            </div>
 
-                        <!-- Issues List -->
-                            <ul v-if="unresolvedIssues?.length > 0" role="list" class="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
-                                 <li v-for="issue in unresolvedIssues" :key="issue.ID || issue.id" class="col-span-1">
+                            <!-- Issues List -->
+                            <ul v-if="unresolvedIssues?.length > 0" role="list" class="space-y-4">
+                                <li v-for="issue in unresolvedIssues" :key="issue.ID || issue.id" class="col-span-1">
                                     <issue-item :issue="issue" />
-                            </li>
-                        </ul>
-                         <div v-else class="text-center text-gray-500 py-4">
+                                </li>
+                            </ul>
+                            <div v-else class="text-center text-gray-500 py-4">
                                 No open issues reported.
-                        </div>
-                    </template>
-                </base-card>
+                            </div>
+                        </template>
+                    </base-card>
 
                     <!-- Latest Activity Preview -->
                     <latest-activity-preview 
@@ -467,22 +457,22 @@ const OverviewTab = {
             <!-- End of Grid -->
 
             <!-- Notes Section (Full Width Below Grid) -->
-                 <base-card>
-                    <template #header>
+            <base-card>
+                <template #header>
                     <div class="flex justify-between items-center">
-                         <h3 class="text-lg font-medium text-gray-900">Notes</h3>
-                         <!-- Placeholder for Read Status Filters/Actions -->
-                         <div class="flex items-center gap-2">
+                        <h3 class="text-lg font-medium text-gray-900">Notes</h3>
+                        <!-- Placeholder for Read Status Filters/Actions -->
+                        <div class="flex items-center gap-2">
                             <base-button size="xs" variant="secondary-light" disabled title="Filter Unread (TBD)">
                                 <i class="far fa-envelope mr-1"></i> Filter Unread
                             </base-button>
-                             <base-button size="xs" variant="secondary-light" disabled title="Mark All Read (TBD)">
+                            <base-button size="xs" variant="secondary-light" disabled title="Mark All Read (TBD)">
                                 <i class="far fa-check-double mr-1"></i> Mark All Read
                             </base-button>
-                         </div>
+                        </div>
                     </div>
-                    </template>
-                    <template #default>
+                </template>
+                <template #default>
                     <!-- Add Note Section - Styled -->
                     <div 
                         class="add-note-section mb-4 relative transition-all duration-200 ease-in-out border rounded-lg"
@@ -495,13 +485,13 @@ const OverviewTab = {
                         @dragleave="handleDragLeave"
                         @drop.prevent="handleFileDrop"
                     >
-                         <base-text-area 
+                        <base-text-area 
                             v-model="newNoteContent" 
                             placeholder="Add a new note... (drag & drop files here)" 
                             rows="3"
                             variant="inline-actions" 
                             class="rounded-t-lg" 
-                         >
+                        >
                             <!-- Actions Slot -->
                             <template #actions>
                                 <div class="flex items-center justify-between w-full flex-wrap gap-2">
@@ -536,81 +526,81 @@ const OverviewTab = {
                                         </div>
                                         <!-- Team Only Checkbox -->
                                         <div class="flex items-center pl-2 sm:pl-0">
-                                             <input id="teamOnlyCheckbox" type="checkbox" v-model="newNoteTeamOnly" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                                             <label for="teamOnlyCheckbox" class="ml-2 block text-sm text-gray-700">Team Only</label>
+                                            <input id="teamOnlyCheckbox" type="checkbox" v-model="newNoteTeamOnly" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                            <label for="teamOnlyCheckbox" class="ml-2 block text-sm text-gray-700">Team Only</label>
                                         </div>
                                     </div>
                                     <!-- Right side action: Submit Button -->
                                     <div class="flex-shrink-0">
-                                         <base-button @click="addNote" size="sm" variant="primary" :disabled="(!newNoteContent.trim() && (!attachments || attachments.value?.length === 0)) || isAddingNote" :loading="isAddingNote">Add Note</base-button>
+                                        <base-button @click="addNote" size="sm" variant="primary" :disabled="(!newNoteContent.trim() && (!attachments || attachments.value?.length === 0)) || isAddingNote" :loading="isAddingNote">Add Note</base-button>
                                     </div>
                                 </div>
                             </template>
-                         </base-text-area>
+                        </base-text-area>
 
-                         <!-- Attachment Previews -->
-                         <div v-if="attachments.length > 0" class="px-3 pb-2 border-t border-gray-200">
-                             <p class="text-xs font-medium text-gray-500 pt-2 pb-1">Attachments:</p>
-                             <div class="flex flex-wrap gap-2">
-                                 <div 
-                                     v-for="(file, index) in attachments" 
-                                     :key="file.name + '-' + file.lastModified" 
-                                     class="relative group h-16 w-16 border border-gray-300 rounded-md overflow-hidden flex items-center justify-center bg-gray-100"
-                                     :title="file.name"
-                                 >
-                                     <!-- Image Preview -->
-                                     <img 
-                                         v-if="file.type.startsWith('image/') && objectUrls.get(file)"
-                                         :src="objectUrls.get(file)" 
-                                         :alt="file.name" 
-                                         class="h-full w-full object-cover" 
-                                         loading="lazy"
-                                         @error="(e) => { e.target.style.display='none'; e.target.nextElementSibling.style.display='flex'; }" 
-                                     />
-                                     <!-- Fallback Icon Container (for images that failed or non-images) -->
-                                     <div 
+                        <!-- Attachment Previews -->
+                        <div v-if="attachments.length > 0" class="px-3 pb-2 border-t border-gray-200">
+                            <p class="text-xs font-medium text-gray-500 pt-2 pb-1">Attachments:</p>
+                            <div class="flex flex-wrap gap-2">
+                                <div 
+                                    v-for="(file, index) in attachments" 
+                                    :key="file.name + '-' + file.lastModified" 
+                                    class="relative group h-16 w-16 border border-gray-300 rounded-md overflow-hidden flex items-center justify-center bg-gray-100"
+                                    :title="file.name"
+                                >
+                                    <!-- Image Preview -->
+                                    <img 
+                                        v-if="file.type.startsWith('image/') && objectUrls.get(file)"
+                                        :src="objectUrls.get(file)" 
+                                        :alt="file.name" 
+                                        class="h-full w-full object-cover" 
+                                        loading="lazy"
+                                        @error="(e) => { e.target.style.display='none'; e.target.nextElementSibling.style.display='flex'; }" 
+                                    />
+                                    <!-- Fallback Icon Container (for images that failed or non-images) -->
+                                    <div 
                                         class="absolute inset-0 flex items-center justify-center"
                                         :style="{ display: (file.type.startsWith('image/') && objectUrls.get(file)) ? 'none' : 'flex' }" 
-                                     >
-                                         <i 
+                                    >
+                                        <i 
                                             :class="[
                                                 'text-2xl', 
                                                 file.type.startsWith('image/') ? 'fas fa-image text-gray-400' : 
                                                 file.name.toLowerCase().endsWith('.pdf') ? 'fas fa-file-pdf text-red-400' : 
                                                 'fas fa-file text-gray-400'
                                             ]"
-                                         ></i>
-                                     </div>
-                                     <!-- Remove Button -->
-                                     <button 
-                                         @click="removeAttachment(index)" 
-                                         class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-600"
-                                         title="Remove attachment"
-                                     >
-                                         &times;
-                                     </button>
-                                 </div>
-                             </div>
-                         </div>
+                                        ></i>
+                                    </div>
+                                    <!-- Remove Button -->
+                                    <button 
+                                        @click="removeAttachment(index)" 
+                                        class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-600"
+                                        title="Remove attachment"
+                                    >
+                                        &times;
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
 
-                         <!-- Hidden File Input -->
-                         <input type="file" multiple ref="fileInputRef" @change="handleFileChange" class="hidden" accept="*/*">
+                        <!-- Hidden File Input -->
+                        <input type="file" multiple ref="fileInputRef" @change="handleFileChange" class="hidden" accept="*/*">
 
-                         <!-- Drag Overlay -->
-                          <div 
-                              v-if="isDragging"
-                              class="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center rounded-lg pointer-events-none"
-                            >
-                             <p class="text-blue-700 font-semibold">Drop files to attach</p>
-                         </div>
+                        <!-- Drag Overlay -->
+                        <div 
+                            v-if="isDragging"
+                            class="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center rounded-lg pointer-events-none"
+                        >
+                            <p class="text-blue-700 font-semibold">Drop files to attach</p>
+                        </div>
                     </div>
                     
                     <!-- Notes List (Iterate over displayedNotes) -->
                     <ul v-if="notes?.length > 0" role="list" class="divide-y divide-gray-200">
                         <li v-for="note in displayedNotes" :key="note.id" class="py-4"> 
                             <note-item :note="note" :replies="note.replies || []" :projectId="project?.ID" /> 
-                            </li>
-                        </ul>
+                        </li>
+                    </ul>
                     <div v-else class="text-center text-gray-500 py-4">
                         No general notes added yet.
                     </div>
@@ -620,10 +610,9 @@ const OverviewTab = {
                         <button @click="toggleShowAllNotes" class="text-sm font-medium text-blue-600 hover:text-blue-800">
                             {{ toggleNotesButtonText }}
                         </button>
-                        </div>
-                    </template>
-                </base-card>
-
+                    </div>
+                </template>
+            </base-card>
         </div>
     `
 };

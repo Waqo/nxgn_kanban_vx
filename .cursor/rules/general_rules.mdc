@@ -21,9 +21,24 @@ These are the most important rules, they supercede any other document.
    *   Refer to `docs/active_docs/project_directory.txt` when unsure about the location of a specific file or the overall project structure. 
 
 **6. Keep The Active Project Build Plan Updated:**
-   *   Current Active Build Plan is [current_detail_modal_build_plan.txt](mdc:docs/current_docs/current_detail_modal_build_plan.txt)
+   *   Current Active Build Plan is [commissions_tab_build_plan.txt](mdc:docs/current_docs/commissions_tab_build_plan.txt)
    *   When a step is completed, add a note to the ## 7. Development Notes section..
    *   When user instruction changes the order of development, or introduces new step, add a note to the ## 7. Development Notes section. 
+
+   **7. Never Assume File Content, Ask User To Share:**
+   *   Never assume the contents of a file, ask the user to share before moving forward.
+
+   **8. Begin using Composition API instead of Option API:**
+   *   Initial build of the code used Option API, we should now prioritize Composition API.
+
+      **9. Never use browser alerts, use existing notification system to indicate errors or missing functionality:**
+
+**10. Use Blue as Primary Accent Color:** The standard primary accent color for interactive elements (buttons, active states, links, focus rings) should be blue (specifically Tailwind's `blue-500` or `blue-600` for primary buttons).
+    *   If existing components use indigo (e.g., `indigo-500`, `indigo-600`) as the primary accent, refactor them to use the corresponding blue shade (e.g., replace `indigo-500` with `blue-500`, `text-indigo-600` with `text-blue-600`, `focus:ring-indigo-500` with `focus:ring-blue-500`).
+    *   Maintain relative shades when converting (e.g., if `indigo-700` was used for a hover state, use `blue-700`).
+
+
+   
 
 
 

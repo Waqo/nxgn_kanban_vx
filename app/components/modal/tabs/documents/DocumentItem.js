@@ -116,7 +116,7 @@ export default {
 
     const docName = computed(() => doc.value?.Document_Name || 'Untitled Document');
     const docTypeName = computed(() => doc.value?.Doc_Type?.Name || null);
-    const addedUser = computed(() => doc.value?.User?.Name || doc.value?.Added_User || 'System');
+    const addedUser = computed(() => doc.value?.User_Lookup?.zc_display_value?.trim() || doc.value?.Added_User || 'System');
 
     const addedTimeRef = computed(() => doc.value?.Added_Time);
     const addedTime = useDateFormat(addedTimeRef, 'MMM D, YYYY', { locales: 'en-US' });

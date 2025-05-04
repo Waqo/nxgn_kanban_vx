@@ -16,11 +16,13 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
     <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+    <link rel="stylesheet" href="https://unpkg.com/@vuepic/vue-datepicker@latest/dist/main.css">
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://unpkg.com/@vueuse/shared"></script>
     <script src="https://unpkg.com/@vueuse/core"></script>
     <script src="https://unpkg.com/pinia@3/dist/pinia.iife.prod.js"></script>
     <script src="https://js.zohostatic.com/creator/widgets/version/2.0/widgetsdk-min.js"></script>
+    <script src="https://unpkg.com/@vuepic/vue-datepicker@latest"></script>
 
     <!-- Custom Styles -->
     <style>
@@ -33,6 +35,14 @@
           display: none;             /* Chrome, Safari and Opera */
       }
       /* Add any other global custom styles here */
+
+      /* --- Custom VueDatePicker Input Styles --- */
+      .dp__input {
+          width: 50%;           /* Override width */
+          font-size: 0.75rem;   /* Override font-size (equivalent to text-xs) */
+          /* The input will still inherit other vars like padding, border, etc. */
+      }
+      /* --- End Custom VueDatePicker Styles --- */
     </style>
 
     <!-- Main App (Will handle importing everything else) -->

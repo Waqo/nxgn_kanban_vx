@@ -61,7 +61,7 @@ export const useUserStore = defineStore('user', {
     
     // Main public actions
     async fetchCurrentUser() {
-      console.log("User Store (Pinia): Starting fetchCurrentUser...");
+     // console.log("User Store (Pinia): Starting fetchCurrentUser...");
       this._setLoading(true);
       this._setError(null);
       this._setUserState(null); // Clear current user
@@ -78,13 +78,13 @@ export const useUserStore = defineStore('user', {
         if (!userEmail) {
           throw new Error("Could not determine logged-in user email from init params.");
         }
-        console.log(`User Store (Pinia): Found user email: ${userEmail}`);
+       // console.log(`User Store (Pinia): Found user email: ${userEmail}`);
 
         let loggedInUserRecord = null;
         if (lookupsStore.users && lookupsStore.users.length > 0) {
              loggedInUserRecord = lookupsStore.users.find(user => user.Email?.toLowerCase() === userEmail.toLowerCase());
              if (loggedInUserRecord) {
-                 console.log(`User Store (Pinia): Found user record for ${userEmail} in lookupsStore.`);
+                // console.log(`User Store (Pinia): Found user record for ${userEmail} in lookupsStore.`);
              } else {
                  console.warn(`User Store (Pinia): User record for ${userEmail} NOT found in lookupsStore. Will create fallback.`);
              }

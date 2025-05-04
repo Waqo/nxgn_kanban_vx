@@ -172,12 +172,28 @@ const DataProcessors = {
       return [];
     }
     try {
-        return salesRepsResponse.data
-            .map(rep => ({
-                id: rep[FIELD_SALES_REP_ID], // Use constant (system field)
-                name: rep[FIELD_SALES_REP_NAME]?.zc_display_value?.trim() || '' // Use constant
-                // Add other fields like email, org if needed elsewhere
-            }))
+        const mappedSalesReps = salesRepsResponse.data
+            .map(rep => {
+                return {
+                    id: rep.ID, // Use ID directly
+                    name: rep.Name?.zc_display_value?.trim() || '', 
+                    firstName: rep.Name?.first_name || '', 
+                    lastName: rep.Name?.last_name || '',
+                    email: rep.Email || '',
+                    phone: rep.Phone || '',
+                    // Parse rates as floats, default to 0
+                    regularCommissionRate: parseFloat(rep.Regular_Commission_Rate) || 0,
+                    commercialCommissionRate: parseFloat(rep.Commercial_Commission_Rate) || 0,
+                    sharedCommissionRate: parseFloat(rep.Shared_Commission_Rate) || 0,
+                    // Include Sales Org info if needed
+                    salesOrgId: rep.Sales_Org?.ID || null,
+                    salesOrgName: rep.Sales_Org?.zc_display_value || null,
+                    // Add user lookup if needed later
+                    userLookupId: rep.User_Lookup?.ID || null
+                };
+            });
+
+        return mappedSalesReps // Continue chaining from the mapped data
             .filter(rep => rep.name) // Filter out reps without a display name
             .sort((a, b) => a.name.localeCompare(b.name));
     } catch (error) {
@@ -417,7 +433,6 @@ const DataProcessors = {
             Applicable_Rate: val => parseFloat(val) || 0,
             PPA_Rate: val => parseFloat(val) || null, // Allow null for PPA rate
             Rate_Year: val => val ? parseInt(val, 10) : null,
-            Active_Commission_Rate: val => parseFloat(val) || 0,
             M1_Amount: val => parseFloat(val) || 0,
             M2_Amount: val => parseFloat(val) || 0,
             M3_Amount: val => parseFloat(val) || 0,
@@ -593,6 +608,19 @@ const DataProcessors = {
             });
             // console.log("DataProcessors: Sorted Communications by time (asc)");
         }
+        
+        // --- ADD Sorting for Issues --- 
+        if (Array.isArray(processedData.Issues) && processedData.Issues.length > 0) {
+            processedData.Issues.sort((a, b) => {
+                const timeA = a.Added_Time ? new Date(a.Added_Time).getTime() : 0;
+                const timeB = b.Added_Time ? new Date(b.Added_Time).getTime() : 0;
+                const validTimeA = isNaN(timeA) ? 0 : timeA;
+                const validTimeB = isNaN(timeB) ? 0 : timeB;
+                return validTimeB - validTimeA; // Descending order (newest first)
+            });
+            // console.log("DataProcessors: Sorted Issues by Added_Time (desc)");
+        }
+        // --- END Sorting for Issues ---
         
         // --- Process Bill of Materials --- 
         processedData.Bill_of_Materials = Array.isArray(processedData.Bill_of_Materials) ? 

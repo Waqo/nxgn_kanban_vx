@@ -21,7 +21,7 @@ import {
 } from '../../config/constants.js';
 
 // Import Helpers
-import { calculateApproxInstallDate } from '../../utils/helpers.js';
+import { calculateApproxInstallDate, formatDisplayPhoneNumber } from '../../utils/helpers.js';
 // Import VueUse composable
 // Correct the import method for VueUse
 // import { useDateFormat } from 'vue-use'; 
@@ -90,6 +90,27 @@ const ModalHeader = {
 
         const contactEmail = computed(() => project.value?.[FIELD_PROJECT_CONTACT_EMAIL] || null);
         const contactPhone = computed(() => project.value?.[FIELD_PROJECT_CONTACT_PHONE] || null);
+
+        // --- ADD Sales Rep Computed Properties ---
+        const salesRepName = computed(() => {
+            if (props.isLoading) return 'Loading...';
+            // Adjust based on actual data structure if needed (lookup vs flattened)
+            return project.value?.Sales_Rep?.zc_display_value?.trim() || project.value?.Sales_Rep_Name || 'Unassigned';
+        });
+        const salesRepEmail = computed(() => project.value?.['Sales_Rep.Email'] || null); // Assuming flattened field
+        const salesRepPhone = computed(() => project.value?.['Sales_Rep.Phone'] || null); // Assuming flattened field
+        // --- ADD Sales Org Computed Property ---
+        const salesRepOrg = computed(() => {
+            if (props.isLoading) return ''; // Don't show loading text here, just empty
+            // Access the Sales Org nested under the Sales Rep data
+            const orgData = project.value?.['Sales_Rep.Sales_Org'];
+            return orgData?.Org_Name || orgData?.zc_display_value || 'No Org';
+        });
+        // --- ADD Formatted Phone for Sales Rep ---
+        const formattedSalesRepPhone = computed(() => {
+            return salesRepPhone.value ? formatDisplayPhoneNumber(salesRepPhone.value) : '';
+        });
+        // --- END Sales Rep Computed Properties ---
 
         const formattedAddress = computed(() => {
             if (props.isLoading) return 'Loading Address...';
@@ -343,6 +364,25 @@ const ModalHeader = {
             }
         };
 
+        // --- ADD Sales Rep Click Handlers ---
+        const handleSalesRepPhoneClick = (e) => {
+            e.preventDefault(); // Prevent any default button behavior
+            if (salesRepPhone.value) {
+                // Use the raw phone number for the tel link
+                const cleaned = String(salesRepPhone.value).replace(/\D/g, ''); 
+                const linkNumber = cleaned.length >= 10 ? `+${cleaned.startsWith('1') ? cleaned : '1' + cleaned}` : salesRepPhone.value;
+                window.location.href = `tel:${linkNumber}`;
+            }
+        };
+
+        const handleSalesRepEmailClick = (e) => {
+            e.preventDefault();
+            if (salesRepEmail.value) {
+                window.location.href = `mailto:${salesRepEmail.value}`;
+            }
+        };
+        // --- END Sales Rep Click Handlers ---
+
         // --- Other Event Handlers (unchanged) ---
         const handleEmailClick = () => { if (contactEmail.value) window.location.href = `mailto:${contactEmail.value}`; };
         const handlePhoneClick = () => { if (contactPhone.value) window.location.href = `tel:${contactPhone.value}`; };
@@ -420,6 +460,11 @@ const ModalHeader = {
             hasProjectFolderLink,
             hasInvestorFolderLink,
             isFundedByRedball,
+            salesRepName,
+            salesRepEmail,
+            salesRepPhone,
+            formattedSalesRepPhone, // Expose formatted phone
+            salesRepOrg, // Expose sales org
 
             // Methods
             handleStageChange,
@@ -438,6 +483,8 @@ const ModalHeader = {
             openProjectFolder,
             openInvestorFolder,
             setActiveTab,
+            handleSalesRepPhoneClick, // Expose phone click handler
+            handleSalesRepEmailClick, // Expose email click handler
             emit // Make emit available if needed directly in template (though usually methods handle this)
         };
     },
@@ -545,7 +592,9 @@ const ModalHeader = {
                          </span>
                     </div>
 
-                     <div class="flex justify-start text-sm text-blue-100 dark:text-blue-200 pt-1">
+                    <!-- Address and Sales Rep Row -->
+                     <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-1 text-sm text-blue-100 dark:text-blue-200 pt-1">
+                        <!-- Address -->
                         <button
                             class="group inline-flex items-center gap-1.5 hover:text-white transition-colors duration-150 text-left disabled:opacity-70 disabled:cursor-not-allowed"
                             @click="handleAddressClick"
@@ -555,6 +604,39 @@ const ModalHeader = {
                             <i class="fas fa-map-marker-alt w-4 h-4 text-blue-200 group-hover:text-white transition-colors duration-150"></i>
                             <span class="truncate">{{ formattedAddress }}</span>
                         </button>
+
+                        <!-- Sales Rep Info (Aligned Right) -->
+                        <div class="flex items-center gap-2 text-blue-100 dark:text-blue-200">
+                             <span class="font-medium">Sales Rep:</span>
+                             <span class="inline-flex items-center gap-1 font-semibold">
+                                 <i class="fas fa-user w-4 h-4 text-blue-200 opacity-80"></i>
+                                 <span>{{ salesRepName }}</span>
+                             </span>
+                             <!-- Placeholder Icons -->
+                             <button 
+                                v-if="salesRepPhone" 
+                                @click="handleSalesRepPhoneClick"
+                                class="inline-flex items-center gap-1 text-blue-200 hover:text-white transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-white rounded-sm px-1"
+                                :title="formattedSalesRepPhone ? 'Call ' + formattedSalesRepPhone : 'Call Sales Rep'"
+                             >
+                                 <i class="fas fa-phone w-4 h-4"></i>
+                                 <span class="ml-1 text-xs">{{ formattedSalesRepPhone }}</span>
+                             </button>
+                             <button 
+                                v-if="salesRepEmail" 
+                                @click="handleSalesRepEmailClick"
+                                class="inline-flex items-center gap-1 text-blue-200 hover:text-white transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-white rounded-sm px-1"
+                                :title="salesRepEmail ? 'Email ' + salesRepEmail : 'Email Sales Rep'"
+                             >
+                                 <i class="fas fa-envelope w-4 h-4"></i>
+                                 <span class="ml-1 text-xs truncate max-w-[150px] sm:max-w-[200px]">{{ salesRepEmail }}</span>
+                             </button>
+                             <!-- Sales Org -->
+                             <span v-if="salesRepOrg && salesRepOrg !== 'No Org'" class="inline-flex items-center gap-1 text-sm text-blue-100 dark:text-blue-200 ml-1">
+                                 <i class="fas fa-building w-4 h-4 text-blue-200 opacity-80"></i>
+                                 <span class="text-xs">{{ salesRepOrg }}</span>
+                             </span>
+                        </div>
                     </div>
 
                     <hr class="border-white/20 my-3"> <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-2">

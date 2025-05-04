@@ -42,15 +42,7 @@ export default {
         type: String, 
         default: '#' 
     },
-    // --- ADD Focus Ring Props ---
-    showFocusRing: {
-        type: Boolean,
-        default: true,
-    },
-    focusRingColorClass: {
-        type: String,
-        default: 'focus:ring-blue-500', // Default to blue as per rule
-    },
+    // --- Remove Focus Ring Props ---
     // --- End Focus Ring Props ---
     // Allow passing attributes like type, name
     attrs: { type: Object, default: () => ({}) }
@@ -63,10 +55,10 @@ export default {
       const variantClasses = [];
       const sizeClasses = [];
 
-      // Add focus ring classes conditionally
-      if (props.showFocusRing) {
-          base.push('focus:ring-2', 'focus:ring-offset-2', props.focusRingColorClass);
-      }
+      // Remove focus ring classes logic
+      // if (props.showFocusRing) {
+      //     base.push('focus:ring-2', 'focus:ring-offset-2', props.focusRingColorClass);
+      // }
 
       // Variant styles (Remove specific focus:ring-* colors here)
       switch (props.variant) {
@@ -93,11 +85,9 @@ export default {
           break;
         case 'link':
           variantClasses.push('text-blue-600 hover:text-blue-700 border-none shadow-none bg-transparent');
-           if (props.showFocusRing) { base.push('focus:ring-offset-0'); } // Link focus usually has no offset
           break;
         case 'icon-ghost':
             variantClasses.push('bg-transparent border-transparent shadow-none hover:bg-gray-100'); // Inherit text color, subtle hover
-            if (props.showFocusRing) { base.push('focus:ring-offset-0'); }
             break;
         case 'primary':
         default:

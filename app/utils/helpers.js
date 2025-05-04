@@ -241,4 +241,106 @@ export function formatDisplayPhoneNumber(phoneNumber) {
     return phoneNumber; 
 }
 
+/**
+ * Formats a date/time value (Date object, ISO string, MM/DD/YY HH:mm:ss) into YYYY-MM-DDTHH:mm format for datetime-local inputs.
+ * @param {string | Date | null | undefined} dateValue - The input date/time value.
+ * @returns {string} Date/time in YYYY-MM-DDTHH:mm format, or empty string if invalid.
+ */
+export function formatDateTimeForInput(dateValue) {
+    if (!dateValue) return '';
+    try {
+        const date = new Date(dateValue);
+        if (isNaN(date.getTime())) {
+             console.warn('Invalid dateValue passed to formatDateTimeForInput:', dateValue);
+             return '';
+        }
+        // Get components in local time
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // Month is 0-indexed
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    } catch (error) {
+        console.error('Error in formatDateTimeForInput:', error);
+        return '';
+    }
+}
+
+/**
+ * Formats a date/time value (Date object, ISO string, YYYY-MM-DDTHH:mm) into MM/DD/YYYY HH:MM:SS format for Zoho API (24-hour clock).
+ * @param {string | Date | null | undefined} dateValue - The input date/time value.
+ * @returns {string | null} Date string in MM/DD/YYYY HH:MM:SS format, or null if input is invalid or empty.
+ */
+export function formatDateTimeForZohoAPI(dateValue) {
+    if (!dateValue) return null;
+    try {
+        const date = new Date(dateValue);
+        if (isNaN(date.getTime())) {
+             console.warn('Invalid dateValue passed to formatDateTimeForZohoAPI:', dateValue);
+            return null;
+        }
+        
+        // Get components
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // Month is 0-indexed
+        const day = String(date.getDate()).padStart(2, '0');
+        const year = String(date.getFullYear()); // Full year
+        const hours = String(date.getHours()).padStart(2, '0'); // 24-hour format
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+
+        return `${month}/${day}/${year} ${hours}:${minutes}:${seconds}`;
+    } catch (error) {
+        console.error('Error in formatDateTimeForZohoAPI:', error);
+        return null;
+    }
+}
+
+/**
+ * Calculates the relative due date string (e.g., "Due in 3 days", "Overdue by 5 days").
+ * @param {string | Date | null | undefined} dueDateValue - The due date.
+ * @returns {{text: string, isOverdue: boolean, isDueToday: boolean}} Object with display text and status flags.
+ */
+export function getRelativeDueDate(dueDateValue) {
+    if (!dueDateValue) {
+        return { text: 'No due date', isOverdue: false, isDueToday: false };
+    }
+
+    try {
+        const dueDate = new Date(dueDateValue);
+        if (isNaN(dueDate.getTime())) {
+            console.warn('Invalid dueDateValue passed to getRelativeDueDate:', dueDateValue);
+            return { text: 'Invalid date', isOverdue: false, isDueToday: false };
+        }
+
+        const now = new Date();
+
+        // Compare dates only (ignore time part for day difference)
+        const dueDateStartOfDay = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+        const nowStartOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        const diffTime = dueDateStartOfDay.getTime() - nowStartOfDay.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Use ceil for days difference
+
+        const isDueToday = diffDays === 0;
+        const isOverdue = diffDays < 0;
+
+        let text = '';
+        if (isDueToday) {
+            text = 'Due today';
+        } else if (isOverdue) {
+            text = `Overdue by ${Math.abs(diffDays)} day${Math.abs(diffDays) > 1 ? 's' : ''}`;
+        } else {
+            text = `Due in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+        }
+
+        return { text, isOverdue, isDueToday };
+
+    } catch (error) {
+        console.error('Error in getRelativeDueDate:', error);
+        return { text: 'Error calculating date', isOverdue: false, isDueToday: false };
+    }
+}
+
 // Add other general helper functions here as needed 

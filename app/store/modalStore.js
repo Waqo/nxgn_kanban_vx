@@ -45,6 +45,10 @@ export const useModalStore = defineStore('modal', {
       this.error = error;
     },
     _setProjectData(data) {
+      console.log('[modalStore._setProjectData] Called. New data is null?', data === null);
+      if (data === null) {
+        console.trace('[modalStore._setProjectData] Setting projectData to null');
+      }
       this.projectData = data;
     },
     _setPreviewDownloadUrl(url) {
@@ -54,29 +58,29 @@ export const useModalStore = defineStore('modal', {
         this.previewContext = context;
     },
     _setPreviewVisibility(isVisible) {
-      console.log(`Modal Store: Setting preview visibility to ${isVisible}`);
+     //// console.log(`Modal Store: Setting preview visibility to ${isVisible}`);
       this.isPreviewVisible = isVisible;
     },
     _setPreviewUrl(url) {
-      console.log(`Modal Store: Setting preview URL to ${url}`);
+     //// console.log(`Modal Store: Setting preview URL to ${url}`);
       this.previewUrl = url;
     },
     _setPreviewTitle(title) {
-        console.log(`Modal Store: Setting preview title to ${title}`);
+       //// console.log(`Modal Store: Setting preview title to ${title}`);
         this.previewTitle = title;
     },
     _setPreviewIsDirectImage(isImage) {
-        console.log(`Modal Store: Setting preview isDirectImage to ${isImage}`);
+       //// console.log(`Modal Store: Setting preview isDirectImage to ${isImage}`);
         this.previewIsDirectImage = isImage;
     },
     _setComparisonVisibility(isVisible) {
-        console.log(`Modal Store: Setting comparison visibility to ${isVisible}`);
+       //// console.log(`Modal Store: Setting comparison visibility to ${isVisible}`);
         this.isComparisonVisible = isVisible;
     },
     _setComparisonDocIds(docIds) {
         // Ensure it's always an array, max 2 items
         const validIds = Array.isArray(docIds) ? docIds.slice(0, 2) : [];
-        console.log(`Modal Store: Setting comparison doc IDs to`, validIds);
+       // console.log(`Modal Store: Setting comparison doc IDs to`, validIds);
         this.comparisonDocIds = validIds;
     },
 
@@ -100,14 +104,14 @@ export const useModalStore = defineStore('modal', {
       const expiresAt = now + oneHour;
       const modalState = { projectId, expiresAt, activeTab: this.activeTab }; // Save current tab
       saveSetting(LS_KEYS.ACTIVE_MODAL, modalState);
-      // console.log(`Modal Store (Pinia): Saved modal state to localStorage`, modalState);
+      //// console.log(`Modal Store (Pinia): Saved modal state to localStorage`, modalState);
 
       // Fetch detailed project data using projectsStore action
       try {
         const data = await projectsStore.fetchProjectDetails(projectId);
         // Process data (assuming processor is available)
         const processedData = DataProcessors.processProjectDetailsData(data, data.Contacts);
-        console.log('Modal Store (Pinia): Processed projectData for modal:', processedData);
+       // console.log('Modal Store (Pinia): Processed projectData for modal:', processedData);
         this._setProjectData(processedData);
         this._setError(null);
       } catch (error) {
@@ -130,7 +134,7 @@ export const useModalStore = defineStore('modal', {
             return;
         }
 
-        // console.log(`Modal Store (Pinia): Refreshing data for Project ID: ${this.currentProjectId}`);
+        //// console.log(`Modal Store (Pinia): Refreshing data for Project ID: ${this.currentProjectId}`);
         const projectsStore = useProjectsStore(); 
         const uiStore = useUiStore(); // Get uiStore instance
         const notificationId = `refresh-modal-${Date.now()}`; // Unique ID for notification
@@ -147,7 +151,7 @@ export const useModalStore = defineStore('modal', {
             const processedData = DataProcessors.processProjectDetailsData(rawData, rawData.Contacts);
             this._setProjectData(processedData); 
             this._setError(null);
-            // console.log(`Modal Store (Pinia): Data refreshed successfully.`);
+            //// console.log(`Modal Store (Pinia): Data refreshed successfully.`);
         } catch (error) {
             console.error("Modal Store (Pinia): Error refreshing project details:", error);
             logErrorToZoho(error, { 
@@ -164,7 +168,7 @@ export const useModalStore = defineStore('modal', {
     },
 
     closeModal() {
-      // console.log("Modal Store (Pinia): Closing modal.");
+      //// console.log("Modal Store (Pinia): Closing modal.");
       this._setVisibility(false);
       this._setProjectId(null);
       this._setProjectData(null);
@@ -174,7 +178,7 @@ export const useModalStore = defineStore('modal', {
       this.closeComparison(); // Close comparison when closing main modal
       // Clear state from localStorage
       localStorage.removeItem(LS_KEYS.ACTIVE_MODAL);
-      // console.log("Modal Store (Pinia): Cleared modal state from localStorage");
+      //// console.log("Modal Store (Pinia): Cleared modal state from localStorage");
     },
 
     setActiveTab(tabId) {
@@ -187,7 +191,7 @@ export const useModalStore = defineStore('modal', {
           if (savedModalState && savedModalState.projectId === this.currentProjectId && savedModalState.expiresAt > Date.now()) {
               savedModalState.activeTab = tabId; // Update the tab
               saveSetting(LS_KEYS.ACTIVE_MODAL, savedModalState); // Save back
-              // console.log(`Modal Store (Pinia): Updated active tab in localStorage to ${tabId}`);
+              //// console.log(`Modal Store (Pinia): Updated active tab in localStorage to ${tabId}`);
           }
       }
     },
@@ -198,9 +202,9 @@ export const useModalStore = defineStore('modal', {
             return;
         }
         const finalDownloadUrl = downloadUrl || previewUrl;
-        console.log(`Modal Store: openPreview action started. PreviewURL: ${previewUrl}, Title: ${title}, IsImage: ${isDirectImage}, DownloadURL: ${finalDownloadUrl}, Context: ${context}`);
+       // console.log(`Modal Store: openPreview action started. PreviewURL: ${previewUrl}, Title: ${title}, IsImage: ${isDirectImage}, DownloadURL: ${finalDownloadUrl}, Context: ${context}`);
         if (this.previewUrl && this.previewUrl.startsWith('blob:')) {
-            console.log('Modal Store: Revoking previous blob URL:', this.previewUrl);
+           // console.log('Modal Store: Revoking previous blob URL:', this.previewUrl);
             URL.revokeObjectURL(this.previewUrl);
         }
         this._setPreviewUrl(previewUrl);
@@ -212,9 +216,9 @@ export const useModalStore = defineStore('modal', {
     },
 
     closePreview() {
-        console.log('Modal Store: closePreview action started.');
+       // console.log('Modal Store: closePreview action started.');
         if (this.previewUrl && this.previewUrl.startsWith('blob:')) {
-            console.log('Modal Store: Revoking blob URL on close:', this.previewUrl);
+           // console.log('Modal Store: Revoking blob URL on close:', this.previewUrl);
             URL.revokeObjectURL(this.previewUrl);
         }
         this._setPreviewVisibility(false);
@@ -227,7 +231,7 @@ export const useModalStore = defineStore('modal', {
 
     openComparison() {
         if (this.comparisonDocIds.length === 2) {
-            console.log('Modal Store: Opening comparison view.');
+           // console.log('Modal Store: Opening comparison view.');
             this._setComparisonVisibility(true);
         } else {
             console.warn('Modal Store: Cannot open comparison view, less than 2 documents selected.');
@@ -235,7 +239,7 @@ export const useModalStore = defineStore('modal', {
     },
 
     closeComparison() {
-        console.log('Modal Store: Closing comparison view.');
+       // console.log('Modal Store: Closing comparison view.');
         this._setComparisonVisibility(false);
         this.clearComparisonDocs(); // *** ADDED: Clear selection on close ***
     },
@@ -246,7 +250,7 @@ export const useModalStore = defineStore('modal', {
     },
 
     clearComparisonDocs() {
-        console.log('Modal Store: Clearing comparison document selection.');
+       // console.log('Modal Store: Clearing comparison document selection.');
         this._setComparisonDocIds([]);
     }
   }

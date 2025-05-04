@@ -179,18 +179,22 @@ const KanbanToolbar = {
         if (!this.selectedFilterType) return [];
         const lookupsStore = useLookupsStore(); // Get store instance
         switch (this.selectedFilterType.value) {
-            case 'tags':        
+            case 'tags':
                 if (lookupsStore.isLoadingTags) return [{ value: '_loading', label: 'Loading Tags...', disabled: true }];
                 return this.tagsForFilter;
-            case 'salesRep':    
-                if (lookupsStore.isLoadingSalesReps) return [{ value: '_loading', label: 'Loading Reps...', disabled: true }];
-                return this.salesRepsForFilter;
-            case 'salesOrg':    
+            case 'salesRep':
+                if (lookupsStore.isLoadingSalesReps) {
+                    return [{ value: '_loading', label: 'Loading Reps...', disabled: true }];
+                }
+                const currentLookupsStore = useLookupsStore(); 
+                return currentLookupsStore.salesRepsForToolbarFilter;
+            case 'salesOrg':
                 if (lookupsStore.isLoadingSalesOrgs) return [{ value: '_loading', label: 'Loading Orgs...', disabled: true }];
                 return this.salesOrgsForFilter;
-            case 'projectType': 
-                return PROJECT_TYPE_OPTIONS; 
-            default:            return [];
+            case 'projectType':
+                return PROJECT_TYPE_OPTIONS;
+            default:
+                return [];
         }
     },
     
@@ -261,12 +265,11 @@ const KanbanToolbar = {
                    projectsStore.setFilter({ key: oldStoreKey, value: [] }); 
                }
           }
-          // --- Trigger On-Demand Fetch --- 
+          // --- Trigger On-Demand Fetch ---
           if (newValue) {
               const lookupsStore = useLookupsStore();
               switch (newValue.value) {
                   case 'tags': lookupsStore.fetchTags(); break;
-                  case 'salesRep': lookupsStore.fetchSalesReps(); break;
                   case 'salesOrg': lookupsStore.fetchSalesOrgs(); break;
               }
           }

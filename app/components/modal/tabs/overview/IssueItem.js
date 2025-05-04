@@ -1,25 +1,17 @@
 import BaseAvatar from '../../../common/BaseAvatar.js';
-import BaseBadge from '../../../common/BaseBadge.js';
-import BaseButton from '../../../common/BaseButton.js'; // Needed for placeholder button
 import { getInitials } from '../../../../utils/helpers.js';
 
-// Import VueUse composable and Vue computed
-const { computed } = Vue;
-const { useTimeAgo } = VueUse; 
+const { computed, ref } = Vue;
+const { useTimeAgo } = VueUse;
 
-// --- ADD UI Store Import ---
 import { useUiStore } from '../../../../store/uiStore.js';
-// --- ADD Projects Store Import ---
 import { useProjectsStore } from '../../../../store/projectsStore.js';
-// --- ADD Modal Store Import ---
 import { useModalStore } from '../../../../store/modalStore.js';
 
 export default {
   name: 'IssueItem',
   components: {
-    BaseAvatar,
-    BaseBadge,
-    BaseButton
+    BaseAvatar
   },
   props: {
     issue: {
@@ -28,136 +20,137 @@ export default {
     }
   },
   setup(props) {
-    // Get UI Store instance
     const uiStore = useUiStore();
     const issue = computed(() => props.issue);
-    // --- ADD Projects Store Instance ---
     const projectsStore = useProjectsStore();
-    // --- ADD Modal Store Instance ---
     const modalStore = useModalStore();
 
-    // Author Name: Prioritize User_Lookup, fallback to Author
-    const authorName = computed(() => issue.value.User_Lookup?.zc_display_value?.trim() || issue.value.author || 'Unknown User');
-    const authorInitials = computed(() => getInitials(authorName.value || 'U')); // Use computed authorName
-    
+    const showAllTaggedUsers = ref(false);
+
+    const authorName = computed(() => {
+      // Prioritize User_Lookup if it exists and has a non-empty display value
+      const userLookupName = issue.value.User_Lookup?.zc_display_value?.trim();
+      if (userLookupName) {
+        return userLookupName;
+      }
+      // Fallback to the Author field if User_Lookup is not usable
+      const authorFieldName = issue.value.Author?.trim();
+      if (authorFieldName) {
+        return authorFieldName;
+      }
+      // Default if neither is available
+      return 'Unknown User';
+    });
+    const authorInitials = computed(() => getInitials(authorName.value || 'U'));
     const timestampRef = computed(() => issue.value.Added_Time);
     const timeAgo = useTimeAgo(timestampRef);
-    
-    const issueContent = computed(() => issue.value.Issue || ''); // Use direct field name
-    const isResolved = computed(() => issue.value.Is_Resolved === 'true'); // Check for string 'true'
-    
-    // Notify Sales Badge
+    const issueContent = computed(() => issue.value.Issue || '');
+    const isResolved = computed(() => issue.value.Is_Resolved === 'true');
     const showNotifySalesBadge = computed(() => issue.value.Notify_Sales === 'true');
 
-    // Tagged Users
     const taggedUsers = computed(() => {
-        if (!Array.isArray(issue.value.Tagged_Users)) {
-            return [];
-        }
-        return issue.value.Tagged_Users.map(user => user.zc_display_value?.trim() || 'Unknown User');
+      if (!Array.isArray(issue.value.Tagged_Users)) return [];
+      return issue.value.Tagged_Users.map(user => user.zc_display_value?.trim() || 'Unknown User');
+    });
+
+    const TAGGED_USER_LIMIT = 3;
+    const hasMoreTaggedUsers = computed(() => taggedUsers.value.length > TAGGED_USER_LIMIT);
+
+    const displayedTaggedUsers = computed(() => {
+      if (hasMoreTaggedUsers.value && !showAllTaggedUsers.value) {
+        return taggedUsers.value.slice(0, TAGGED_USER_LIMIT);
+      }
+      return taggedUsers.value;
+    });
+
+    const remainingTaggedUsersCount = computed(() => {
+        return taggedUsers.value.length - TAGGED_USER_LIMIT;
     });
 
     const resolveIssue = () => {
-        // Replace alert with notification
-        // uiStore.addNotification({ type: 'info', message: `Resolve Issue ${issue.value.id || issue.value.ID} functionality not implemented yet.` });
-        const issueId = issue.value?.ID || issue.value?.id;
-        if (!issueId) {
-            uiStore.addNotification({ type: 'error', message: 'Cannot resolve issue: ID missing.', duration: 3000 });
-            return;
-        }
-        
-        // Call store action
-        projectsStore.resolveProjectIssue({ issueId })
-            .then(() => {
-                // Success notification is handled in store
-                // Refresh modal data to update the UI
-                return modalStore.refreshModalData();
-            })
-            .catch(error => {
-                // Error notification is handled in store
-                console.error("IssueItem: Failed to resolve issue", error);
-            });
+      const issueId = issue.value?.ID || issue.value?.id;
+      if (!issueId) {
+        uiStore.addNotification({ type: 'error', message: 'Cannot resolve issue: ID missing.', duration: 3000 });
+        return;
+      }
+      projectsStore.resolveProjectIssue({ issueId })
+        .then(() => modalStore.refreshModalData())
+        .catch(error => console.error("IssueItem: Failed to resolve issue", error));
     };
 
     return {
-        issue,
-        authorInitials,
-        authorName,
-        timeAgo,
-        timestampRef,
-        issueContent,
-        isResolved,
-        showNotifySalesBadge, // Expose new computed
-        taggedUsers, // Expose new computed
-        resolveIssue
+      issue,
+      authorInitials,
+      authorName,
+      timeAgo,
+      timestampRef,
+      issueContent,
+      isResolved,
+      showNotifySalesBadge,
+      taggedUsers,
+      resolveIssue,
+      showAllTaggedUsers,
+      displayedTaggedUsers,
+      remainingTaggedUsersCount,
+      hasMoreTaggedUsers
     };
   },
   template: `
-    <!-- Main container for the issue item -->
-    <div class="issue-item space-y-2 bg-red-50 border border-red-200 rounded-lg p-3">
-        <!-- Row 1: Avatar, Author, Time -->
-        <div class="flex items-center space-x-3">
-            <div class="flex-shrink-0">
-                 <base-avatar :initials="authorInitials" size="sm" variant="gray"></base-avatar>
-            </div>
-            <div class="flex-1 flex items-center justify-between min-w-0">
-                <h3 class="text-sm font-medium text-gray-900 truncate" :title="authorName">{{ authorName }}</h3>
-                <p class="text-sm text-gray-500 flex-shrink-0 ml-2" :title="timestampRef">{{ timeAgo }}</p>
-            </div>
+    <div class="rounded-lg bg-red-50 border border-red-200 p-4 shadow-sm">
+      <div class="flex items-start gap-3 mb-2">
+        <base-avatar :initials="authorInitials" size="sm" variant="gray" />
+        <div class="flex-1 min-w-0">
+          <div class="flex justify-between items-center">
+            <h3 class="font-semibold text-sm text-gray-900 truncate" :title="authorName">{{ authorName }}</h3>
+            <p class="text-xs text-gray-500" :title="timestampRef">{{ timeAgo }}</p>
+          </div>
         </div>
+      </div>
 
-        <!-- Row 2: Divider -->
-        <div class="border-t border-gray-200"></div>
+      <p class="text-sm text-gray-800 whitespace-pre-wrap break-words leading-relaxed mb-4">{{ issueContent }}</p>
 
-        <!-- Row 3: Issue Content -->
-        <div class="pt-1">
-             <p class="text-sm text-gray-700 whitespace-pre-wrap break-words">{{ issueContent }}</p>
-        </div>
-
-        <!-- Row 4: Divider -->
-        <div class="border-t border-gray-200"></div>
-
-        <!-- Row 5: Tagged Users -->
-        <div class="pt-1 flex items-center flex-wrap gap-1 text-xs">
-            <!-- Tagged Users -->
-            <template v-if="taggedUsers.length > 0">
-                <!-- <span class="text-gray-500 flex-shrink-0"><i class="fas fa-users mr-1"></i></span> -->
-                <span v-for="(userName, index) in taggedUsers" :key="index" class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full flex-shrink-0">
-                    @{{ userName }}
-                </span>
+      <div class="flex flex-wrap items-center gap-1 text-xs mb-2">
+        <template v-if="taggedUsers.length > 0">
+          <span v-for="(userName, index) in displayedTaggedUsers" :key="index" class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+            @{{ userName }}
+          </span>
+          <button
+            v-if="hasMoreTaggedUsers" 
+            @click="showAllTaggedUsers = !showAllTaggedUsers" 
+            class="ml-1 flex items-center justify-center h-5 w-5 bg-gray-200 text-gray-600 rounded-full text-xs font-medium hover:bg-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-400 focus:ring-offset-1"
+            :title="showAllTaggedUsers ? 'Show fewer tagged users' : 'Show ' + remainingTaggedUsersCount + ' more tagged users'"
+          >
+            <template v-if="!showAllTaggedUsers">
+              +{{ remainingTaggedUsersCount }}
             </template>
-            <span v-if="taggedUsers.length === 0" class="text-gray-400 italic">
-                No tags.
-            </span>
+            <template v-else>
+              <i class="fas fa-chevron-up text-xs"></i>
+            </template>
+          </button>
+        </template>
+        <span v-else class="italic text-gray-400">No tags.</span>
+      </div>
+
+      <div class="flex flex-wrap justify-between items-center gap-2">
+        <div v-if="showNotifySalesBadge" class="inline-flex items-center gap-1 px-2 py-0.25 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+          <i class="fas fa-bullhorn text-xs"></i>
+          <span>Sales Notified</span>
         </div>
-
-        <!-- Row 6: Divider (only show if there are tags) -->
-        <div v-if="taggedUsers.length > 0" class="border-t border-gray-200"></div>
-
-        <!-- Row 7: Actions (Mark Resolved Button / Resolved Badge) -->
-        <div class="pt-1 flex justify-end">
-            <base-badge v-if="isResolved" color="green">Resolved</base-badge> 
-            <base-button 
-                v-if="!isResolved" 
-                @click="resolveIssue" 
-                size="xs" 
-                variant="secondary-light"
-                leading-icon="fas fa-check"
-                title="Mark Resolved" 
-            >
-                <span class="hidden md:inline">Mark Resolved</span>
-            </base-button>
+        <div class="ml-auto">
+          <div v-if="isResolved" class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+            <i class="fas fa-check-circle"></i>
+            <span>Resolved</span>
+          </div>
+          <button
+            v-else
+            @click="resolveIssue"
+            title="Mark Resolved"
+            class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-400 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-500"
+          >
+            <i class="fas fa-check text-xs"></i>
+          </button>
         </div>
-
-        <!-- Row 8: Divider (only show if sales badge will be shown below) -->
-        <div v-if="showNotifySalesBadge" class="border-t border-gray-200"></div>
-
-        <!-- Row 9: Sales Notified Badge -->
-        <div v-if="showNotifySalesBadge" class="pt-1">
-            <base-badge color="purple" size="sm" class="inline-flex items-center">
-                <i class="fas fa-bullhorn mr-1"></i> Sales Notified
-            </base-badge>
-        </div>
+      </div>
     </div>
   `
-}; 
+};
