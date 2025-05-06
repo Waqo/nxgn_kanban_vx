@@ -154,7 +154,13 @@ const ModalHeader = {
                         const mappedTag = tagsMap.get(rawTag.ID);
                         if (!mappedTag) {
                             console.warn(`Tag ID ${rawTag.ID} not found in lookups store.`);
-                            return { id: rawTag.ID, name: `Tag ${rawTag.ID}`, badgeColorName: 'gray', description: 'Unknown Tag' };
+                            // --- Fallback for inactive/missing tags --- 
+                            return { 
+                                id: rawTag.ID, 
+                                name: 'Inactive Tag', 
+                                badgeColorName: 'gray', 
+                                description: 'This tag is currently inactive.'
+                            };
                         }
                         const category = mappedTag.category || 'default';
                         const badgeColorName = TAG_CATEGORY_COLORS[category] || TAG_CATEGORY_COLORS['default'] || 'gray';

@@ -1,0 +1,159 @@
+# Communications Tab - Detailed Build Plan (communications_tab_build_plan.txt)
+
+## Goal
+Replicate and enhance the functionality of the old React `CommunicationTab`, `CommItem`, and `EmailTemplatesSection` components within the new Vue 3 Composition API structure, leveraging Pinia for state management and established Base Components. This includes displaying SMS, Calls, and Emails, allowing users to send SMS messages, and send predefined email templates.
+
+## Phase 0: Store Setup & Basic Structure
+
+**0.1. Create Store (`communicationsStore.js`):**
+    *   **Create File:** `app/store/communicationsStore.js`.
+    *   **Setup:** Use Pinia `defineStore`.
+    *   **Dependencies:** Import `ZohoAPIService`, `useModalStore`, `useUiStore`, `DataProcessors` (if needed for specific communication processing), `constants`, `helpers`.
+    *   **State:** Minimal state initially, potentially `isLoading: false`, `error: null`. (Most data will come from `modalStore.projectData`).
+    *   **Actions (Placeholders):** Define placeholders for `sendSms`, `sendEmailTemplate`.
+    *   **No Getters:** Data is primarily derived from `modalStore.projectData.Communication`.
+
+**0.2. Refactor `CommunicationsTab.js`:**
+    *   **API:** Ensure it uses Composition API (`setup`).
+    *   **Props:** Keep `project: { type: Object, required: true }`.
+    *   **Store Access:** Import and use `useModalStore`, `useUiStore`, `useCommunicationsStore`.
+    *   **Component Registration:** Import and register necessary Base components (`BaseCard`, `BaseButton`, `BaseButtonGroup`, `BaseTextArea`, `BaseFeed`, `BaseAvatar`? etc.).
+    *   **Layout:**
+        *   Use a two-section layout:
+            *   Left/Top: Communication Feed (SMS, Calls, Emails).
+            *   Right/Bottom: Interaction panels (SMS Input, Email Templates).
+        *   Consider using `BaseCard` for structure.
+
+**0.3. Data Processing & Display:**
+    *   **Processing (`DataProcessors.js` - Verify/Update):**
+        *   Ensure `processProjectDetailsData` handles the `Communication` array:
+            *   Initializes as `[]` if null/undefined.
+            *   Potentially parses/normalizes fields if needed (though current data seems okay).
+            *   **Sorting:** **Crucially**, ensure it sorts `Communication` by an appropriate date field (`Added_Time` or specific type times) **oldest first** for feed display. This corrects the current Vue implementation.
+            *   Add logic to determine `lastSentTime` for each email template type and attach it to the main `projectData` or make it derivable.
+    *   **`CommunicationsTab.js` Computed `communications()`:**
+        *   Return `project.value?.Communication || []` (already sorted by processor).
+    *   **`CommunicationsTab.js` Computed `filteredCommunications()`:**
+        *   Implement filtering logic based on `activeFilters` state.
+    *   **`CommunicationsTab.js` Computed `paginatedCommunications()`:**
+        *   Implement pagination logic based on `showAllItems` state (show last N or all).
+    *   **Basic Template:**
+        *   Render `paginatedCommunications` using `BaseFeed` or a custom list (`ul`).
+        *   Use a placeholder component (`CommItem.js` - to be created) for rendering each item.
+        *   Add filter UI (`BaseButtonGroup`?).
+        *   Add "View All" / "Show Less" button.
+        *   Add placeholders for SMS input and Email Templates sections.
+
+## Phase 1: Communication Item Display
+
+**1.1. Create `CommItem.js` Component:**
+    *   **Create File:** `app/components/modal/tabs/communications/CommItem.js`.
+    *   **API:** Use Composition API (`setup`).
+    *   **Props:** `communication: { type: Object, required: true }`.
+    *   **Component Registration:** Import `BaseAvatar`, `BaseBadge`, `BaseButton`, icons (from `fontawesome` or similar).
+    *   **Helpers:** Import `formatDateTime`, `formatDuration` from `utils/helpers.js`.
+    *   **Local State:** `isExpanded: ref(false)` for call details.
+    *   **Methods:**
+        *   `toggleExpansion()`: Toggles `isExpanded`.
+    *   **Computed:**
+        *   `itemType()`: Returns 'sms', 'call', or 'email'.
+        *   `iconClass()`: Returns appropriate Font Awesome icon class.
+        *   `sender()`: Determines sender (User, Contact, System).
+        *   `recipient()`: Determines recipient.
+        *   `isOutgoingSms()`: Checks `SMS_Type`.
+        *   `callStatusInfo()`: Replicates logic from old `CallView` for icon/color/text.
+    *   **Template:**
+        *   Use `v-if`/`v-else-if` or dynamic component based on `itemType`.
+        *   **SMS View:** Replicate chat bubble style (`flex justify-start/end`, background colors). Display content, time, sender/recipient, delivery status (if outgoing).
+        *   **Call View:** Display basic info (icon, type, duration, user, time). Include "View Details" button bound to `toggleExpansion`. Use `v-if="isExpanded"` to show detailed description, contact, etc., similar to old `CallView`.
+        *   **Email View:** Display icon, subject, recipient, time, sender, type (Template/Automated).
+
+**1.2. Integrate `CommItem.js`:**
+    *   **`CommunicationsTab.js`:** Import and register `CommItem`. Replace placeholder rendering with `<comm-item :communication="comm" />`.
+
+**1.3. Filtering & Pagination UI:**
+    *   **`CommunicationsTab.js`:**
+        *   Implement `activeFilters: ref(new Set(['SMS', 'Call', 'Email']))`.
+        *   Implement `showAllItems: ref(false)`.
+        *   Add `BaseButtonGroup` for filter types, binding to `toggleFilter` method.
+        *   Add "View All" / "Show Less" button, binding to `showAllItems`. Update text/logic based on total vs shown count.
+
+## Phase 2: SMS Sending Functionality
+
+**2.1. Store Action (`communicationsStore.js`):**
+    *   **Action `sendSms({ projectId, contactId, userId, message })`:**
+        *   **Dependencies:** Inject `useModalStore`, `useUiStore`.
+        *   **Validation:** Check for required inputs (`projectId`, `contactId`, `userId`, non-empty `message`). Show UI notification on failure.
+        *   **Payload:** Construct `data` object for `Add_Communication` form (matching old code: `Communication_Type: "SMS"`, `User`, `Contact`, `SMS_Type: "OUTGOING"`, `SMS_Content`). Use `FORM_COMMUNICATION` constant.
+        *   **API Call:** `ZohoAPIService.addRecord(FORM_COMMUNICATION, payload)`.
+        *   **Loading/Error:** Use `uiStore.showLoadingToast`, `uiStore.showSuccessToast`, `uiStore.showErrorToast`.
+        *   **Activity Log:** `ZohoAPIService.addActivityLog(...)`.
+        *   **Refresh:** On success, call `modalStore.refreshModalData()`.
+        *   **Return:** Boolean success/failure.
+
+**2.2. UI Implementation (`CommunicationsTab.js`):**
+    *   **State:** `newMessage: ref('')`, `isSendingSms: ref(false)`.
+    *   **Template:** Add SMS input section:
+        *   `BaseTextArea` bound to `newMessage`. Use `v-model`. Add placeholder.
+        *   `BaseButton` ("Send SMS") with icon. Bind `@click` to `handleSendSms`. Disable based on `!newMessage.trim()` or `isSendingSms`. Show loading state on button.
+    *   **Method `handleSendSms()`:**
+        *   Get `projectId`, `contactId` (from `project.value`), `userId` (from `currentUser`). Handle missing data.
+        *   Set `isSendingSms = true`.
+        *   Call `communicationsStore.sendSms(...)`.
+        *   If successful, clear `newMessage`.
+        *   `finally { isSendingSms = false; }`.
+
+## Phase 3: Email Template Functionality
+
+**3.1. Create `EmailTemplatesSection.js` Component:**
+    *   **Create File:** `app/components/modal/tabs/communications/EmailTemplatesSection.js`.
+    *   **API:** Use Composition API (`setup`).
+    *   **Props:** `project: { type: Object, required: true }`, `currentUser: { type: Object, required: true }`.
+    *   **Store Access:** Import and use `useCommunicationsStore`.
+    *   **Component Registration:** Import `BaseButton`, icons.
+    *   **Constants:** Import `EMAIL_TEMPLATES` from `app/config/constants.js` (or similar).
+    *   **State:** `selectedTemplates: ref(new Set())`, `isSendingTemplates: ref(false)`.
+    *   **Computed `templatesWithStatus()`:** Map `EMAIL_TEMPLATES` to include `lastSentTime` (passed via prop or calculated from `project.value.Communication`) and `isSelected`.
+    *   **Methods:**
+        *   `toggleTemplate(templateId)`: Updates `selectedTemplates` set.
+        *   `handleSendTemplates()`: Orchestrates sending selected templates.
+    *   **Template:**
+        *   Replicate layout from old `EmailTemplatesSectionjs.txt`.
+        *   Header with "Send Selected" button (`@click="handleSendTemplates"`, disable/loading states).
+        *   Grid/List displaying `templatesWithStatus`:
+            *   Template name, description.
+            *   Display `lastSentTime` (formatted).
+            *   Selection indicator (checkbox or visual style) bound to `selectedTemplates` set and `toggleTemplate`.
+
+**3.2. Store Action (`communicationsStore.js`):**
+    *   **Action `sendEmailTemplate({ projectId, contactId, userId, templateName })`:**
+        *   **Dependencies:** Inject `useModalStore`, `useUiStore`.
+        *   **Validation:** Check inputs.
+        *   **Payload:** Construct `data` for `Add_Communication` (Type: "Email", Email_Type: "Template", `Email_Subject: templateName`, `Email_To: project.contactEmail`, `Project`, `Contact`, `User`, `TRIG_Send_Template: true`, `Email_Sent_Time` using `formatDateTimeForAPI`). Use `FORM_COMMUNICATION`.
+        *   **API Call:** `ZohoAPIService.addRecord(FORM_COMMUNICATION, payload)`.
+        *   **Loading/Error:** Use `uiStore` toasts.
+        *   **Activity Log:** `ZohoAPIService.addActivityLog(...)`.
+        *   **Refresh:** Trigger `modalStore.refreshModalData()` *after* all selected templates are processed in the component method.
+        *   **Return:** Boolean success/failure per template.
+
+**3.3. Integration (`CommunicationsTab.js` & `EmailTemplatesSection.js`):**
+    *   **`CommunicationsTab.js`:** Import and register `EmailTemplatesSection`. Add it to the template, passing `project` and `currentUser`.
+    *   **`EmailTemplatesSection.js` Method `handleSendTemplates()`:**
+        *   Get required IDs (`projectId`, `contactId`, `userId`). Handle missing.
+        *   Set `isSendingTemplates = true`.
+        *   Use `Promise.all` to iterate over `selectedTemplates` and call `communicationsStore.sendEmailTemplate` for each.
+        *   Collect results. Show summary toast (e.g., "Sent X templates", or list failures).
+        *   If *any* succeeded, call `modalStore.refreshModalData()`.
+        *   Clear `selectedTemplates`.
+        *   `finally { isSendingTemplates = false; }`.
+
+## Phase 4: Refinement & Finalization
+
+*   **Styling:** Ensure consistent use of Tailwind CSS and Base components. Match look and feel of other tabs.
+*   **Icons:** Replace Lucide/placeholder icons with appropriate Font Awesome icons used elsewhere in the project.
+*   **Error Handling:** Add robust error handling and user feedback via `uiStore` for all actions.
+*   **Loading States:** Implement clear loading indicators for sending SMS, sending templates, and potentially during refresh.
+*   **Helpers:** Ensure `formatDateTime`, `formatDuration` are in `utils/helpers.js`.
+*   **Constants:** Move `EMAIL_TEMPLATES` array to `app/config/constants.js` or `app/config/options.js`. Define `FORM_COMMUNICATION` in `constants.js`.
+*   **Directory Update:** Update `docs/active_docs/project_directory.txt`.
+*   **Testing:** Test filtering, pagination, SMS sending, template selection/sending, display variations for different communication types, error conditions. 

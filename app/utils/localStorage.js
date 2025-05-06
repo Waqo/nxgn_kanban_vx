@@ -9,6 +9,7 @@ export const LS_KEYS = {
     ACTIVE_MODAL: 'kanbanWidgetActiveModal',
     TOOLBAR_SORT: 'kanbanWidgetToolbarSort',
     BOARD_STAGE_VIEW: 'kanbanWidgetBoardStageView',
+    USER_PROFILE: 'currentUserProfile',
     // Add other keys here later, e.g.:
     // TOOLBAR_FILTERS: 'kanbanWidgetToolbarFilters',
     // TOOLBAR_SORT: 'kanbanWidgetToolbarSort',
@@ -22,7 +23,20 @@ export const LS_KEYS = {
    */
   export function saveSetting(key, value) {
     try {
-      const stringifiedValue = JSON.stringify(value);
+      let valueToStore;
+      // --- Add Expiration Logic for User Profile ---
+      if (key === LS_KEYS.USER_PROFILE) {
+        const expirationMs = 60 * 60 * 1000; // 1 hour
+        valueToStore = {
+          data: value,
+          expiresAt: Date.now() + expirationMs
+        };
+      } else {
+        // Store other settings directly
+        valueToStore = value;
+      }
+      // --- End Expiration Logic ---
+      const stringifiedValue = JSON.stringify(valueToStore);
       localStorage.setItem(key, stringifiedValue);
     } catch (error) {
       console.error(`Error saving setting '${key}' to local storage:`, error);
@@ -42,7 +56,33 @@ export const LS_KEYS = {
       if (storedValue === null) {
         return defaultValue; // Key not found
       }
-      return JSON.parse(storedValue);
+      
+      const parsedValue = JSON.parse(storedValue);
+
+      // --- Add Expiration Check for User Profile ---
+      if (key === LS_KEYS.USER_PROFILE) {
+        if (
+          parsedValue &&
+          typeof parsedValue === 'object' &&
+          parsedValue.hasOwnProperty('data') &&
+          parsedValue.hasOwnProperty('expiresAt') &&
+          typeof parsedValue.expiresAt === 'number' &&
+          parsedValue.expiresAt > Date.now()
+        ) {
+          // Cache is valid and not expired, return the data part
+          return parsedValue.data;
+        } else {
+          // Cache is invalid, expired, or doesn't match expected structure
+          console.log(`LocalStorage: Cached user profile for key '${key}' is invalid or expired.`);
+          localStorage.removeItem(key); // Clean up invalid/expired cache
+          return defaultValue;
+        }
+      } else {
+        // Return parsed value directly for other settings
+        return parsedValue;
+      }
+      // --- End Expiration Check ---
+
     } catch (error) {
       console.error(`Error loading or parsing setting '${key}' from local storage:`, error);
       return defaultValue; // Return default on error

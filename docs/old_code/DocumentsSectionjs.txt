@@ -1,0 +1,89 @@
+/* global React, ZOHO */
+
+import React from 'react';
+
+const DocumentsSection = ({ documents, showAll = false, setActiveTab }) => {
+    const displayDocuments = showAll ? documents : documents.slice(0, 4);
+    
+    const handleOpenDocument = (doc) => {
+        ZOHO.CREATOR.init().then(() => {
+            const param = {
+                action: "open",
+                url: `https://creatorapp.zoho.com/nexgenroofingandsolar/nexgen-portal/record-summary/View_Document/${doc.ID}/`,
+                window: "new"
+            };
+            ZOHO.CREATOR.UTIL.navigateParentURL(param);
+        }).catch((error) => {
+            console.error("Error initializing Zoho Creator SDK:", error);
+        });
+    };
+
+    return React.createElement(
+        'div',
+        { className: "bg-white rounded-lg shadow-sm p-4" },
+        React.createElement(
+            'div',
+            { className: "flex justify-between items-center mb-4" },
+            React.createElement(
+                'h3',
+                { className: "text-sm font-medium text-gray-500" },
+                showAll ? 'All Documents' : 'Recent Documents'
+            ),
+            !showAll && documents.length > 4 && React.createElement(
+                'button',
+                {
+                    onClick: () => setActiveTab('documents'),
+                    className: "text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                },
+                'View All',
+                React.createElement('i', { className: "fas fa-chevron-right text-xs" })
+            )
+        ),
+        displayDocuments.length > 0 ? React.createElement(
+            'div',
+            { className: "grid grid-cols-1 md:grid-cols-2 gap-3" },
+            displayDocuments.map((doc) => React.createElement(
+                'div',
+                {
+                    key: doc.id,
+                    className: "flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                },
+                React.createElement(
+                    'div',
+                    { className: "w-10 h-10 flex items-center justify-center bg-white rounded-lg shadow-sm" },
+                    React.createElement('i', { className: "fas fa-file-alt text-gray-400 text-lg" })
+                ),
+                React.createElement(
+                    'div',
+                    { className: "ml-3 flex-1 min-w-0" },
+                    React.createElement(
+                        'p',
+                        { className: "text-sm font-medium text-gray-900 truncate" },
+                        doc.name
+                    ),
+                    React.createElement(
+                        'p',
+                        { className: "text-xs text-gray-500" },
+                        doc.type
+                    )
+                ),
+                React.createElement(
+                    'button',
+                    {
+                        onClick: () => handleOpenDocument(doc),
+                        className: "ml-2 p-2 text-gray-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity",
+                        title: "Open document"
+                    },
+                    React.createElement('i', { className: "fas fa-external-link-alt" })
+                )
+            ))
+        ) : React.createElement(
+            'div',
+            { className: "text-center py-6 text-gray-500" },
+            React.createElement('i', { className: "fas fa-file-alt text-gray-400 text-3xl mb-2" }),
+            React.createElement('p', null, 'No documents available')
+        )
+    );
+};
+
+export default DocumentsSection;

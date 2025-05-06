@@ -1,0 +1,9 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+\
+      **9. Never use browser alerts, use existing notification system to indicate errors or missing functionality:**
+
+**10. Required Zoho API Date/Time Format:** All Date and Datetime fields sent to the Zoho API (e.g., in `addRecord` or `updateRecordById` payloads) MUST be formatted as `MM/dd/yy HH:mm:ss` (24-hour format). Use a dedicated helper function in `utils/helpers.js` for this conversion.

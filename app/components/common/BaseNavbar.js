@@ -1,7 +1,17 @@
+import NotificationBell from '../navbar/NotificationBell.js';
+import UserProfileMenu from '../navbar/UserProfileMenu.js';
+import UserProfileName from '../navbar/UserProfileName.js';
+import { useUiStore } from '../../store/uiStore.js';
+
 const { ref, computed } = Vue;
 
 export default {
   name: 'BaseNavbar',
+  components: {
+    NotificationBell,
+    UserProfileMenu,
+    UserProfileName
+  },
   props: {
     /**
      * Color theme variant.
@@ -28,13 +38,6 @@ export default {
       default: 'px-4 sm:px-6 lg:px-8',
     },
     /**
-     * Height of the navbar (Tailwind class, e.g., 'h-16').
-     */
-    height: {
-      type: String,
-      default: 'h-16',
-    },
-    /**
      * Custom classes for the root <nav> element.
      */
     className: {
@@ -50,6 +53,7 @@ export default {
     },
   },
   setup(props, { slots }) {
+    const uiStore = useUiStore();
     const isMobileMenuOpen = ref(false);
 
     const toggleMobileMenu = () => {
@@ -60,7 +64,7 @@ export default {
 
     const navClasses = computed(() => {
       return [
-        props.variant === 'dark' ? 'bg-gray-800' : 'bg-white shadow-sm',
+        props.variant === 'dark' ? 'bg-gray-800' : 'bg-white shadow-md',
         props.className,
       ].filter(Boolean).join(' ');
     });
@@ -75,8 +79,8 @@ export default {
 
     const innerFlexClasses = computed(() => {
       return [
-        'relative flex justify-between',
-        props.height,
+        'relative flex justify-between items-center',
+        'py-2'
       ].join(' ');
     });
 
@@ -88,6 +92,8 @@ export default {
     const currentTextColor = computed(() => props.variant === 'dark' ? 'text-white' : 'text-gray-900');
     const currentBgColor = computed(() => props.variant === 'dark' ? 'bg-gray-900' : 'bg-gray-100'); // Example, adjust as needed
     const currentBorderColor = computed(() => props.variant === 'dark' ? 'border-transparent' : 'border-indigo-500');
+
+    const isGloballyLoading = computed(() => uiStore.isGloballyLoading);
 
     return {
       isMobileMenuOpen,
@@ -102,11 +108,13 @@ export default {
       defaultHoverBgColor,
       currentTextColor,
       currentBgColor,
-      currentBorderColor
+      currentBorderColor,
+      isGloballyLoading
     };
   },
   template: `
-    <nav :class="navClasses">
+    <nav :class="navClasses" class="relative">
+      <div v-if="isGloballyLoading" class="absolute top-0 left-0 right-0 h-0.5 bg-blue-500 animate-pulse z-50"></div>
       <div :class="containerClasses">
         <div :class="innerFlexClasses">
           <!-- Left Section: Logo and Desktop Nav -->
@@ -115,7 +123,7 @@ export default {
              <div class="flex-shrink-0 flex items-center">
                 <slot name="logo">
                   <!-- Default Logo Placeholder -->
-                  <img class="h-8 w-auto" src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=600" alt="Logo" />
+                  <img class="h-8 w-auto" src="https://contacts.zoho.com/file?t=appaccount&ID=859244706&nocache=1746352594438" alt="Logo" />
                 </slot>
              </div>
              <!-- Desktop Navigation Slot -->
@@ -144,14 +152,22 @@ export default {
                  :defaultHoverTextColor="defaultHoverTextColor"
                  :variant="variant"
               >
-                 <!-- Default Desktop Actions Example -->
-                 <!-- 
-                 <button type="button" class="relative rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" :class="[defaultIconColor, defaultHoverTextColor]">
-                     <span class="absolute -inset-1.5" />
-                     <span class="sr-only">View notifications</span>
-                     <i class="far fa-bell h-6 w-6"></i>
-                 </button>
-                 -->
+                  <!-- Default Actions in desired order -->
+                  <notification-bell :variant="variant" />
+                  <!-- Only show Name and Avatar when not loading -->
+                  <template v-if="!isGloballyLoading">
+                    <user-profile-name :variant="variant" class="ml-3" /> 
+                    <user-profile-menu :variant="variant" class="ml-3" /> 
+                  </template>
+
+                  <!-- Default Desktop Actions Example -->
+                  <!-- 
+                  <button type="button" class="relative rounded-full p-1 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" :class="[defaultIconColor, defaultHoverTextColor]">
+                      <span class="absolute -inset-1.5" />
+                      <span class="sr-only">View notifications</span>
+                      <i class="far fa-bell h-6 w-6"></i>
+                  </button>
+                  -->
               </slot>
           </div>
 

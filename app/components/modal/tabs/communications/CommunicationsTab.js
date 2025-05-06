@@ -138,7 +138,7 @@ export default {
         // --- ADD Diagnostic Log ---
         Vue.watchEffect(() => {
             // Include the new computed property in the log
-            console.log(`CommunicationsTab Check: totalFilteredCount=${totalFilteredCount.value}, itemsToShow=${itemsToShow}, showAllItems=${showAllItems.value}, shouldShow=${shouldShowViewOlderButton.value}`);
+          // console.log(`CommunicationsTab Check: totalFilteredCount=${totalFilteredCount.value}, itemsToShow=${itemsToShow}, showAllItems=${showAllItems.value}, shouldShow=${shouldShowViewOlderButton.value}`);
         });
         // --- END Diagnostic Log ---
 
@@ -190,12 +190,12 @@ export default {
             const userId = props.currentUser?.id;
 
             // --- Add Debugging Logs ---
-            console.log('handleSendSms check:');
-            console.log('  props.project:', props.project);
-            console.log('  props.currentUser:', props.currentUser);
-            console.log(`  projectId: ${projectId}`);
-            console.log(`  contactId (from Owner_Name.ID): ${contactId}`);
-            console.log(`  userId: ${userId}`);
+          // console.log('handleSendSms check:');
+          // console.log('  props.project:', props.project);
+          // console.log('  props.currentUser:', props.currentUser);
+          // console.log(`  projectId: ${projectId}`);
+          // console.log(`  contactId (from Owner_Name.ID): ${contactId}`);
+          // console.log(`  userId: ${userId}`);
             // --- End Debugging Logs ---
 
             // More specific validation check

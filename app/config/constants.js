@@ -6,13 +6,14 @@
 // --- Application Identification ---
 export const APP_NAME = "nexgen-portal"; // Replace if needed
 // --- App Version Info ---
-export const APP_VERSION = '3.0.0-beta.4';
-export const APP_BUILD_DATE_STR = 'May 3, 2025 5:56 AM';
+export const APP_VERSION = '3.0.0-beta.5';
+export const APP_BUILD_DATE_STR = 'May 4, 2025 8:11 AM';
 export const APP_BUILD_INFO = `v${APP_VERSION} (${APP_BUILD_DATE_STR})`; 
 
 
 // --- Startup / Debug Flags ---
-export const START_IN_DEMO_MODE = true; // Set true for demo-only version, false for normal
+export const IS_DEVELOPMENT = true; // ADDED: Flag for development-specific logic
+export const START_IN_DEMO_MODE = false; // Set true for demo-only version, false for normal
 
 // --- Report Link Names ---
 export const REPORT_PROJECTS = "Main_Projects";
@@ -37,6 +38,7 @@ export const REPORT_NOTE_ATTACHMENTS = "PM_Kanban_Note_Attachments"; // Added fo
 export const REPORT_PUBLISHED_NOTE_ATTACHMENTS = "Published_Note_Attachments"; // Added for fetching/updating published note attachments if needed separately
 export const REPORT_PUBLISHED_DOCUMENTS = "Published_Documents"; // Added for fetching/updating published documents if needed separately
 export const REPORT_TASKS = "All_Tasks"; // *** ADDED for Tasks (Assumption) ***
+export const REPORT_NOTIFICATIONS = "All_Notifications";
 // Add other report names as needed
 
 // --- Form Link Names ---
@@ -52,11 +54,12 @@ export const FORM_PERMITTING = "Add_Permitting"; // Assuming form name
 export const FORM_COMMUNICATION = "Add_Communication"; // *** ADDED for Comms Tab ***
 export const FORM_LOGS = "Add_Logs"; // *** ADDED for Error Logging ***
 export const FORM_TASKS = "Add_Task";     // *** ADDED for Tasks Tab ***
+export const FORM_NOTIFICATIONS = "Add_Notification"; // Matches your schema
 
 // Add other form names as needed (e.g., for adding notes, issues)
 
 // --- Kanban Initialization Data ---
-export const REPORT_KANBAN_INIT = "All_Kanban_Init";
+export const REPORT_KANBAN_INIT = "Kanban_Init";
 export const KANBAN_INIT_RECORD_ID = "4663646000004794131";
 
 // --- Field API Link Names (Commonly Used) ---
@@ -228,10 +231,24 @@ export const FIELD_ISSUE_RESOLVED_BY = 'Resolved_By'; // Lookup to Add_User (or 
 export const FIELD_TASK_ID = 'ID'; // System Generated
 export const FIELD_TASK_PROJECT_LOOKUP = 'Project';
 export const FIELD_TASK_ASSIGNEE_LOOKUP = 'Assignee'; // List Lookup
-export const FIELD_TASK_ASSIGNED_BY_LOOKUP = 'Assigned_By'; // User Lookup
+export const FIELD_TASK_ASSIGNED_BY_LOOKUP = 'User_Lookup'; // User Lookup
 export const FIELD_TASK_DESCRIPTION = 'Description'; // Text
 export const FIELD_TASK_STATUS = 'Status'; // Picklist
 export const FIELD_TASK_PRIORITY = 'Priority'; // Picklist
 export const FIELD_TASK_DUE_DATE = 'Due_Date'; // Date
 export const FIELD_TASK_COMPLETED_TIME = 'Completed_Time'; // Datetime
 // --- END Task Fields --- 
+
+// --- ADD Notification Field Names ---
+export const FIELD_NOTIFICATION_USER_LOOKUP = 'Notification_For'; // Link Name from your schema
+export const FIELD_NOTIFICATION_GENERATED_BY = 'Generated_By';   // Link Name from your schema
+export const FIELD_NOTIFICATION_TYPE = 'Notification_Type';    // Link Name from your schema
+export const FIELD_NOTIFICATION_MESSAGE = 'Message';           // Link Name from your schema
+export const FIELD_NOTIFICATION_IS_READ = 'Is_Read';             // Link Name from your schema
+export const FIELD_NOTIFICATION_READ_TIME = 'Read_Time';         // Link Name from your schema
+export const FIELD_NOTIFICATION_PROJECT_LOOKUP = 'Related_Project'; // Link Name from your schema
+export const FIELD_NOTIFICATION_NOTE_LOOKUP = 'Related_Note';      // Link Name from your schema
+export const FIELD_NOTIFICATION_ISSUE_LOOKUP = 'Related_Issue';    // Link Name from your schema
+export const FIELD_NOTIFICATION_TASK_LOOKUP = 'Related_Task';     // Link Name from your schema
+// Add FIELD_NOTIFICATION_CONTEXT_SNIPPET if you implement it
+// Built-in Added_Time doesn't need a constant typically 

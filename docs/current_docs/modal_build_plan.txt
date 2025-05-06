@@ -1,0 +1,605 @@
+# Project Details Modal - Detailed Build Plan (modal_build_plan.txt)
+
+## Phase 0: Setup & Foundation
+
+**Goal:** Establish the basic modal structure, state management, and triggering mechanism.
+
+**0.1. Store Module (`modalStore.js`):**
+    *   **Verify/Create:** Ensure `app/store/modalStore.js` exists and uses Pinia `defineStore`.
+    *   **State:** Define initial state: `isVisible: false`, `currentProjectId: null`, `isLoading: false`, `error: null`, `projectData: null`, `activeTab: 'overview'`.
+    *   **Actions (Internal Helpers - Optional):** Define `_setVisibility`, `_setProjectId`, `_setLoading`, `_setError`, `_setProjectData`, `_setActiveTab`.
+    *   **Actions (Public):**
+        *   `openModal(projectId)`: Placeholder action (will be fleshed out in Phase 1). Sets visibility, project ID, loading state, clears previous data/error, resets active tab.
+        *   `closeModal()`: Resets all state (`isVisible: false`, `currentProjectId: null`, `projectData: null`, etc.), removes `LS_KEYS.ACTIVE_MODAL` from local storage.
+        *   `setActiveTab(tabId)`: Updates `activeTab` state.
+    *   **Local Storage:** `openModal` should save `{ projectId, expiresAt }` to `LS_KEYS.ACTIVE_MODAL`. `closeModal` should remove it.
+
+**0.2. Modal Component Shell (`ProjectDetailModal.js`):**
+    *   **Verify/Create:** Ensure `app/components/modal/ProjectDetailModal.js` exists.
+    *   **Structure:**
+        *   Use `BaseModal` component as the root.
+        *   Bind `BaseModal`'s `:show` prop to `modalStore.isVisible`.
+        *   Listen for `BaseModal`'s `@close` event and call `modalStore.closeModal`.
+        *   Set a large default size (e.g., `:size="'6xl'"`).
+        *   **Slots:** Define `#header`, `#default`, and potentially `#footer` slots for `BaseModal`.
+    *   **State Mapping:** Use `mapState(useModalStore, ['isVisible', 'isLoading', 'error', 'projectData', 'activeTab'])`.
+    *   **Action Mapping:** Use `mapActions(useModalStore, ['closeModal', 'setActiveTab'])`.
+    *   **Template:**
+        *   Inside `#default` slot: Add basic conditional rendering for `isLoading`, `error`, or "No project data" based on store state. Placeholder for tabs and content.
+
+**0.3. Triggering Mechanism (`KanbanCard.js`):**
+    *   **Import:** Import `useModalStore` from `../store/modalStore.js`.
+    *   **Method:** Implement `handleCardClick()`.
+        *   Get `modalStore` instance: `const modalStore = useModalStore();`.
+        *   Call `modalStore.openModal(this.project.ID);`.
+    *   **Template:** Add `@dblclick="handleCardClick"` to the main `div` of the Kanban card. (Using double-click to avoid conflict with drag-and-drop).
+
+**0.4. Rendering in View (`WidgetView.js`):**
+    *   **Import:** Import `ProjectDetailModal` from `../components/modal/ProjectDetailModal.js`.
+    *   **Register:** Add `ProjectDetailModal` to the `components` object.
+    *   **State Mapping:** Ensure `isModalVisible: 'isVisible'` is mapped from `useModalStore`.
+    *   **Template:** Add `<project-detail-modal v-if="isModalVisible"></project-detail-modal>` within the main content area (likely within the `v-else` block after loading/error states).
+
+**0.5. Initialisation Logic (`initService.js`):**
+    *   **Verify:** Ensure `initializeApp` checks for and restores modal state from `LS_KEYS.ACTIVE_MODAL` *if* no `projectId` is found in the URL query parameters.
+    *   **Logic:**
+        *   Load setting: `const savedModalState = loadSetting(LS_KEYS.ACTIVE_MODAL, null);`
+        *   Check expiry: `if (savedModalState && savedModalState.expiresAt && savedModalState.expiresAt > Date.now())`
+        *   If valid, call `modalStore.openModal(savedModalState.projectId)`.
+        *   If expired, remove item from local storage.
+
+## Phase 1: Data Fetching & Processing
+
+**Goal:** Implement the fetching and processing of detailed project data when the modal opens.
+
+**1.1. API Service (`ZohoAPIService.js`):**
+    *   **Verify `getRecordById`:** Ensure it accepts `fieldConfig` parameter (defaults to `'detail_view'`). Ensure it throws errors on non-3000 codes and returns only `response.data`.
+    *   **Verify `getRecords`:** Ensure it handles criteria correctly for fetching contacts.
+
+**1.2. Projects Store (`projectsStore.js`):**
+    *   **Action `fetchProjectDetails(projectId)`:**
+        *   **Input:** `projectId`.
+        *   **Logic:**
+            *   Validate `projectId`.
+            *   Use `Promise.all` to fetch concurrently:
+                *   Main Project: `ZohoAPIService.getRecordById(REPORT_PROJECTS, projectId, null, 'detail_view')` (or 'all' if needed).
+                *   Contacts: `ZohoAPIService.getRecords(REPORT_CONTACTS, \`(Project == \${projectId})\`)`.
+            *   Handle potential errors from either API call within the `Promise.all` catch or individual `.catch` handlers attached to the promises. Rethrow a consolidated error if necessary.
+            *   On success, combine the results: `{ ...projectDetails, Contacts: relatedContacts.data || [] }`.
+            *   Return the combined data object.
+        *   **Error Handling:** Catch errors, log them, and re-throw them so the calling action (`modalStore.openModal`) can handle them.
+
+**1.3. Data Processor (`processors.js`):**
+    *   **Function `processProjectDetailsData(projectResponse, contactsResponse)`:**
+        *   **Input:** Raw project data object (including related lists), raw contacts array.
+        *   **Logic:**
+            *   Start with a copy of `projectResponse`.
+            *   **Related List Normalization:** Iterate through expected related list keys (`Activities`, `Communication`, `Documents`, `Notes`, `Permitting`, `Survey_Results`, `Issues`, `Tags`, `Contacts1`, `Tasks`, `Bill_of_Materials`, etc.). Ensure each key exists and its value is an array (initialize as `[]` if null/undefined/not array).
+            *   **Add Fetched Contacts:** Set `processedData.Contacts = Array.isArray(contactsResponse) ? contactsResponse : []`.
+            *   **Field Processing:** Iterate through a map of field keys and processing functions (booleans, numbers, ensuring lookups are objects or null, as defined in the existing processor). Apply transformations.
+            *   **Sorting Related Lists:**
+                *   Sort `Activities` by `Added_Time` (desc).
+                *   Sort `Notes` by `Added_Time` (desc). Implement threading/reply logic later if needed here, or delegate to `NotesSection` component.
+                *   Sort `Communication` by `Added_Time` (asc or desc?).
+                *   Sort `Documents` by `Added_Time` (desc).
+            *   **Tag Processing (Requires Lookups):** This step might need to happen *after* lookups are available or be done within the component. If done here, it needs access to `lookupsStore.tags`. Placeholder: `processedData.processedTags = []`.
+            *   **Event Construction:** Create the `Events` array based on `EVENT_TYPES` constants and corresponding project fields.
+        *   **Return:** The fully processed project data object.
+
+**1.4. Modal Store (`modalStore.js`):**
+    *   **Action `openModal(projectId)`:**
+        *   **Enhance Logic:**
+            *   After setting initial state (`SET_VISIBILITY`, `SET_PROJECT_ID`, `SET_LOADING(true)`...).
+            *   `try...catch` block:
+                *   `const rawData = await projectsStore.fetchProjectDetails(projectId);`
+                *   `const processedData = DataProcessors.processProjectDetailsData(rawData, rawData.Contacts);` (Pass both parts).
+                *   `this._setProjectData(processedData);`
+                *   `this._setError(null);`
+            *   `catch (error)`:
+                *   `console.error(...)`
+                *   `this._setError(error.message || 'Failed to load project details.');`
+                *   `this._setProjectData(null);`
+            *   `finally`:
+                *   `this._setLoading(false);`
+
+## Phase 2: Modal Header Implementation
+
+**Goal:** Build the `ModalHeader` component with dynamic data display and core actions.
+
+**2.1. Header Component (`ModalHeader.js`):**
+    *   **Verify/Create:** Ensure `app/components/modal/ModalHeader.js` exists.
+    *   **Props:** Define props: `projectData`, `isLoading`, `error`. Remove `tabs`, `activeTab` (handle tabs in `ProjectDetailModal`).
+    *   **Emits:** Define emits: `close`, `refresh-data`, `request-help`. (Stage/Tranche changes will be handled via store actions triggered locally).
+    *   **Component Registration:** Register required Base components (`BaseSelectMenu`, `BaseButton`, `BaseBadge`).
+    *   **Store Access:** Import `useLookupsStore`, `useProjectsStore`. Map necessary state (`stages`, `tranches` from lookups) and actions (`updateProjectStage`, `updateProjectTranche` from projects).
+    *   **Computed Properties:**
+        *   `project()`: Alias for `projectData`.
+        *   `contactName`, `contactEmail`, `contactPhone`, `formattedAddress`. Add loading/error states.
+        *   `currentStageId`, `currentTrancheId`.
+        *   `stageOptions`, `trancheOptions` (formatted for `BaseSelectMenu`, handle loading state of lookups).
+        *   `processedTags` (logic to map IDs from `project.Tags` using `lookupsStore.tags`). Add loading/error handling for tags lookup.
+        *   `systemSizeDisplay`, `paymentOptionDisplay`, `projectTypeBadge`, `soldDateDisplay`, `installDateDisplay`. Add loading states.
+        *   `hasOpenSolarLink`, `hasAduuLink`, `hasProjectFolderLink`, `hasInvestorFolderLink`, `isFundedByRedball`.
+    *   **Methods:**
+        *   `handleStageChange(newStageId)`: Get `projectsStore`, call `updateProjectStage({ projectId: this.project.ID, newStageId })`, add `.catch`. (Value comes directly from `BaseSelectMenu`'s `@update:modelValue`).
+        *   `handleTrancheChange(newTrancheId)`: Handle `null` for unassigned. Get `projectsStore`, call `updateProjectTranche({ projectId: this.project.ID, newTrancheId })`, add `.catch`.
+        *   `handleAddTagClick()`: Placeholder (will trigger UI later).
+        *   `handleRemoveTagClick(tagId)`: Add confirmation, call `projectsStore.removeProjectTag` (if action exists).
+        *   `handleEmailClick`, `handlePhoneClick`, `handleAddressClick`: Implement using `window.location.href` or `$api.navigateParentUrl`. Check for data availability.
+        *   `handleOpenSolarClick`, `handleAduuClick`, `openProjectFolder`, `openInvestorFolder`: Implement using `window.open`. Check for data availability.
+        *   `handleFundedByRedballChange(isChecked)`: Call `projectsStore.updateProjectFundedStatus` (if action exists).
+        *   `handleRefreshData`, `handleRequestHelp`: Emit events.
+    *   **Template:**
+        *   Replicate the layout from the audit using Tailwind CSS and Base components.
+        *   Bind computed properties to display elements.
+        *   Use `v-if="isLoading"` / `v-else-if="error"` / `v-else-if="!project"` for top-level conditional rendering.
+        *   Use `BaseSelectMenu` for Stage and Tranche selectors, binding `v-model` (or `:modelValue` + `@update:modelValue`) to computed IDs and change handlers. Disable while loading lookups/project.
+        *   Render tags using `v-for` and `BaseBadge`. Add remove button. Add placeholder "Add Tag" button.
+        *   Implement "Funded By Redball" checkbox/toggle.
+        *   Implement action buttons (Email, Call, Folders, External Links), disabling based on data availability (`:disabled="!contactEmail"`).
+        *   Implement Refresh, Help(?), Close buttons, emitting events or calling store actions.
+
+**2.2. Integration (`ProjectDetailModal.js`):**
+    *   **Import & Register:** Import and register `ModalHeader`.
+    *   **Template:** Place `<modal-header>` within the `#header` slot of `BaseModal`.
+    *   **Props:** Pass `:project-data="projectData"`, `:is-loading="isLoading"`, `:error="error"`.
+    *   **Event Handling:** Listen for `@close="closeModal"`, `@refresh-data="handleRefresh"`, `@request-help="handleHelp"`. Implement handler methods (`handleRefresh`, `handleHelp`) if needed (e.g., `handleRefresh` could call `modalStore.refreshModalData()`).
+
+## Phase 3: Tab Structure & Overview Tab
+
+**Goal:** Implement the tab navigation and build the initial `OverviewTab`.
+
+**3.1. Tab Navigation (`ProjectDetailModal.js`):**
+    *   **Import:** Import `BaseTabs`. Register in `components`.
+    *   **Computed `tabs()`:** Define the array of tab objects: `[{ id: 'overview', name: 'Overview' }, { id: 'contacts', name: 'Contacts' }, ...]`.
+    *   **Template:**
+        *   Place `<base-tabs>` component below the header area (inside the `#default` slot of `BaseModal`).
+        *   Bind `:tabs="tabs"`.
+        *   Use `v-model:activeTab="activeTab"` (or `:modelValue="activeTab" @update:modelValue="setActiveTab"`) to sync with `modalStore`. Ensure `activeTab` is mapped or directly used from the store in `setup()`.
+
+**3.2. Dynamic Tab Content (`ProjectDetailModal.js`):**
+    *   **Computed `activeTabComponent()`:** Implement the `switch` statement mapping `activeTab` state string to the component name string (e.g., `'OverviewTab'`, `'ContactsTab'`).
+    *   **Template:**
+        *   Below `<base-tabs>`, add a content container (`div class="p-6"`).
+        *   Inside the container, use `<component :is="activeTabComponent" v-if="activeTabComponent && projectData" :project="projectData" />`. This dynamically renders the correct tab component and passes the project data. Add handling for `!projectData`.
+
+**3.3. Overview Tab Component (`OverviewTab.js`) - Expanded Display Implementation:**
+
+    *   **Goal:** Create the main layout and display components for the Overview tab, showing existing notes, issues, events, and summary info read-only. Interactions (adding, resolving, editing) will be added in Phase 5 using dedicated stores.
+    *   **Tech:** Use **Composition API** (`setup()` function) for `OverviewTab.js` and all new sub-components created in this phase.
+
+    *   **3.3.1. `OverviewTab.js` Shell & Layout:**
+        *   **Create/Verify:** Ensure `app/components/modal/tabs/overview/OverviewTab.js` exists.
+        *   **API:** Use `setup()` function. Import `computed` from Vue.
+        *   **Props:** Define `project: { type: Object, required: true }`. Access project data within `setup` using `const project = computed(() => props.project);`.
+        *   **Component Registration:** Import and register `BaseCard` initially.
+        *   **Template Layout:** Replicate the two-column layout from the old modal audit using Tailwind CSS (`grid grid-cols-1 lg:grid-cols-3 gap-6`).
+        *   **Section Structure:** Use `BaseCard` components for distinct sections (Notes, Issues, Events, etc.).
+
+    *   **3.3.2. Notes Section Display (Left Column):**
+        *   **`OverviewTab.js`:**
+            *   Import and register `BaseTextArea`, `BaseButton`.
+            *   Add a `BaseCard` for "Notes".
+            *   Include placeholders for the "Add Note" area (`BaseTextArea`, `BaseButton`) - mark as non-functional for now (Phase 5).
+            *   Add a list container (`ul`).
+            *   Use `v-for` to iterate over `project.value?.Notes || []` (assuming notes are pre-sorted by `DataProcessors`).
+            *   Render a new `NoteItem` component for each note (passing `:note="note"`).
+            *   Include a placeholder for "Show More Notes" logic if applicable (Phase 5).
+            *   Add an empty state message (`v-if="!project.value?.Notes?.length"`).
+        *   **Create `NoteItem.js` Component:**
+            *   **API:** Use Composition API (`setup`).
+            *   **Props:** `note: { type: Object, required: true }`.
+            *   **Component Registration:** Import and register `BaseAvatar`, `BaseBadge`.
+            *   **Structure:** Replicate `NoteItemjs.txt` display structure: Avatar (`BaseAvatar`), Author, Timestamp, Content (`whitespace-pre-wrap`), Badges (Team Only/Sales Notified, Department?), Tagged Users Pills.
+            *   **Helpers:** Import `formatRelativeTime` from `utils/helpers.js`.
+            *   **Display Only:** Do *not* implement reply button, reply input, or attachment rendering logic yet (Phase 5).
+            *   **Attachments:** Add a simple placeholder indicating the number of attachments if `note.attachments?.length > 0` (e.g., `<span class="text-xs text-gray-500"><i class="fas fa-paperclip mr-1"></i>{{ note.attachments.length }}</span>`).
+
+    *   **3.3.3. Issues Section Display (Left Column):**
+        *   **`OverviewTab.js`:**
+            *   Add a `BaseCard` for "Issues".
+            *   Include a placeholder "Raise Issue" button (`BaseButton`) in the header - mark as non-functional (Phase 5).
+            *   Add a list container (`ul`).
+            *   Add a computed property in `setup` to filter for *unresolved* issues: `const unresolvedIssues = computed(() => (project.value?.Issues || []).filter(i => !i.Is_Resolved));`.
+            *   Use `v-for` to iterate over `unresolvedIssues.value`.
+            *   Render a new `IssueItem` component for each issue (passing `:issue="issue"`).
+            *   Add an empty state message (`v-if="!unresolvedIssues.value?.length"`).
+        *   **Create `IssueItem.js` Component:**
+            *   **API:** Use Composition API (`setup`).
+            *   **Props:** `issue: { type: Object, required: true }`.
+            *   **Component Registration:** Import and register `BaseAvatar`, `BaseBadge`.
+            *   **Structure:** Replicate `IssuesSectionjs.txt` display structure: Avatar (`BaseAvatar`), Author, Timestamp, Content (`whitespace-pre-wrap`), Status Badge (`BaseBadge` - "Open"), Tagged Users Pills.
+            *   **Helpers:** Use `formatRelativeTime` from `utils/helpers.js`.
+            *   **Display Only:** Do *not* implement the "Mark Resolved" button yet (Phase 5).
+
+    *   **3.3.4. Events Section Display (Right Column):**
+        *   **`OverviewTab.js`:**
+            *   Add a `BaseCard` for "Events".
+            *   Add a list container (`ul`).
+            *   Use `v-for` to iterate over `project.value?.Events || []` (created by `DataProcessors`).
+            *   Render a new `EventItem` component for each event (passing `:event="event"`).
+            *   Add an empty state message (`v-if="!project.value?.Events?.length"`).
+        *   **Create `EventItem.js` Component:**
+            *   **API:** Use Composition API (`setup`).
+            *   **Props:** `event: { type: Object, required: true }`.
+            *   **Component Registration:** Import and register `BaseBadge`.
+            *   **Structure:** Replicate `EventsSectionjs.txt` display structure: Icon (derive from `event.type`), Event Type Name, Formatted Date (`event.date`), Status Badge (`BaseBadge` based on `event.status`).
+            *   **Helpers:** Import `formatEventDate` and `getStatusBadgeClass` from `utils/helpers.js`. Add logic to `getEventIcon` (based on old code) locally or in helpers.
+            *   **Display Only:** Do *not* implement booking button or status change dropdowns yet (Phase 5).
+
+    *   **3.3.5. Sales Rep Info Display (Right Column):**
+        *   **`OverviewTab.js`:** Render `SalesRepInfoCard` component, passing `project.value?.Sales_Rep` as prop.
+        *   **Verify `SalesRepInfoCard.js` Component:** (Already created)
+            *   Ensure it uses Composition API (`setup`).
+            *   Ensure props (`salesRep`) are defined.
+            *   Ensure structure replicates `SalesRepInfojs.txt` display: Card, Rep Name, Org, Email (`mailto:`), Phone (`tel:`). Handles null state.
+
+    *   **3.3.6. Latest Activity Preview Display (Right Column):**
+        *   **`OverviewTab.js`:** Render a new `LatestActivityPreview.js` component, passing `project.value?.Activities` as a prop and the `setActiveTab` method.
+        *   **Create `LatestActivityPreview.js` Component:**
+            *   **API:** Use Composition API (`setup`).
+            *   **Props:** `activities: { type: Array, default: () => [] }`, `setActiveTab: { type: Function, required: true }`.
+            *   **Component Registration:** Import `BaseCard`.
+            *   **Logic:** Find the most recent activity (assuming `activities` are pre-sorted descending by `DataProcessors`).
+            *   **Structure:** Replicate relevant parts of old `OverviewTabjs.txt`'s inline activity preview: Card structure, Header ("Latest Activity"), display the latest activity's description, author, and timestamp (use `useTimeAgo`). Include a "View All" button calling `props.setActiveTab('activity')`. Handle empty state.
+
+    *   **3.3.7. Helper Functions:**
+        *   Ensure `useTimeAgo` is used consistently for relative times.
+        *   Ensure `formatDateWithOptions` is used for event dates.
+        *   Ensure `getStatusBadgeClass` and `getEventIcon` logic exists (likely within `EventItem.js`).
+        *   Ensure `getInitials` helper exists in `app/utils/helpers.js`.
+
+**3.4. Integration (`ProjectDetailModal.js`):**
+    *   **Import & Register:** Import and register `OverviewTab` and all newly created/verified sub-components (`NoteItem`, `IssueItem`, `EventItem`, `SalesRepInfoCard`, `LatestActivityPreview`).
+    *   Ensure `activeTabComponent` computed property correctly returns `'OverviewTab'` when `activeTab` is `'overview'`.
+
+## Phase 4: Implementing Remaining Tabs (Iterative)
+
+**Goal:** Build out the functionality for each remaining tab based on the old modal audit and the Vue plan.
+
+**(Repeat for each tab: Contacts, Documents, Survey, Systems, Tasks, Permitting, Commissions, PropertyInfo, Activity, Communications, Investors)**
+
+**Example: Contacts Tab (`ContactsTab.js`)**
+
+**4.X.1. Component Structure (Detailed):**
+    *   **Verify/Create:** `app/components/modal/tabs/contacts/ContactsTab.js`.
+    *   **Props:** Define `project: { type: Object, required: true }`.
+    *   **Imports/Registration:** Import and register `BaseStackedList` (or use `ul`), `BaseAvatar`, `BaseButton`, `BaseBadge`, `BaseTextInput`, `BaseSelectMenu` (for type/state), potentially `BaseCheckbox`.
+    *   **Local State (`data` or `setup`):**
+        *   `isAddingContact: ref(false)` or `data: { isAddingContact: false }` (for toggling add form).
+        *   `isEditingContactId: ref(null)` or `data: { isEditingContactId: null }` (to track which contact is being edited inline).
+        *   `newContactForm: ref({...})` or `data: { newContactForm: {...} }` (state for the add form fields).
+        *   `editedContactForm: ref({...})` or `data: { editedContactForm: {...} }` (state for the edit form fields).
+        *   `searchTerm: ref('')` or `data: { searchTerm: '' }` (if implementing search).
+        *   `selectedTypeFilter: ref('All')` or `data: { selectedTypeFilter: 'All' }` (if implementing type filter).
+    *   **Computed Properties:**
+        *   `contacts()`: Return `this.project?.Contacts || []`.
+        *   `filteredContacts()`: (If implementing search/filter) Logic to filter `contacts()` based on `searchTerm` and `selectedTypeFilter`.
+        *   `contactTypes()`: Static array or computed prop defining contact type options for dropdowns (e.g., `['Owner 1', 'Owner 2', 'Tenant', 'Other Project Contact', 'Business POC']`).
+    *   **Methods:**
+        *   `formatFullName(contact)`: Combine first/last name.
+        *   `toggleAddContactForm()`: Toggles `isAddingContact`.
+        *   `startEditing(contact)`: Sets `isEditingContactId` and populates `editedContactForm`.
+        *   `cancelEditing()`: Resets `isEditingContactId` and `editedContactForm`.
+        *   `handleAddContactSubmit()`: Placeholder for add form submission logic.
+        *   `handleEditContactSubmit(contactId)`: Placeholder for edit form submission logic.
+        *   `handleDeleteContact(contactId)`: Placeholder for delete logic.
+        *   `handleSetAsMainOwner(contactId)`: Placeholder for setting main owner logic.
+        *   Placeholders for input change handlers for add/edit forms.
+    *   **Template:**
+        *   Header: Title, Add Contact button (`@click="toggleAddContactForm"`).
+        *   Add Contact Form (`v-if="isAddingContact"`): Include inputs for First/Last Name, Type (`BaseSelectMenu`), Email, Phone, Mobile, Business POC (`BaseCheckbox`?), Job Title (conditional), Business Name (conditional), Billing Address (potentially expandable section with inputs). Bind fields to `newContactForm`. Add Save/Cancel buttons triggering appropriate methods.
+        *   Search/Filter UI (Optional): Input bound to `searchTerm`, Dropdown bound to `selectedTypeFilter`.
+        *   Contacts List (`ul` or `BaseStackedList`, using `v-for` on `filteredContacts` or `contacts`):
+            *   For each contact:
+                *   Display block (`v-if="isEditingContactId !== contact.ID"`):
+                    *   Use `BaseAvatar`.
+                    *   Display name, type badge, contact details (email/phone/mobile - maybe clickable), business info.
+                    *   Action buttons/menu: Edit (`@click="startEditing(contact)"`), Delete (`@click="handleDeleteContact(contact.ID)"`), Set as Main Owner (`@click="handleSetAsMainOwner(contact.ID)"`).
+                *   Edit Form (`v-else-if="isEditingContactId === contact.ID"`):
+                    *   Inline form with inputs bound to `editedContactForm`.
+                    *   Save/Cancel buttons triggering `handleEditContactSubmit(contact.ID)` and `cancelEditing()`.
+        *   Empty state (`v-if="!contacts.length"` or `!filteredContacts.length`).
+
+**4.X.2. Add Functionality (Detailed - requires store actions):**
+    *   **Create Store Actions (`projectsStore.js` - or a new `contactsStore`?):**
+        *   `addProjectContact({ projectId, contactData })`:
+            *   Validates input.
+            *   Constructs payload for `Add_Contact` form (handle nested `Name`, `Billing_Address`, `Project` lookup).
+            *   Calls `ZohoAPIService.addRecord(FORM_CONTACTS, payload)`. *Need `FORM_CONTACTS` constant*. Verify form link name.
+            *   On success, dispatches `modalStore.refreshModalData()`. Returns success/failure.
+        *   `updateProjectContact({ contactId, contactData })`:
+            *   Validates input.
+            *   Constructs payload for `REPORT_CONTACTS` (or underlying form?).
+            *   Calls `ZohoAPIService.updateRecordById(REPORT_CONTACTS, contactId, payload)`. *Need `REPORT_CONTACTS` constant*.
+            *   On success, dispatches `modalStore.refreshModalData()`. Returns success/failure.
+        *   `deleteProjectContact({ contactId })`:
+            *   Calls `ZohoAPIService.deleteRecordById(REPORT_CONTACTS, contactId)`.
+            *   On success, dispatches `modalStore.refreshModalData()`. Returns success/failure.
+        *   `setProjectMainOwner({ projectId, contactId })`:
+            *   Calls `ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, { data: { [FIELD_PROJECT_CONTACT_NAME_LOOKUP]: contactId } })`.
+            *   On success, dispatches `modalStore.refreshModalData()`. Returns success/failure.
+    *   **Implement Component Methods:**
+        *   `handleAddContactSubmit()`: Validate `newContactForm`, call `projectsStore.addProjectContact`, handle loading state, reset form, close form (`isAddingContact = false`).
+        *   `handleEditContactSubmit(contactId)`: Validate `editedContactForm`, call `projectsStore.updateProjectContact`, handle loading state, exit edit mode (`isEditingContactId = null`).
+        *   `handleDeleteContact(contactId)`: Add confirmation dialog. Call `projectsStore.deleteProjectContact`, handle loading state.
+        *   `handleSetAsMainOwner(contactId)`: Add confirmation. Call `projectsStore.setProjectMainOwner`, handle loading state.
+    *   **Data Refresh:** Ensure all successful actions trigger `modalStore.refreshModalData()` to update the view.
+    *   **Error Handling:** Implement try/catch in methods calling store actions, display errors to the user (e.g., using `uiStore` notifications).
+    *   **Loading States:** Add loading indicators for Add/Edit/Delete/Set Owner operations.
+
+**Example: Documents Tab (`DocumentsTab.js`)**
+
+**4.X.1. Component Structure (Initial Display - ✅ COMPLETED 2024-07-28):**
+    *   **✅ Verify/Create:** `app/components/modal/tabs/documents/DocumentsTab.js` (using Composition API).
+    *   **✅ Props:** `project: { type: Object, required: true }`.
+    *   **✅ Imports/Registration:** `BaseBadge`, `BaseButton`, `DocumentChecklist`, `DocumentTypeGroup`, `DocumentItem`.
+    *   **✅ Store Access:** `useLookupsStore` for DocTypes fetched during init.
+    *   **✅ Computed `projectDocuments()`:** Return `props.project?.Documents || []`.
+    *   **✅ Computed `docTypes()`:** Return `lookupsStore.docTypes`.
+    *   **✅ Computed `groupedDocuments()`:** Logic to group `projectDocuments` by `Doc_Type.ID` and separate untyped documents, sorted by `Added_Time` descending within groups.
+    *   **✅ Computed `checklistDocTypes()`:** Filter `docTypes` where `Include_In_Checklist` is true.
+    *   **✅ Methods:** `formatDate(dateString)` (handled by `useDateFormat` in `DocumentItem`), `getIsChecklistCompleted(docTypeId)`.
+    *   **✅ Template:**
+        *   ✅ Header with Title ("Documents"), document count badge, and conditional "Create/Open Project Folders" buttons. Includes placeholder Search input.
+        *   ✅ `DocumentChecklist` component bound to `project` and `checklistDocTypes`.
+        *   ✅ Placeholder Upload Button/Area.
+        *   ✅ Loop through `groupedDocuments` using `DocumentTypeGroup` for typed documents.
+        *   ✅ Display untyped documents using `DocumentItem`.
+    *   **✅ Sub-Components Created:**
+        *   ✅ `DocumentChecklist.js` (Composition API): Displays checklist based on `docTypes`.
+        *   ✅ `DocumentTypeGroup.js` (Composition API): Collapsible container for documents of a specific type.
+        *   ✅ `DocumentItem.js` (Composition API): Displays individual document details (Name, Type, Added By/Time) and basic "View/Download" button.
+
+**4.X.2. Implement Search & Filtering (Next Step):**
+    *   **`DocumentsTab.js`:**
+        *   **State:** Add `searchQuery = ref('')`.
+        *   **Computed `filteredGroupedDocuments()`:** Modify `groupedDocuments` logic to filter documents within each group (and the untyped list) based on `searchQuery` (matching `Document_Name` or `Doc_Type.Name`).
+        *   **Template:** Bind the search input to `searchQuery`. Update `v-for` loops to use `filteredGroupedDocuments`. Handle empty state after filtering.
+
+**4.X.3. Implement File Upload (Requires Store):**
+    *   **Create `documentsStore.js`:**
+        *   **State:** `isUploading: false`, `uploadProgress: {}`.
+        *   **Action `uploadDocument({ projectId, file, documentName, documentType, isRevision })`:**
+            *   Handles the 3-step Zoho process (from `fileUploadjs.txt`):
+                1.  `ZohoAPIService.addRecord(FORM_DOCUMENTS, ...)` with metadata.
+                2.  `ZohoAPIService.uploadFile(...)` using the new record ID.
+                3.  `ZohoAPIService.updateRecordById(...)` to set `File_Uploaded: true`.
+            *   Uses `currentUser` from `userStore` for `User_Lookup`.
+            *   Updates `isUploading` state.
+            *   Dispatches `modalStore.refreshModalData()` on success.
+            *   Handles errors and logs activity.
+    *   **Create `MultipleFileUploadForm.js` (Vue Component):**
+        *   Replicate UI from `MultipleFileUploadFormjs.txt` using Base components (`BaseModal`, `BaseButton`, `BaseSelectMenu`, `BaseCheckbox`, Base Progress Bar?).
+        *   **Props:** `files` (initial File objects), `docTypes`.
+        *   **State:** Manage `fileConfigs` array locally (`{ file, processedFile, documentType, isRevision }`).
+        *   **UI:** Display list of files, allow setting type/revision per file, bulk actions, remove file button. Add drag/drop zone to add more files.
+        *   **Emit:** `@close`, `@upload(fileConfigs)`.
+    *   **`DocumentsTab.js`:**
+        *   **State:** `showMultipleUploadForm = ref(false)`, `selectedFilesForUpload = ref([])`.
+        *   **Drag & Drop UI:** Implement the drag/drop zone UI from `DocumentsTabjs.txt`.
+        *   **Methods:**
+            *   `handleDrag`, `handleDrop`: Update `selectedFilesForUpload` and show the form.
+            *   `handleFileInputChange`: Handle files from the hidden input, update `selectedFilesForUpload`, show form.
+            *   `openUploadFormOnClick`: Trigger hidden file input click.
+            *   `handleMultipleUploadSubmit(fileConfigs)`: Loop through `fileConfigs`, call `documentsStore.uploadDocument` for each (potentially with progress tracking). Show toast notifications for progress/completion.
+        *   **Template:** Integrate drag/drop zone, hidden file input. Render `<MultipleFileUploadForm>` conditionally.
+
+**4.X.4. Implement Inline Editing (Requires Store):**
+    *   **`documentsStore.js`:**
+        *   **Action `updateDocument({ documentId, updateData })`:**
+            *   Calls `ZohoAPIService.updateRecordById(REPORT_DOCUMENTS, documentId, { data: updateData })`.
+            *   Validates `Document_Name`. Handles `Is_Revision` boolean conversion. Clears `Revision_Number` if `Is_Revision` becomes false.
+            *   Dispatches `modalStore.refreshModalData()` on success.
+            *   Handles errors and logs activity.
+    *   **`DocumentItem.js`:**
+        *   **State:** `isEditing = ref(false)`.
+        *   **Props:** Add `docTypes` prop.
+        *   **Computed:** `editFormData = ref({...})`. Populate based on `props.document` when editing starts.
+        *   **Methods:** `startEditing()`, `cancelEditing()`.
+        *   **Emit:** `@save(documentId, formData)`, `@editToggled(boolean)`.
+    *   **Template:**
+            *   Add Edit button (`<i class="fas fa-edit"></i>`).
+            *   Conditionally render display view or edit form (`v-if="!isEditing"`, `v-else`).
+            *   Edit form: Inputs for `Document_Name` (`BaseTextInput`), `Doc_Type` (`BaseSelectMenu` bound to `docTypes`), `Is_Revision` (checkbox/`BaseToggle`). Add Save/Cancel buttons emitting `@save` or calling `cancelEditing`. Prevent event propagation on form interactions.
+    *   **`DocumentsTab.js`:**
+        *   **Method `handleSaveEdit(documentId, formData)`:** Call `documentsStore.updateDocument`. Handle loading/error states.
+
+**4.X.5. Implement Other Actions & Display (Requires Store):**
+    *   **`documentsStore.js`:**
+        *   **Action `triggerWorkDriveUpload({ documentId })`:** Calls `updateRecordById` to set `TRIG_Upload_to_WorkDrive: "true"`. Refreshes modal data.
+        *   **Action `triggerSendToInvestor({ documentId })`:** Calls `updateRecordById` to set `Trigger_Send_to_Inv: "true"`. Refreshes modal data.
+    *   **`DocumentItem.js`:**
+        *   **Display:**
+            *   Add badges for `Is_Revision` (showing `Revision_Number`) and `Sent_To_Investor_Portal`. Use `BaseBadge`.
+            *   Display `File_Tags` if desired.
+        *   **Actions:**
+            *   Add "More Actions" dropdown (`BaseDropdown` or similar).
+            *   Add "Upload to WorkDrive" option (visible if `WorkDrive_Link` is missing, calls store action).
+            *   Add "Send to Investor Portal" option (visible if `WorkDrive_Link` exists and not already sent/processing, calls store action).
+            *   Add "View in WorkDrive" option (visible if `WorkDrive_Link` exists, opens link).
+
+**4.X.6. Implement Document Preview (Requires Store/UI):**
+    *   **Option A (Simple Modal):**
+        *   **`DocumentsTab.js`:**
+            *   **State:** `previewUrl = ref(null)`, `previewTitle = ref('')`, `showPreviewModal = ref(false)`.
+            *   **Method `showDocumentPreview(url, title)`:** Set state and show modal.
+            *   **Template:** Add `<BaseModal v-model:show="showPreviewModal">` containing an `<iframe>` bound to `previewUrl`.
+        *   **`DocumentItem.js`:**
+            *   Modify `handleViewDocument` (or create new method `handlePreviewDocument`) to emit `@preview(url, title)` instead of `window.open`.
+    *   **Option B (Dedicated Component):**
+        *   Create `DocumentPreviewModal.js`.
+        *   Pass URL/Title as props or use a dedicated `uiStore` state.
+    *   **WorkDrive Upload Trigger:**
+        *   In `DocumentItem.js`'s preview logic, check if `Embed_Link` or `WorkDrive_Link` exists.
+        *   If not, call `documentsStore.triggerWorkDriveUpload`.
+        *   Implement polling/waiting logic (e.g., using `watch` or checking after `refreshModalData`) before attempting to show the preview. Potentially show a loading state.
+
+**(Continue planning structure and basic display for other tabs)**
+
+## Phase 5: Implementing Core Interactions
+
+**Goal:** Add functionality like adding notes, resolving issues, uploading documents.
+
+**5.1. Add Note/Reply (`OverviewTab.js` / `NotesSection.js`):**
+    *   **UI:** Implement the text area, attachment handling (basic UI first), Team Only checkbox, Add Note button.
+    *   **Store Action (`projectsStore.addNoteToProject`):**
+        *   **Input:** `{ projectId, noteData: { Note, Team_Only, Attachments?, Replied_To?, Tagged_Users? } }`.
+        *   **Logic:**
+            *   Construct payload for `Add_Note` form, including lookups (`Project`, `User_Lookup`).
+            *   Call `ZohoAPIService.addRecord(FORM_ACTIVITIES, payload)`.
+            *   Handle potential attachment uploads (needs separate logic/action).
+            *   On success, dispatch `modalStore.refreshModalData()`.
+    *   **Component Method:** Call the store action on button click. Clear input on success.
+
+**5.2. Resolve Issue (`OverviewTab.js` / `IssuesSection.js`):**
+    *   **UI:** Add "Resolve" button to open issues.
+    *   **Store Action (`projectsStore.resolveProjectIssue`):**
+        *   **Input:** `{ projectId, issueId }`.
+        *   **Logic:** Call `ZohoAPIService.updateRecordById(REPORT_ISSUES, issueId, { data: { Is_Resolved: true } })`.
+        *   On success, dispatch `modalStore.refreshModalData()`.
+    *   **Component Method:** Call the store action on button click.
+
+**5.3. Upload Document (`DocumentsTab.js`):**
+    *   **UI:** Implement file input or drag-drop area. Add metadata inputs (Doc Type, Is Revision?).
+    *   **Store Action (`projectsStore.uploadProjectDocument`):**
+        *   **Input:** `{ projectId, fileData: { fileObject, documentName, docTypeId?, isRevision? } }`.
+        *   **Logic (assuming Add_Document form linkage):**
+            *   Step 1: `addRecord` to `Add_Document` form with metadata (`Document_Name`, `Doc_Type`, `Is_Revision`, `Project` lookup). Get new document record ID.
+            *   Step 2: `uploadFile` using the new document ID, `File_Upload` field name, and `fileObject`.
+            *   Step 3: `updateRecordById` on the new document record to set `File_Uploaded: true` (if needed).
+        *   On success, dispatch `modalStore.refreshModalData()`.
+    *   **Component Method:** Handle file selection, gather metadata, call the store action. Show loading/progress.
+
+**5.4. Refresh Data (`modalStore.js`):**
+    *   **Action `refreshModalData()`:**
+        *   Check if `currentProjectId` exists.
+        *   Set `isLoading = true`.
+        *   Repeat the fetch (`projectsStore.fetchProjectDetails`) and process (`DataProcessors.processProjectDetailsData`) logic from `openModal`.
+        *   Update `projectData` state.
+        *   Set `isLoading = false`. Handle errors.
+
+## Phase 6: Refinement & Testing
+
+*   **Styling:** Ensure consistent Tailwind usage and responsiveness.
+*   **Error Handling:** Add specific error messages and user feedback for all interactions.
+*   **Loading States:** Implement granular loading indicators for specific actions (saving notes, uploading files, etc.) beyond the main modal loading state.
+*   **Edge Cases:** Test with missing data, API errors, different user roles.
+*   **Cross-referencing:** Continuously compare implemented functionality against the old modal audit and the Vue plan.
+*   **Accessibility:** Perform basic accessibility checks (keyboard navigation, focus states, ARIA attributes).
+
+*(This plan provides a detailed roadmap. Each step, especially within Phase 4 and 5, may involve further sub-tasks depending on the complexity of the specific UI and logic.)*
+
+## 7. Development Notes
+
+*   **2024-07-27:** Initial detailed build plan created.
+*   **2024-07-27:** Addressed UI concerns in `ProjectDetailModal.js`:
+    *   Created `ProjectDetailModalSkeleton.js` component to provide a better loading state experience.
+    *   Integrated the skeleton component into `ProjectDetailModal.js`, replacing the simple text loading indicator.
+    *   Removed the default footer close button from `BaseModal` by adding an empty `<template #footer></template>` in `ProjectDetailModal.js` to avoid duplication with the header close button.
+*   **2024-07-27:** Fixed `BaseCheckbox` hallucination: Removed import/registration from `ContactsTab.js`. Decided to use standard inputs + Tailwind for checkboxes.
+*   **2024-07-27:** Refined `ContactsTab.js` display:
+    *   Integrated `BaseGridList` for card layout.
+    *   Adjusted action button styling (removed variant, used text colors, updated icons to outline).
+    *   Corrected `BaseAvatar` prop from `:name` to `:initials`.
+*   **2024-07-27:** Fixed `BaseModal.js` footer rendering: Wrapped footer div in `v-if="$slots.footer"` to truly hide it when the slot isn't used.
+*   **2024-07-27:** Implemented contact sorting logic in `ContactsTab.js`: Owner 1 -> Owner 2 -> Alphabetical.
+*   **2024-07-27:** Implemented saving/restoring `activeTab` in `modalStore.js` and `initService.js` using local storage.
+*   **2024-07-27:** Fixed syntax error (redeclaration) in `BaseButton.js` computed `buttonClasses`.
+*   **2024-07-27:** Added `icon-ghost` variant to `BaseButton.js` for borderless/backgroundless icon buttons.
+*   **2024-07-27:** Refined `ContactsTab.js` display structure:
+    *   Integrated `BaseGridList` component.
+    *   Updated card layout to match target style (removed user icon, adjusted spacing/sizing, placed action buttons top-right).
+    *   Updated action buttons to use `icon-ghost` variant and outline icons (`far fa-edit`, `far fa-trash-alt`) or solid where needed (`fas fa-user-check`, `fas fa-phone-alt`).
+    *   Displayed Contact Type as a `BaseBadge`.
+    *   Adjusted grid columns to 1, sm:2.
+    *   Removed hover shadow effect from cards.
+*   **2024-07-27:** Added Contact CRUD actions (`addProjectContact`, `updateProjectContact`, `deleteProjectContact`, `setProjectMainOwner`) to `projectsStore.js`.
+*   **2024-07-27:** Fixed `FORM_CONTACTS` constant missing in `constants.js`.
+*   **2024-07-27:** Added activity logging for contact CRUD actions in `projectsStore.js`.
+*   **2024-07-27:** Implemented `refreshModalData` action in `modalStore.js` and integrated notification-based loading feedback.
+*   **2024-07-27:** Reverted contact updates to use full `modalStore.refreshModalData` for consistency.
+*   **2024-07-27:** Fixed `DataCloneError` on contact update by extracting `.value` from `Primary_Contact_Type1` object in store actions.
+*   **2024-07-27:** Fixed `Invalid column value for Project` error on contact add by sending `Project` lookup as `[projectId]` array in store action.
+*   **2024-07-27:** Implemented "Owner 1" uniqueness and Project Owner lookup synchronization logic within `projectsStore.js` contact actions, using `skipRefresh` to prevent loops. Fixed bug where syncing types cleared optional fields.
+*   **2024-07-27:** Replaced browser `confirm()` with inline confirmation buttons in `ContactsTab.js` for delete/set-owner actions.
+*   **2024-07-27:** Fixed billing address display logic in `ContactsTab.js`.
+*   **2024-07-27:** Prevented direct selection of "Owner 1" in `ContactsTab.js` dropdowns.
+*   **2024-07-27:** Removed contact ID from activity log messages in `projectsStore.js`.
+*   **2024-07-27:** Extracted contact card display logic from `ContactsTab.js` into new `ContactCard.js` component. Refactored `ContactsTab.js` to use `ContactCard` and handle emitted events.
+*   **2024-07-27:** Extracted Add/Edit forms from `ContactsTab.js` into reusable `ContactForm.js` component.
+*   **2024-07-27:** Corrected `ContactCard.js` default export error.
+*   **2024-07-27:** Moved validation logic (required fields, phone) into `ContactForm.js` (pending UI integration for errors).
+*   **2024-07-27:** Corrected `ContactsTab.js` sorting error after `formatFullName` removal.
+*   **2024-07-27:** Corrected `project_directory.txt` structure.
+*   **2024-07-27:** Moved phone validation logic into `ContactForm.js` and implemented inline error display using `BaseTextInput` error prop.
+*   **2024-07-27:** Refactored `ContactsTab.js` submit handlers to receive validated data from `ContactForm.js`.
+*   **2024-07-27:** Moved `formatAndValidatePhoneNumber` from `ContactForm.js` to `utils/helpers.js`.
+*   **2024-07-27:** Added `Counters.js` component to display days since key dates (Sold, Permit Submitted, PTO Approved, System On) and integrated into `ModalHeader.js`.
+*   **2024-07-27:** Refactored tag handling: Implemented optimistic UI for tag removal in `ModalHeader.js`, removed refresh from `projectsStore.updateProjectTags`, and added specific activity logging for tag removal from `ModalHeader.js`.
+*   **2024-07-28:** Refactored `OverviewTab.js` to use Composition API.
+*   **2024-07-28:** Created display-only `NoteItem.js`, `IssueItem.js`, `EventItem.js`, `SalesRepInfoCard.js`, `LatestActivityPreview.js` components for Overview Tab.
+*   **2024-07-28:** Implemented notes processing in `DataProcessors.js` (threading, attachments, context splitting).
+*   **2024-07-28:** Implemented recursive reply display and attachment previews (`NoteAttachmentPreview.js`) in `NoteItem.js`.
+*   **2024-07-28:** Added tagged user display to `NoteItem.js` and `IssueItem.js`.
+*   **2024-07-28:** Adjusted `OverviewTab.js` layout (Events/Notes sections).
+*   **2024-07-28:** Refactored `BaseCard.js` to include standard border.
+*   **2024-07-28:** Refactored `BaseTextArea.js` to Composition API with variants and slots.
+*   **2024-07-28:** Added UI placeholders for note read status functionality.
+*   **2024-07-28:** Replaced `alert()` calls with `uiStore.addNotification()` in Overview-related components.
+*   **2024-07-28:** Created `DocumentChecklist.js` component.
+*   **2024-07-28:** Refactored `DocumentsTab.js` to use Composition API, implement grouping via `DocumentTypeGroup.js`, and integrate `DocumentChecklist`.
+*   **2024-07-28:** Created `DocumentTypeGroup.js` component.
+*   **2024-07-28:** Created `DocumentItem.js` component.
+*   **2024-07-28:** Refactored `BaseFeed.js` to use scoped slots.
+*   **2024-07-28:** Refactored `SurveyTab.js` to use Composition API and display data.
+*   **2024-07-28:** Added editing state/placeholders and inputs to `SurveyTab.js`.
+*   **2024-07-29:** Completed `SystemsTab.js` implementation (Composition API, inline edit for overview, unified inline `MaterialForm.js` for add/edit, delete confirmation, bug fixes).
+*   **2024-07-29:** Refactored `PermittingTab.js` to use Composition API.
+*   **2024-07-29:** Enhanced `PermittingTab.js` UI: Integrated Base Components (`BaseCard`, `BaseButton`, `BaseBadge`), added status badge coloring, displayed all fields from old version, restructured layout into section cards, fixed alignments, ensured field order consistency, and updated 'Last Updated' logic to use `Modified_Time`.
+*   **2024-07-29:** Added inline editing state/logic (`isEditing`, `formData`, `startEditing`, etc.) and input components (`BaseSelectMenu`, `BaseTextInput`, date, checkbox) to `PermittingTab.js`.
+*   **2024-07-29:** Moved `formatDateForInput` helper to `utils/helpers.js`.
+*   **2024-07-29:** Fixed syntax error related to tag checkbox IDs in `PermittingTab.js` template.
+*   **2024-07-29:** Ensured dropdown options were returned from `setup` in `PermittingTab.js`.
+*   **2024-07-29:** Reordered fields in Interconnection edit mode and removed Status fields in `PermittingTab.js`.
+*   **2024-07-29:** Added rule #10 to `general_rules.mdc` regarding required Zoho API date/time format (`MM/dd/yy HH:mm:ss`).
+*   **2024-07-29:** Added `formatDateTimeForAPI` helper function to `utils/helpers.js`.
+*   **2024-07-29:** Created `permittingStore.js` with `addPermitRecord` and `updatePermitRecord` actions.
+*   **2024-07-29:** Added `REPORT_PERMITTING` and `FORM_PERMITTING` constants.
+*   **2024-07-29:** Updated `permittingStore.js` actions to use `formatDateTimeForAPI` helper.
+*   **2024-07-29:** Fixed `DataCloneError` in `permittingStore.js` by converting reactive Tags array using `Array.from()`.
+*   **2024-07-29:** Corrected field removal in `PermittingTab.js` (removed Submitted instead of Status) and updated store payloads accordingly.
+*   **2024-07-29:** Connected `PermittingTab.js` `handleSave` method to call `permittingStore` actions.
+*   **2024-07-29:** Updated Edit/Add button in `PermittingTab.js` to dynamically change text based on permit existence.
+*   **2024-07-29:** Implemented `CommunicationsTab.js` (Composition API): Added layout, filters, message feed (`CommItem.js`), SMS sending via `communicationsStore.js`, Email Template sending UI (`EmailTemplatesSection.js`) triggering backend workflow via `communicationsStore.js`. Resolved UI/reactivity issues with dynamic item loading ("View More" button) and implemented internal card scrolling (`BaseCard` `bodyFlex`). Adjusted `CommItem.js` email display to use blue accent color. Fixed data access issues for SMS/Email actions (`Owner_Name.Email`, `currentUser`). Refactored `ProjectDetailModal.js` to Composition API.
+
+## 8. Learnings & Future Patterns
+
+Based on the implementation of the Contacts tab, the following patterns and learnings should be applied consistently to subsequent tab development:
+
+*   **Dedicated Stores:** Use dedicated Pinia stores (e.g., `notesStore`, `documentsStore`) for managing the state and CRUD actions related to specific related list entities, rather than overloading `projectsStore`. Actions within these stores should handle API calls, payload construction, activity logging, and triggering modal refreshes via `modalStore.refreshModalData()`. `projectsStore` remains for project list data and project-level fields (Stage, Tranche). 
+*   **Component Extraction:** Extract reusable display components (like `ContactCard`, `NoteItem`, `DocumentRow`) and form components (like `ContactForm`, `NoteForm`) from main tab components (`ContactsTab`, `NotesTab`, etc.) to keep tab components focused on orchestration and layout.
+*   **Form Validation:** Validation logic (required fields, specific formats like phone/email) should reside within the dedicated form component (e.g., `ContactForm`) and run *before* the `submit` event is emitted. Error states should be managed within the form component and displayed inline using props on Base input components (e.g., `BaseTextInput:error`). Browser `alert()` should not be used for validation feedback.
+*   **Confirmations:** Use the `BaseDialog` component for critical confirmations (like Delete) or implement inline confirmation patterns (like `ContactCard`'s Set Owner/Delete) for less critical actions where context is important. Avoid browser `confirm()`.
+*   **Data Refresh:** Stick to the pattern of calling `modalStore.refreshModalData()` after successful data modification actions within the relevant store (`contactsStore`, `notesStore`, etc.) to ensure data consistency across the modal, rather than implementing complex optimistic UI updates.
+*   **Loading Indicators:** Use the `uiStore` notification system for indicating loading during longer operations (like `setProjectMainOwner`) or full modal refreshes. Consider adding local loading state flags (and corresponding UI like disabled buttons/spinners) within components for specific actions (e.g., within `ContactForm` during submission) if granular feedback is desired.
+*   **Helper Functions:** Move generic, reusable utility functions (like phone/date formatters/validators) to `app/utils/helpers.js`. Keep component-specific formatting or logic local.
+*   **Constants/Options:** Define API names, report/form names, and fixed dropdown options in `app/config/constants.js` and `app/config/options.js` respectively.
+
+*   **Composition API Standard (Overview Tab):** Successfully refactored `OverviewTab` and created all its sub-components using the Composition API (`setup()`), reinforcing this as the standard moving forward (General Rule #8).
+*   **Data Processing in `processors.js` (Notes):** Implemented complex note processing (threading, attachments, context splitting) within `DataProcessors.js`. This centralizes structural transformation before data hits stores or components.
+*   **Prioritize VueUse Composables:** Used `useTimeAgo` in `NoteItem` and `IssueItem` instead of a custom `formatRelativeTime` helper, establishing a preference for standard composables when available.
+*   **Interaction Stores (Deferred):** Confirmed plan to create dedicated stores (`notesStore`, `issuesStore`) in later phases (Phase 5+) for CRUD/interaction logic, keeping `OverviewTab` components focused on display for now.
+*   **UI Refinement Cycle:** Iteratively refined UI elements like tagged user display and section card styling (`BaseCard` border update) after initial implementation.
+*   **No Browser Alerts:** Replaced all remaining `alert()` calls in Overview-related components with `uiStore` notifications (General Rule #9).
+
+*   **Unified Inline Forms (Systems Tab):** Reaffirmed the pattern of creating a single form component (e.g., `MaterialForm.js`) for both adding and editing inline, controlled by parent state (`isAddingMaterial`, `editingMaterialId`). This is preferable to separate add/edit modals or multiple inline form structures for maintainability.
+*   **Payload Casing (Systems Tab):** Encountered and fixed issues where component state (camelCase) differed from API payload expectations (PascalCase). Reinforced the need to be vigilant about data transformation in store actions.
+*   **API Response Handling (Systems Tab):** Corrected error handling for `deleteRecordById` which had a different response structure than `updateRecordById`, emphasizing the need to verify responses for each action type.
+*   **Template Bindings (Systems Tab):** Fixed a bug where a template `@click` handler referred to the internal function name (`startEditingMaterial`) instead of the exposed alias (`editMaterial`), highlighting the importance of matching template calls to the `setup` function's return object.
+*   **Reactive Data Loading (Systems Tab):** Used `watchEffect` in `MaterialForm.js` to reliably trigger data fetching (`fetchEquipmentFallback`) when needed, proving more robust than relying solely on `onMounted` for data required by conditionally rendered components.
+*   **Reactivity Timing & v-if:** When conditionally rendering elements based on computed properties derived from asynchronously loaded data (like `totalFilteredCount` in `CommunicationsTab`), directly using the condition in `v-if` can sometimes lead to timing issues where the template renders before the computed value updates. Creating a dedicated computed property for the `v-if` condition (e.g., `shouldShowViewOlderButton`) can help Vue track dependencies more reliably and ensure the element appears correctly once data is available.
+*   **Nested/Flattened Props:** Be mindful of accessing nested data passed down as props, especially data derived from Zoho lookups (e.g., `props.project['Owner_Name.Email']` vs. `props.project.Owner_Email`). Use browser dev tools or console logs to verify the exact structure and property names available in the component's props.
+*   **Sticky Positioning in Nested Scroll Containers:** Implementing `position: sticky` (e.g., for a "View More" button) within a container that itself has `overflow-y: auto` (like `BaseCard` with `bodyFlex`) requires placing the sticky element *directly* inside the scrollable container, not as a sibling outside it. Ensure the parent of the sticky element is the intended scrollport.
+
+## 9. Component Implementation Status Tracker

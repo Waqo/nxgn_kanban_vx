@@ -1,0 +1,354 @@
+import React from 'react';
+import { processFile } from '../utils/fileUtils.js';
+
+const MultipleFileUploadForm = ({ 
+    files, 
+    onClose, 
+    onUpload, 
+    documentTypes,
+    currentUser,
+    isUploading,
+    uploadProgress
+}) => {
+    const [fileConfigs, setFileConfigs] = React.useState(
+        files.map(file => ({
+            file: file,
+            processedFile: processFile(file),
+            documentType: '',
+            isRevision: false
+        }))
+    );
+
+    // Add new state for drag handling
+    const [dragActive, setDragActive] = React.useState(false);
+
+    // Add drag handlers
+    const handleDrag = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === "dragenter" || e.type === "dragover") {
+            setDragActive(true);
+        } else if (e.type === "dragleave") {
+            setDragActive(false);
+        }
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+
+        const newFiles = Array.from(e.dataTransfer.files);
+        if (newFiles.length === 0) return;
+
+        // Add new files to existing configs
+        setFileConfigs(prev => [
+            ...prev,
+            ...newFiles.map(file => ({
+                file: file,
+                processedFile: processFile(file),
+                documentType: '',
+                isRevision: false
+            }))
+        ]);
+    };
+
+    // Add file input ref
+    const fileInputRef = React.useRef(null);
+
+    const handleTypeChange = (index, type) => {
+        setFileConfigs(prev => prev.map((config, i) => 
+            i === index ? { ...config, documentType: type } : config
+        ));
+    };
+
+    const handleRevisionChange = (index) => {
+        setFileConfigs(prev => prev.map((config, i) => 
+            i === index ? { ...config, isRevision: !config.isRevision } : config
+        ));
+    };
+
+    const handleRemoveFile = (index) => {
+        setFileConfigs(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleUploadAll = () => {
+        onUpload(fileConfigs);
+    };
+
+    const setBulkType = (type) => {
+        setFileConfigs(prev => prev.map(config => ({
+            ...config,
+            documentType: type
+        })));
+    };
+
+    const setBulkRevision = (isRevision) => {
+        setFileConfigs(prev => prev.map(config => ({
+            ...config,
+            isRevision
+        })));
+    };
+
+    const getProgressBar = (index, config) => {
+        const progress = uploadProgress[index] || {};
+        
+        return React.createElement('div',
+            { className: "mt-2" },
+            [
+                progress.status === 'uploading' && React.createElement('div',
+                    { className: "w-full bg-gray-200 rounded-full h-2" },
+                    React.createElement('div', {
+                        className: "bg-blue-600 h-2 rounded-full transition-all duration-300",
+                        style: { width: `${progress.progress || 0}%` }
+                    })
+                ),
+                progress.status === 'success' && React.createElement('span',
+                    { className: "text-green-600 text-sm flex items-center gap-1" },
+                    [
+                        React.createElement('i', { className: "fas fa-check" }),
+                        "Upload complete"
+                    ]
+                ),
+                progress.status === 'error' && React.createElement('span',
+                    { className: "text-red-600 text-sm flex items-center gap-1" },
+                    [
+                        React.createElement('i', { className: "fas fa-exclamation-circle" }),
+                        progress.error || "Upload failed"
+                    ]
+                )
+            ]
+        );
+    };
+
+    return React.createElement('div',
+        { className: "fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" },
+        React.createElement('div',
+            { 
+                className: "bg-white rounded-lg w-full max-w-4xl mx-4"
+            },
+            [
+                // Fixed Header
+                React.createElement('div',
+                    { className: "p-6 border-b" },
+                    [
+                        // Header content
+                        React.createElement('div',
+                            { className: "flex items-center justify-between mb-4" },
+                            [
+                                React.createElement('h3',
+                                    { className: "text-lg font-semibold" },
+                                    `Upload ${fileConfigs.length} Files`
+                                ),
+                                React.createElement('button',
+                                    {
+                                        onClick: onClose,
+                                        className: "text-gray-400 hover:text-gray-500"
+                                    },
+                                    React.createElement('i', { className: "fas fa-times" })
+                                )
+                            ]
+                        ),
+                        // Bulk Actions
+                        React.createElement('div',
+                            { className: "flex gap-4" },
+                            React.createElement('select',
+                                {
+                                    onChange: (e) => setBulkType(e.target.value),
+                                    className: "px-3 py-2 border rounded-md text-sm"
+                                },
+                                [
+                                    React.createElement('option', { value: '' }, "Set All Types..."),
+                                    ...documentTypes.map(type =>
+                                        React.createElement('option', 
+                                            { 
+                                                value: type.ID, 
+                                                key: type.ID 
+                                            }, 
+                                            type.Name
+                                        )
+                                    )
+                                ]
+                            ),
+                            React.createElement('button',
+                                {
+                                    onClick: () => setBulkRevision(true),
+                                    className: "px-3 py-2 text-sm border rounded-md hover:bg-gray-50"
+                                },
+                                "Mark All as Revision"
+                            ),
+                            React.createElement('button',
+                                {
+                                    onClick: () => setBulkRevision(false),
+                                    className: "px-3 py-2 text-sm border rounded-md hover:bg-gray-50"
+                                },
+                                "Clear All Revisions"
+                            )
+                        ),
+                        // Add drag area to the render between bulk actions and file list
+                        React.createElement('div',
+                            { className: "px-6 pt-4" },
+                            React.createElement('div',
+                                {
+                                    className: `border-2 border-dashed rounded-lg p-4 text-center cursor-pointer ${
+                                        dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                                    }`,
+                                    onDragEnter: handleDrag,
+                                    onDragLeave: handleDrag,
+                                    onDragOver: handleDrag,
+                                    onDrop: handleDrop,
+                                    onClick: () => fileInputRef.current?.click()
+                                },
+                                [
+                                    React.createElement('i',
+                                        { className: "fas fa-cloud-upload-alt text-xl text-gray-400" }
+                                    ),
+                                    React.createElement('p',
+                                        { className: "text-sm text-gray-600" },
+                                        "Drop more files here or click to add"
+                                    ),
+                                    React.createElement('input',
+                                        {
+                                            ref: fileInputRef,
+                                            type: "file",
+                                            multiple: true,
+                                            className: "hidden",
+                                            onChange: (e) => {
+                                                if (e.target.files && e.target.files.length > 0) {
+                                                    const newFiles = Array.from(e.target.files);
+                                                    setFileConfigs(prev => [
+                                                        ...prev,
+                                                        ...newFiles.map(file => ({
+                                                            file: file,
+                                                            processedFile: processFile(file),
+                                                            documentType: '',
+                                                            isRevision: false
+                                                        }))
+                                                    ]);
+                                                }
+                                            }
+                                        }
+                                    )
+                                ]
+                            )
+                        )
+                    ]
+                ),
+                
+                // Scrollable Files List
+                React.createElement('div',
+                    { 
+                        className: "overflow-y-auto p-6",
+                        style: { maxHeight: "calc(80vh - 200px)" }
+                    },
+                    React.createElement('div',
+                        { className: "space-y-3" },
+                        fileConfigs.map((config, index) => 
+                            React.createElement('div',
+                                {
+                                    key: index,
+                                    className: "flex flex-col p-3 bg-gray-50 rounded-lg"
+                                },
+                                [
+                                    // File Icon & Name
+                                    React.createElement('div',
+                                        { className: "flex items-center gap-4" },
+                                        [
+                                            React.createElement('i',
+                                                { className: "fas fa-file text-gray-400" }
+                                            ),
+                                            React.createElement('span',
+                                                { className: "font-medium" },
+                                                config.processedFile.fileName
+                                            )
+                                        ]
+                                    ),
+                                    // Document Type Select
+                                    React.createElement('select',
+                                        {
+                                            value: config.documentType,
+                                            onChange: (e) => handleTypeChange(index, e.target.value),
+                                            className: "px-3 py-2 border rounded-md"
+                                        },
+                                        [
+                                            React.createElement('option', { value: '' }, "Select Type"),
+                                            ...documentTypes.map(type =>
+                                                React.createElement('option', 
+                                                    { 
+                                                        value: type.ID, 
+                                                        key: type.ID 
+                                                    }, 
+                                                    type.Name
+                                                )
+                                            )
+                                        ]
+                                    ),
+                                    // Revision Checkbox
+                                    React.createElement('label',
+                                        { className: "flex items-center gap-2" },
+                                        [
+                                            React.createElement('input',
+                                                {
+                                                    type: "checkbox",
+                                                    checked: config.isRevision,
+                                                    onChange: () => handleRevisionChange(index),
+                                                    className: "rounded border-gray-300"
+                                                }
+                                            ),
+                                            "Revision"
+                                        ]
+                                    ),
+                                    // Remove Button
+                                    React.createElement('button',
+                                        {
+                                            onClick: () => handleRemoveFile(index),
+                                            className: "text-red-500 hover:text-red-600"
+                                        },
+                                        React.createElement('i', { className: "fas fa-trash" })
+                                    ),
+                                    // Add progress bar
+                                    getProgressBar(index, config)
+                                ]
+                            )
+                        )
+                    )
+                ),
+                
+                // Fixed Footer
+                React.createElement('div',
+                    { className: "p-6 border-t bg-white" },
+                    [
+                        React.createElement('div',
+                            { className: "flex justify-end gap-3" },
+                            [
+                                React.createElement('button',
+                                    {
+                                        onClick: onClose,
+                                        className: "px-4 py-2 text-gray-700 border rounded-md hover:bg-gray-50"
+                                    },
+                                    "Cancel"
+                                ),
+                                React.createElement('button',
+                                    {
+                                        onClick: handleUploadAll,
+                                        disabled: isUploading || fileConfigs.length === 0,
+                                        className: `px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 
+                                            disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`
+                                    },
+                                    [
+                                        isUploading && React.createElement('i', 
+                                            { className: "fas fa-spinner fa-spin" }
+                                        ),
+                                        isUploading ? "Uploading..." : "Upload All"
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
+        )
+    );
+};
+
+export default MultipleFileUploadForm; 

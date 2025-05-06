@@ -1,0 +1,836 @@
+/* global React */
+import React from 'react';
+import DocumentContent from './DocumentContent.js';
+import { useToast } from '../contexts/ToastContext.js';
+import { navigateToURL } from '../utils/navigation.js';
+import { updateRecord } from '../utils/recordUpdates.js';
+import PDFPreview from './PDFPreview.js';
+
+const DOCUMENT_TYPES = [
+    "Plan Set with Stamp",
+    "Shade Report",
+    "Yield Report",
+    "Yield Report with Tree Trimming",
+    "Yield Report without Tree Trimming",
+    "Electrical Permit",
+    "Building Permit",
+    "Site Survey Report",
+    "ATI",
+    "Tree Trimming Invoice",
+    "MPU Invoice",
+    "Roofing Invoice",
+    "Utility Bill",
+    "Proposal",
+    "Relationship Letter",
+    "Owner/Property ID",
+    "Signed Contract",
+    "Feeder Image",
+    "Property Ownership",
+    "Permission To Operate",
+    "PEPCO ATO",
+    "Redball ATO",
+    "PEPCO As Built",
+    "Redball As Built",
+    "TES Inspection Report"
+];
+
+const truncateFileName = (fileName, limit = 25) => {
+    if (!fileName) return '';
+    if (fileName.length <= limit) return fileName;
+    return fileName.slice(0, limit) + '...';
+};
+
+const DocumentActions = ({ 
+    doc, 
+    onRefresh,
+    handleFileClick,
+    projectId,
+    workDriveFolderId,
+    currentUser,
+    users,
+    onDropdownChange
+}) => {
+    const { showToast } = useToast();
+    const [isUploading, setIsUploading] = React.useState(false);
+    const [isSendingToInvestor, setIsSendingToInvestor] = React.useState(false);
+    const [showActionsMenu, setShowActionsMenu] = React.useState(false);
+    const actionMenuRef = React.useRef(null);
+
+    // Add click outside handler for dropdown
+    React.useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (actionMenuRef.current && !actionMenuRef.current.contains(event.target)) {
+                setShowActionsMenu(false);
+                onDropdownChange?.(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [onDropdownChange]);
+
+    // Notify parent when dropdown state changes
+    React.useEffect(() => {
+        onDropdownChange?.(showActionsMenu);
+    }, [showActionsMenu, onDropdownChange]);
+
+    const isTruthy = (value) => {
+        return value === true || value === "true" || value === 1 || value === "1";
+    };
+
+    const handleUploadToWorkDrive = async () => {
+        if (!projectId || !currentUser?.email || !doc.ID || !workDriveFolderId) {
+            showToast('Missing required information for upload', 'error');
+            return;
+        }
+
+        setIsUploading(true);
+        showToast('Uploading to WorkDrive...', 'loading');
+
+        try {
+            await uploadWorkDriveFile(
+                projectId,
+                currentUser.email,
+                doc.ID
+            );
+            await onRefresh();
+            showToast('File uploaded to WorkDrive successfully', 'success');
+        } catch (error) {
+            console.error('Error uploading to WorkDrive:', error);
+            showToast(error.message || 'Failed to upload file to WorkDrive', 'error');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleSendToInvestor = async () => {
+        if (!doc.WorkDrive_Link) {
+            showToast('No WorkDrive link available', 'error');
+            return;
+        }
+        
+        try {
+            setIsSendingToInvestor(true);
+            showToast('Sending to investor portal...', 'loading');
+            
+            await updateRecord(
+                "PM_Kanban_Documents",
+                doc.ID,
+                {
+                    data: {
+                        Trigger_Send_to_Inv: "true"
+                    }
+                }
+            );
+            
+            showToast('Document sent to investor portal', 'success');
+            if (onRefresh) await onRefresh();
+        } catch (error) {
+            console.error('Error sending to investor portal:', error);
+            showToast('Failed to send to investor portal', 'error');
+        } finally {
+            setIsSendingToInvestor(false);
+        }
+    };
+
+    return React.createElement('div',
+        { 
+            className: "flex items-center gap-2",
+            ref: actionMenuRef
+        },
+        [
+            // Primary actions
+            React.createElement('button',
+                {
+                    onClick: () => handleFileClick(doc.File_Upload, doc.ID),
+                    className: "px-3 py-1 text-xs text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md"
+                },
+                [
+                    React.createElement('i',
+                        { className: "fas fa-external-link-alt mr-1" }
+                    ),
+                    "Open"
+                ]
+            ),
+
+            // More actions dropdown
+            React.createElement('div',
+                { className: "relative" },
+                [
+                    React.createElement('button',
+                        {
+                            onClick: () => setShowActionsMenu(!showActionsMenu),
+                            className: "px-2 py-1 text-xs text-gray-600 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md"
+                        },
+                        [
+                            React.createElement('i',
+                                { className: "fas fa-ellipsis-v" }
+                            )
+                        ]
+                    ),
+                    
+                    showActionsMenu && React.createElement('div',
+                        {
+                            className: "absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg z-[60] py-1 border border-gray-200"
+                        },
+                        [
+                            workDriveFolderId && (
+                                // Check if WorkDrive_Link is a non-empty string or has content
+                                (typeof doc.WorkDrive_Link === 'string' && doc.WorkDrive_Link.trim()) ||
+                                (doc.WorkDrive_Link && typeof doc.WorkDrive_Link === 'object' && Object.keys(doc.WorkDrive_Link).length > 0)
+                                    ? [
+                                        React.createElement('button',
+                                            {
+                                                onClick: () => {
+                                                    const workDriveUrl = typeof doc.WorkDrive_Link === 'string' 
+                                                        ? doc.WorkDrive_Link 
+                                                        : doc.WorkDrive_Link?.url;
+                                                    if (workDriveUrl?.trim()) {
+                                                        navigateToURL(workDriveUrl);
+                                                        setShowActionsMenu(false);
+                                                    }
+                                                },
+                                                className: "w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                                            },
+                                            [
+                                                React.createElement('i',
+                                                    { className: "fas fa-cloud w-4" }
+                                                ),
+                                                "View in WorkDrive"
+                                            ]
+                                        ),
+                                        !isTruthy(doc.Sent_To_Investor_Portal) && 
+                                        !isTruthy(doc.Trigger_Send_to_Inv) && 
+                                        React.createElement('button',
+                                            {
+                                                onClick: () => {
+                                                    handleSendToInvestor();
+                                                    setShowActionsMenu(false);
+                                                },
+                                                disabled: isSendingToInvestor,
+                                                className: "w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 disabled:opacity-50"
+                                            },
+                                            [
+                                                React.createElement('i',
+                                                    { className: isSendingToInvestor ? "fas fa-spinner fa-spin w-4" : "fas fa-paper-plane w-4" }
+                                                ),
+                                                isSendingToInvestor ? "Sending..." : "Send to Investor Portal"
+                                            ]
+                                        )
+                                    ]
+                                    : React.createElement('button',
+                                        {
+                                            onClick: () => {
+                                                handleUploadToWorkDrive();
+                                                setShowActionsMenu(false);
+                                            },
+                                            disabled: isUploading,
+                                            className: "w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 disabled:opacity-50"
+                                        },
+                                        [
+                                            React.createElement('i',
+                                                { className: isUploading ? "fas fa-spinner fa-spin w-4" : "fas fa-cloud-upload-alt w-4" }
+                                            ),
+                                            isUploading ? "Uploading..." : "Upload to Project Folder"
+                                        ]
+                                    )
+                            )
+                        ]
+                    )
+                ]
+            )
+        ]
+    );
+};
+
+const DocumentTypeDrawer = ({ 
+    doc = { type: '', typeId: '', versions: [] },
+    isLatestVersion = false, 
+    onRefresh,
+    handleFileClick,
+    projectId,
+    workDriveFolderId,
+    currentUser,
+    users,
+    docTypes,
+    onToggle,
+    isExpanded,
+    previewDoc,
+    setPreviewDoc
+}) => {
+    const { showToast } = useToast();
+    const [showAll, setShowAll] = React.useState(false);
+    const [hasOpenDropdown, setHasOpenDropdown] = React.useState(false);
+    const [loadingStates, setLoadingStates] = React.useState({});
+    const [editingDocId, setEditingDocId] = React.useState(null);
+    const [editFormData, setEditFormData] = React.useState({
+        name: '',
+        type: '',
+        isRevision: false
+    });
+    const [errorMessage, setErrorMessage] = React.useState('');
+
+    // Only show content if expanded
+    const versions = isExpanded ? (doc?.versions || []) : [];
+    const visibleVersions = showAll ? versions : versions.slice(0, 3);
+    const hasMore = versions.length > 3;
+
+    const hasWorkDriveLink = (doc) => {
+        if (!doc.WorkDrive_Link) return false;
+        
+        // Handle string format
+        if (typeof doc.WorkDrive_Link === 'string') {
+            return doc.WorkDrive_Link.trim() !== '';
+        }
+        
+        // Handle object format
+        if (typeof doc.WorkDrive_Link === 'object') {
+            return doc.WorkDrive_Link.url && doc.WorkDrive_Link.url.trim() !== '';
+        }
+        
+        return false;
+    };
+
+    const isTruthy = (value) => {
+        return value === true || value === "true" || value === 1 || value === "1";
+    };
+
+    const handleUploadToWorkDrive = async (doc) => {
+        if (!projectId || !currentUser?.email || !doc.ID || !workDriveFolderId) {
+            showToast('Missing required information for upload', 'error');
+            return;
+        }
+
+        setLoadingStates(prev => ({ ...prev, [doc.ID]: { uploading: true } }));
+        showToast('Uploading to WorkDrive...', 'loading');
+
+        try {
+            await updateRecord(
+                "PM_Kanban_Documents",
+                doc.ID,
+                {
+                    data: {
+                        TRIG_Upload_to_WorkDrive: "true"
+                    }
+                }
+            );
+            await onRefresh();
+            showToast('File upload to WorkDrive initiated', 'success');
+        } catch (error) {
+            console.error('Error initiating WorkDrive upload:', error);
+            showToast(error.message || 'Failed to initiate WorkDrive upload', 'error');
+        } finally {
+            setLoadingStates(prev => ({ ...prev, [doc.ID]: { uploading: false } }));
+        }
+    };
+
+    const handleSendToInvestor = async (doc) => {
+        if (!doc.WorkDrive_Link) {
+            showToast('No WorkDrive link available', 'error');
+            return;
+        }
+        
+        try {
+            setLoadingStates(prev => ({ ...prev, [doc.ID]: { sending: true } }));
+            showToast('Sending to investor portal...', 'loading');
+            
+            await updateRecord(
+                "PM_Kanban_Documents",
+                doc.ID,
+                {
+                    data: {
+                        Trigger_Send_to_Inv: "true"
+                    }
+                }
+            );
+            
+            showToast('Document sent to investor portal', 'success');
+            if (onRefresh) await onRefresh();
+        } catch (error) {
+            console.error('Error sending to investor portal:', error);
+            showToast('Failed to send to investor portal', 'error');
+        } finally {
+            setLoadingStates(prev => ({ ...prev, [doc.ID]: { sending: false } }));
+        }
+    };
+
+    const handleEditClick = (doc) => {
+        setEditingDocId(doc.ID);
+        setEditFormData({
+            name: doc.docName || doc.Document_Name || '',
+            type: doc.Doc_Type?.ID || '',
+            isRevision: doc.Is_Revision === "true"
+        });
+    };
+
+    const handleCancelEdit = () => {
+        setEditingDocId(null);
+        setEditFormData({ name: '', type: '', isRevision: false });
+    };
+
+    const handleSaveEdit = async (docId) => {
+        try {
+            if (!editFormData.name.trim()) {
+                throw new Error('Document name cannot be empty');
+            }
+
+            const updateData = {
+                Document_Name: editFormData.name.trim(),
+                Doc_Type: editFormData.type,
+                Is_Revision: editFormData.isRevision ? "true" : "false"
+            };
+
+            if (!editFormData.isRevision) {
+                updateData.Revision_Number = null;
+            }
+
+            const response = await updateRecord(
+                "PM_Kanban_Documents",
+                docId,
+                {
+                    data: updateData
+                }
+            );
+
+            if (response.code === 3000) {
+                setEditingDocId(null);
+                setEditFormData({ name: '', type: '', isRevision: false });
+                if (onRefresh) await onRefresh();
+            } else {
+                throw new Error('Failed to update document');
+            }
+        } catch (error) {
+            console.error('Error updating document:', error);
+            setErrorMessage(error.message || 'Failed to update document');
+        }
+    };
+
+    const handleViewInWorkDrive = async (version, event) => {
+        // Prevent the drawer from collapsing
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        // If no WorkDrive or Embed link, trigger upload first
+        if (!version.WorkDrive_Link && !version.Embed_Link && workDriveFolderId) {
+            try {
+                // Trigger upload
+                await updateRecord(
+                    "PM_Kanban_Documents",
+                    version.ID,
+                    {
+                        data: {
+                            TRIG_Upload_to_WorkDrive: "true"
+                        }
+                    }
+                );
+
+                // Poll for WorkDrive link
+                let attempts = 0;
+                const maxAttempts = 6;
+                let updatedDoc = null;
+
+                while (attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    
+                    // Fetch fresh project data
+                    if (onRefresh) {
+                        await onRefresh();
+                    }
+                    
+                    // Check if link is now available
+                    if (version.WorkDrive_Link || version.Embed_Link) {
+                        break;
+                    }
+                    
+                    attempts++;
+                }
+            } catch (error) {
+                console.error('Error uploading to WorkDrive:', error);
+                showToast('Failed to upload file to WorkDrive', 'error');
+                return;
+            }
+        }
+
+        // Try to get the embed URL first
+        const embedUrl = version.Embed_Link?.trim();
+        
+        // Fallback to WorkDrive URL
+        let workDriveUrl = null;
+        if (hasWorkDriveLink(version)) {
+            workDriveUrl = typeof version.WorkDrive_Link === 'string' 
+                ? version.WorkDrive_Link 
+                : version.WorkDrive_Link?.url;
+        }
+        
+        // Use the first available URL
+        const previewUrl = embedUrl || workDriveUrl;
+        
+        if (previewUrl && setPreviewDoc) {
+            setPreviewDoc({
+                url: previewUrl,
+                name: version.docName || version.Document_Name
+            });
+        }
+    };
+
+    return React.createElement(React.Fragment, null, [
+        React.createElement('div',
+        { 
+            key: doc.typeId || doc.type,
+            className: `mb-4 border border-gray-200 rounded-xl bg-white relative ${hasOpenDropdown ? 'z-[50]' : ''}`
+        },
+        [
+            // Type Header
+            React.createElement('div',
+                { 
+                    className: "border-b border-gray-200 overflow-visible",
+                    onClick: onToggle
+                },
+                [
+                    // Document Type Header
+                    React.createElement('div',
+                        {
+                            className: "flex items-center justify-between p-4 bg-gray-50 cursor-pointer hover:bg-gray-100",
+                        },
+                        [
+                            React.createElement('div',
+                                { className: "flex items-center gap-3" },
+                                [
+                                    React.createElement('span',
+                                        { className: "text-lg font-semibold text-gray-900" },
+                                        doc.type
+                                    ),
+                                    React.createElement('span',
+                                        { className: "text-sm text-gray-500" },
+                                        `${doc.versions?.length || 0} document${(doc.versions?.length || 0) !== 1 ? 's' : ''}`
+                                    )
+                                ]
+                            ),
+                            React.createElement('i',
+                                { 
+                                    className: `fas fa-chevron-${isExpanded ? 'up' : 'down'} text-gray-400`
+                                }
+                            )
+                        ]
+                    ),
+                    // Only render content if expanded
+                    isExpanded && [
+                        // Table Header
+                        React.createElement('div',
+                            { className: "grid grid-cols-12 gap-4 p-4 bg-gray-50 border-b border-gray-200" },
+                            [
+                                React.createElement('div', { className: "col-span-4 font-medium text-gray-700" }, "Document Name"),
+                                React.createElement('div', { className: "col-span-2 font-medium text-gray-700" }, "Added By"),
+                                React.createElement('div', { className: "col-span-2 font-medium text-gray-700" }, "Added Time"),
+                                React.createElement('div', { className: "col-span-2 font-medium text-gray-700" }, "Status"),
+                                React.createElement('div', { className: "col-span-2 font-medium text-gray-700" }, "Actions")
+                            ]
+                        ),
+                        // Table Body
+                        React.createElement('div',
+                            { className: "divide-y divide-gray-200" },
+                            visibleVersions.map(version =>
+                                React.createElement('div',
+                                    {
+                                        key: version.ID,
+                                        className: "grid grid-cols-12 gap-4 p-4 hover:bg-gray-50"
+                                    },
+                                    [
+                                        React.createElement('div', 
+                                            { className: "col-span-4" },
+                                                editingDocId === version.ID ? (
+                                                    // Edit form
+                                                    React.createElement('div',
+                                                        { 
+                                                            className: "space-y-2",
+                                                            onClick: (e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                            }
+                                                        },
+                                                        [
+                                                            // Name input
+                                                            React.createElement('input',
+                                                                {
+                                                                    type: 'text',
+                                                                    value: editFormData.name,
+                                                                    onChange: (e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        setEditFormData(prev => ({ ...prev, name: e.target.value }));
+                                                                    },
+                                                                    onClick: (e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                    },
+                                                                    className: "block w-full px-3 py-1 text-sm border border-gray-300 rounded-md"
+                                                                }
+                                                            ),
+                                                            // Document type dropdown
+                                                            React.createElement('select',
+                                                                {
+                                                                    value: editFormData.type,
+                                                                    onChange: (e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        setEditFormData(prev => ({ ...prev, type: e.target.value }));
+                                                                    },
+                                                                    onClick: (e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                    },
+                                                                    className: "block w-full px-3 py-1 text-sm border border-gray-300 rounded-md"
+                                                                },
+                                                                [
+                                                                    React.createElement('option', { value: '' }, 'Select Type'),
+                                                                    ...docTypes.map(type =>
+                                                                        React.createElement('option', 
+                                                                            { 
+                                                                                value: type.ID, 
+                                                                                key: type.ID 
+                                                                            }, 
+                                                                            type.Name
+                                                                        )
+                                                                    )
+                                                                ]
+                                                            ),
+                                                            // Revision checkbox
+                                                            React.createElement('label',
+                                                                { 
+                                                                    className: "flex items-center gap-2 text-sm text-gray-600",
+                                                                    onClick: (e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                    }
+                                                                },
+                                                                [
+                                                                    React.createElement('input',
+                                                                        {
+                                                                            type: 'checkbox',
+                                                                            checked: editFormData.isRevision,
+                                                                            onChange: (e) => {
+                                                                                e.preventDefault();
+                                                                                e.stopPropagation();
+                                                                                setEditFormData(prev => ({ 
+                                                                                    ...prev, 
+                                                                                    isRevision: e.target.checked 
+                                                                                }));
+                                                                            },
+                                                                            onClick: (e) => {
+                                                                                e.preventDefault();
+                                                                                e.stopPropagation();
+                                                                            },
+                                                                            className: "rounded border-gray-300"
+                                                                        }
+                                                                    ),
+                                                                    "Is Revision"
+                                                                ]
+                                                            ),
+                                                            // Save/Cancel buttons
+                                                            React.createElement('div',
+                                                                { 
+                                                                    className: "flex gap-2 mt-2",
+                                                                    onClick: (e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                    }
+                                                                },
+                                                                [
+                                                                    React.createElement('button',
+                                                                        {
+                                                                            onClick: (e) => {
+                                                                                e.preventDefault();
+                                                                                e.stopPropagation();
+                                                                                handleSaveEdit(version.ID);
+                                                                            },
+                                                                            className: "px-3 py-1 text-xs text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+                                                                        },
+                                                                        "Save"
+                                                                    ),
+                                                                    React.createElement('button',
+                                                                        {
+                                                                            onClick: (e) => {
+                                                                                e.preventDefault();
+                                                                                e.stopPropagation();
+                                                                                handleCancelEdit();
+                                                                            },
+                                                                            className: "px-3 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md"
+                                                                        },
+                                                                        "Cancel"
+                                                                    )
+                                                                ]
+                                                            )
+                                                        ]
+                                                    )
+                                                ) : (
+                                            React.createElement('span',
+                                                { 
+                                                    className: "font-medium",
+                                                    title: version.docName || version.Document_Name || ''
+                                                },
+                                                truncateFileName(version.docName || version.Document_Name || '')
+                                                    )
+                                            )
+                                        ),
+                                        React.createElement('div', 
+                                            { className: "col-span-2 text-gray-600 text-xs" },
+                                            version.User?.Name || version.Added_User || 'Unknown User'
+                                        ),
+                                        React.createElement('div', 
+                                            { className: "col-span-2 text-gray-600 text-xs" },
+                                            new Date(version.Added_Time).toLocaleString('en-US', {
+                                                month: '2-digit',
+                                                day: '2-digit',
+                                                year: '2-digit',
+                                                hour: 'numeric',
+                                                minute: 'numeric',
+                                                hour12: true
+                                            })
+                                        ),
+                                        React.createElement('div', 
+                                            { className: "col-span-2" },
+                                            React.createElement('span',
+                                                {
+                                                    className: `px-2 py-1 text-xs rounded-full ${
+                                                        version.Is_Revision === "true"
+                                                            ? 'bg-purple-100 text-purple-700'
+                                                            : 'bg-blue-100 text-blue-700'
+                                                    }`
+                                                },
+                                                version.Is_Revision === "true"
+                                                    ? `Revision ${version.Revision_Number}` 
+                                                    : 'Not Revision'
+                                            )
+                                        ),
+                                        React.createElement('div', 
+                                            { className: "col-span-2" },
+                                                React.createElement('div',
+                                                    { className: "flex items-center gap-2" },
+                                                    [
+                                                        // Open button (for preview) - only show if we have a valid preview URL
+                                                        (version.Embed_Link?.trim() || hasWorkDriveLink(version)) &&
+                                                        React.createElement('button',
+                                                            {
+                                                                onClick: (e) => handleViewInWorkDrive(version, e),
+                                                                className: "p-2 text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md group relative",
+                                                                title: "Open Document"
+                                                            },
+                                                            [
+                                                                React.createElement('i',
+                                                                    { className: "fas fa-external-link-alt" }
+                                                                ),
+                                                                React.createElement('span',
+                                                                    { className: "absolute right-0 bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2" },
+                                                                    "Open Document"
+                                                                )
+                                                            ]
+                                                        ),
+
+                                                        // Download button
+                                                        React.createElement('button',
+                                                            {
+                                                                onClick: (e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleFileClick(version.File_Upload, version.ID);
+                                                                },
+                                                                className: "p-2 text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md group relative",
+                                                                title: "Download Document"
+                                                            },
+                                                            [
+                                                                React.createElement('i',
+                                                                    { className: "fas fa-download" }
+                                                                ),
+                                                                React.createElement('span',
+                                                                    { className: "absolute right-0 bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2" },
+                                                                    "Download Document"
+                                                                )
+                                                            ]
+                                                        ),
+
+                                                        // Upload to WorkDrive button (only shown when needed)
+                                                        workDriveFolderId && !hasWorkDriveLink(version) && 
+                                                            React.createElement('button',
+                                                                {
+                                                                    onClick: (e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        handleUploadToWorkDrive(version);
+                                                                    },
+                                                                    disabled: loadingStates[version.ID]?.uploading,
+                                                                    className: "p-2 text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md group relative disabled:opacity-50",
+                                                                    title: "Upload to Project Folder"
+                                                                },
+                                                                [
+                                                                    React.createElement('i',
+                                                                        { className: loadingStates[version.ID]?.uploading ? "fas fa-spinner fa-spin" : "fas fa-cloud-upload-alt" }
+                                                                    ),
+                                                                    React.createElement('span',
+                                                                        { className: "absolute right-0 bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2" },
+                                                                        loadingStates[version.ID]?.uploading ? "Uploading..." : "Upload to Project Folder"
+                                                                    )
+                                                                ]
+                                                            ),
+
+                                                        // Edit button
+                                                        React.createElement('button',
+                                                            {
+                                                                onClick: (e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    handleEditClick(version);
+                                                                },
+                                                                className: "p-2 text-gray-600 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md group relative",
+                                                                title: "Edit Document"
+                                                            },
+                                                            [
+                                                                React.createElement('i',
+                                                                    { className: "fas fa-edit" }
+                                                                ),
+                                                                React.createElement('span',
+                                                                    { className: "absolute right-0 bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2" },
+                                                                    "Edit Document"
+                                                                )
+                                                            ]
+                                                        )
+                                                    ]
+                                                )
+                                        )
+                                    ]
+                                )
+                            )
+                        ),
+                        // View More Button
+                        hasMore && React.createElement('div',
+                            { 
+                                className: "px-4 py-3 bg-gray-50 border-t border-gray-200"
+                            },
+                            React.createElement('button',
+                                {
+                                    className: "text-sm text-gray-600 hover:text-gray-900 flex items-center gap-2",
+                                    onClick: (e) => {
+                                        e.stopPropagation(); // Prevent triggering parent's onClick
+                                        setShowAll(!showAll);
+                                    }
+                                },
+                                [
+                                    React.createElement('i',
+                                        { 
+                                            className: `fas fa-chevron-${showAll ? 'up' : 'down'} text-xs`
+                                        }
+                                    ),
+                                    showAll ? "Show Less" : `View More (${versions.length - 3} more)`
+                                ]
+                            )
+                        )
+                    ]
+                ]
+            )
+        ]
+        )
+    ]);
+};
+
+export default DocumentTypeDrawer;

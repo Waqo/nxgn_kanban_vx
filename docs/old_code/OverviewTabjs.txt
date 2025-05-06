@@ -105,7 +105,7 @@ const OverviewTab = ({
 
                     // Right sidebar
                     React.createElement('div',
-                        { className: "w-80 flex-shrink-0 space-y-6" },
+                        { className: "w-96 flex-shrink-0 space-y-6" },
                         [
                             // Sales Rep Info
                             React.createElement(SalesRepInfo, {

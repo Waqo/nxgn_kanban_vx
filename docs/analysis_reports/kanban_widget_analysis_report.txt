@@ -1,0 +1,586 @@
+# Kanban Widget VX Analysis Report
+
+## 1. Introduction & Overview
+   - **Purpose:** To analyze the current Zoho Creator Kanban widget codebase (`nxgn_kanban_vx`) to understand its structure, functionality, data flow, technology stack, identify potential issues, and suggest improvements. This report will be built incrementally as files are provided.
+   - **Widget Goal:** Provide a Kanban board interface for managing solar installation projects within Zoho Creator. Key features include viewing project details in a modal, performing CRUD operations, viewing projects grouped by stages or tranches, and receiving real-time notifications.
+   - **Current Status (as reported by user):** Kanban board UI/functionality is complete. Project details modal UI uses a consistent set of base components, but CRUD functionality for most of its various tabs is still under development, read-only, or uses placeholder actions. A notification system has been added.
+   - **Application Version Info (from `constants.js`):** v3.0.0-beta.5 (May 4, 2025 8:11 AM) # Updated
+
+## 2. Core Technologies & Architecture
+   - **Frontend Framework/Libraries (from `widget.html`, `App.js`):**
+     - Vue 3 (via CDN `vue.global.prod.js`): Core UI framework.
+     - Pinia 3 (via CDN `pinia.iife.prod.js`): State management library.
+     - VueUse Core & Shared (via CDN): Collection of utility functions for Vue (e.g., `useDateFormat`, `useTimeAgo`, `useDebounceFn`).
+     - Zoho Creator Widget SDK v2.0 (via CDN `widgetsdk-min.js`): Essential for widget-platform communication.
+     - Tailwind CSS v2 (via CDN `tailwind.min.css`): Primary CSS utility framework.
+     - Tailwind UI (via CDN `tailwind-ui.min.css`): Pre-built Tailwind components (potentially).
+     - Font Awesome 5.15.3 (via CDN): Icon library.
+     - Inter Font (via `rsms.me`): Primary typeface.
+   - **Architecture Style:** Component-based using Vue 3. Increasing use of Composition API (`setup` function) observed in newer/refactored components (`ProjectDetailModal`, `ModalHeader`, `OverviewTab`, `NoteItem`, `IssueItem`, `EventItem`, `SalesRepInfoCard`, `LatestActivityPreview`, `KanbanCard`, `KanbanToolbar` setup, `DevToolbar` setup, Navbar Components) alongside Options API (e.g., `KanbanBoard`, `KanbanColumn`, most store logic, `App.js`).
+   - **Configuration (`config/` directory):**
+     - **`constants.js`:** Centralizes application-wide static values. Includes `IS_DEVELOPMENT` flag.
+     - **`options.js`:** Defines static arrays for UI elements and structure definitions.
+   - **State Management:** Pinia (`projectsStore`, `lookupsStore`, `uiStore`, `userStore`, `modalStore`, `notesStore`, `notificationsStore`). Modal state (`isVisible`, `isLoading`, `projectData`, `activeTab`, preview/comparison state) managed centrally in `modalStore`. Note-specific actions managed in `notesStore`. Notification state and polling managed in `notificationsStore`.
+   - **API Interaction:**
+     - **Zoho Creator SDK Wrapper (`zohoCreatorAPI.js`).**
+     - **Store Actions:** Encapsulate logic using `ZohoAPIService`.
+     - **Activity Logging (`activityLogService.js`).**
+     - **Error Logging (`errorLogService.js`):** Includes `logErrorToZoho` and `logInfoToZoho`.
+   - **Data Processing (`utils/processors.js`):** Centralizes transformation of raw Zoho API data.
+   - **Utility Functions (`utils/helpers.js`):** General formatting and calculation functions.
+   - **Build Process:** No build step apparent.
+   - **Global Error Handling:** Via `app.config.errorHandler`.
+   - **Local Storage Usage (`utils/localStorage.js`):** Persists UI settings (modal state, sort, stage view, column collapse state).
+
+## 3. Workflow: Initial Load & App Setup
+   - **HTML Entry Point (`widget.html`):**
+     - Standard HTML5 document structure.
+     - Sets viewport and mobile web app meta tags.
+     - Loads all external CSS (Tailwind, Font Awesome, Inter) and JS libraries (Vue, Pinia, VueUse, Zoho SDK) via CDN.
+     - Includes minimal custom global CSS (e.g., `.scrollbar-hide`).
+     - Defines the root `div` with `id="app"` where the Vue application will mount.
+     - Loads the main application script `App.js` as an ES module.
+   - **JavaScript Entry Point (`App.js`):**
+     - Imports Vue, Pinia, the root component (`WidgetView`), services (`zohoCreatorAPI`, `initService`, `errorLogService`), and numerous `Base*` components from `app/components/common/`.
+     - **Initialization Sequence:**
+       1. Creates the Vue application instance with `WidgetView` as the root component.
+       2. Creates and registers the Pinia store instance.
+       3. **Calls `initializeApp()` from `initService.js` BEFORE components are registered or the app is mounted.**
+       4. Registers all `Base*` components globally.
+       5. Registers the `ZohoAPIService` instance as a global property (`$api`).
+       6. Sets up the global Vue error handler.
+       7. Mounts the Vue application to the `#app` div in `widget.html`.
+     - **Commented Code:** Confirms migration from Vuex to Pinia and suggests refactoring away from global registration for feature-specific components.
+   - **Initialization Service (`initService.js`):**
+     - **Purpose:** Orchestrates the fetching of essential data required before the application can be fully interactive. Manages global loading/error states during this process.
+     - **Revised Sequence Understanding:**
+       1. Set global loading true (`uiStore`).
+       2. Fetch Query Params (`ZohoAPIService.getQueryParams`, async).
+       3. Fetch Kanban Init Record (`ZohoAPIService.getRecordById`, await).
+       4. **Phase 1 (Awaited Core Data):**
+          - `projectsStore.fetchInitialProjects` (uses `ZohoAPIService.getRecords`, processed by `DataProcessors.processProjectsData`, await).
+          - `lookupsStore.fetchCoreLookups` (processes Init Record data using `DataProcessors`, initiates fallbacks if needed, await).
+          - `userStore.fetchCurrentUser` (uses `ZohoAPIService.getInitParams`, data from `lookupsStore.users`, await).
+       5. Check Deep Link / Restore Modal State (`modalStore`, `localStorage.loadSetting`).
+       6. Set global loading false (`uiStore`).
+       7. **Development Logging:** If `IS_DEVELOPMENT` is true, log widget access via `logInfoToZoho` *after* user is fetched.
+       8. **Start Notification Polling:** Call `notificationsStore.startPolling()`.
+       9. **Phase 2 (On Demand):** Filter lookups fetched by `lookupsStore` later.
+   - **Root View Component (`WidgetView.js`):**
+     - **Purpose:** Acts as the main container for the widget's UI, orchestrating the display of different sections based on application state.
+     - **Structure:**
+       - Renders `BaseNavbar` (containing `NotificationBell`, `UserProfileMenu`).
+       - Renders `DevToolbar` conditionally based on `isAdmin` state (from `userStore`).
+       - Renders `KanbanToolbar`.
+       - Renders the main content area, conditionally displaying:
+         - `KanbanBoardSkeleton` if `isLoading` is true.
+         - An error message if `globalError` is present (from `uiStore`).
+         - `KanbanBoard` and potentially `ProjectDetailModal` (if `isModalVisible` from `modalStore` is true) when not loading and no error.
+       - Renders a container for `BaseNotification` components (bottom-right toasts), driven by `activeNotifications` from `uiStore`.
+       - Renders a container for `NewNotificationAlert` components (top-right alerts), driven by `activeNewAlerts` from `uiStore`.
+     - **State Management:** Uses Pinia's `mapState` and `mapActions` extensively to react to changes in `uiStore`, `userStore`, `lookupsStore`, and `modalStore`. Calculates a combined `isLoading` state from global loading and lookups loading.
+     - **Local Components:** Registers required components locally (`KanbanBoard`, `DevToolbar`, `BaseNotification`, `BaseNavbar`, `NewNotificationAlert`, `KanbanToolbar`, `KanbanBoardSkeleton`, `ProjectDetailModal`).
+
+## 4. Workflow: Kanban Board Display
+   - **Data Fetching:** `initService` orchestrates fetching via stores/services/processors.
+   - **Filtering/Sorting:** `KanbanToolbar` provides UI controls (search, dropdowns, toggles, buttons). User interactions trigger actions in `projectsStore` (`setSearchTerm`, `setFilter`, `setSort`, `toggleDemoFilterMode`, `toggleDuplicateFilter`) and `uiStore` (`setStageView`, `setBoardViewMode`). `KanbanToolbar` also triggers on-demand fetching of filter lookups (Tags, Reps, Orgs) via `lookupsStore` actions.
+   - **Rendering Structure:**
+     - `WidgetView` renders `BaseNavbar`, `DevToolbar` (if admin), `KanbanToolbar`, and conditionally `KanbanBoardSkeleton` or `KanbanBoard`.
+     - `KanbanBoard` determines columns based on `uiStore.boardViewMode` and data from `lookupsStore`.
+     - `KanbanBoard` renders `KanbanColumn`s, passing filtered projects based on `projectsStore.filteredSortedProjects`.
+     - `KanbanColumn` renders `KanbanCard`s.
+   - **Component Responsibilities:**
+     - **`KanbanBoardSkeleton`:** Loading placeholder.
+     - **`DevToolbar`:** (Admin Only) Provides Demo Filter toggle (`projectsStore.toggleDemoFilterMode`), User Impersonation dropdown (`userStore.impersonateUser/revertImpersonation`), Hard Refresh button (`location.reload`), Clear Local Storage button (`localStorage.clear`).
+     - **`KanbanToolbar`:** Main user control panel. Handles search (with debounced type-ahead on full project list, opens modal on click), filtering (dynamic dropdowns trigger on-demand lookups, toggles update store state), sorting, view switching (Stage/Tranche, All/Sales/Install via `uiStore`), Reset (`projectsStore.resetFiltersAndSort`), Refresh (`projectsStore.fetchInitialProjects`, `lookupsStore.fetchCoreLookups`). Displays counts/totals from `projectsStore` and last updated/version info.
+     - **`KanbanBoard`:** Orchestrates board layout, groups projects, manages drag-and-drop logic (calling `projectsStore` update actions), manages column collapse state (local + `localStorage`).
+     - **`KanbanColumn`:** Displays column header and cards, manages drag-over state, emits events to `KanbanBoard`.
+     - **`KanbanCard`:** Displays project details, handles card dragging, opens modal (`modalStore.openModal`), initiates calls (`ZohoAPIService` + page reload), opens email client (`ZohoAPIService`).
+   - **Data Flow:** `WidgetView` -> (`BaseNavbar`, `DevToolbar`, `KanbanToolbar`, `KanbanBoard`) -> `KanbanColumn` -> `KanbanCard`. State flows down via Pinia getters/props. Events flow up or trigger store actions.
+   - **State Interaction:** Stores provide data. `KanbanToolbar`/`DevToolbar` modify state in `projectsStore`/`uiStore`/`userStore`. `KanbanBoard` modifies `projectsStore` (via actions) and local state. `KanbanCard` triggers `modalStore` actions and direct API calls.
+
+## 5. Workflow: Viewing/Editing Project Details (Modal)
+   - **Opening:** Double-click on `KanbanCard` or search result click in `KanbanToolbar` triggers `modalStore.openModal(projectId)`.
+   - **Data Fetching:** `modalStore.openModal` sets loading state, clears previous data, sets visibility, saves state to `localStorage`, then calls `projectsStore.fetchProjectDetails`. The result is processed by `DataProcessors.processProjectDetailsData` and stored in `modalStore.projectData`. If `IS_DEVELOPMENT` is true, logs modal opening with project details via `logInfoToZoho` after data fetch.
+   - **Structure & Rendering:**
+     - **`ProjectDetailModal`:** Main container, manages state via `modalStore`, renders header/tabs, dynamically renders active tab component.
+     - **`ProjectDetailModalSkeleton`:** Loading placeholder.
+     - **`ModalHeader`:** Displays key info, status indicators, action buttons, external links, interactive elements (Stage/Tranche/Funded/Tags). Includes `Counters` component. Handles inactive tag display ("Inactive Tag").
+     - **`Counters`:** Displays time-since badges (Sold, Days in Stage, Permit Submitted, PTO Approved, System On) using data from `ModalHeader`'s project prop.
+     - **Tab Components:**
+       - **`OverviewTab`:** Composition API. Arranges child components in grid/layout. Manages local state for add note/issue forms. Interacts with stores.
+         - **`NoteItem`:** (Under Dev) Composition API. Renders note/reply, attachments, badges. Handles previews. Recursive rendering.
+         - **`IssueItem`:** Composition API. Renders issue details. Triggers resolution.
+         - **`EventItem`:** Composition API. Renders a single project event (Survey, Install, etc.). Uses helpers for status badge color and icon. Formats date using `useDateFormat`. Includes inline editing form for date/status.
+         - **`SalesRepInfoCard`:** Composition API. Displays Sales Rep name, org, email, formatted phone. Provides clickable `tel:` and `mailto:` links.
+         - **`LatestActivityPreview`:** Composition API. Displays the most recent activity log entry (text, author, time ago). Provides 'View All' button to navigate to the Activity tab (`setActiveTab` prop).
+         - *(Other Overview Child Components TBD: `WorkRequirementBars`, `CommSection` based on old structure?)*
+       - **`ContactsTab`:** Renders the "Contacts" tab UI within the Project Detail Modal, displaying contacts and allowing users to add, edit, delete, and set the main project owner.
+       - **`DocumentsTab`:** Orchestrates document display (grouped by type), checklist, upload (drag/drop, button), search, WorkDrive folder actions, and document comparison.
+       - **`SurveyTab`:** Displays details from the latest survey result (`project.Survey_Results[0]`) and allows editing of findings and summary notes. (Note: Save functionality API calls not yet implemented).
+       - **`SystemsTab`:** Displays system overview statistics (Size, Output, Usage, Yield, Offset, Approval Status) with inline editing capability. Manages the Bill of Materials list, allowing adding, editing, and deleting components (grouped by category).
+       - **`PermittingTab`:** Displays permitting and interconnection details (Status, Number, Dates) from the primary permit record (`project.Permitting[0]`). Allows adding or editing this information.
+       - **`CommissionsTab.js` (named `SalesRepTab` internally):** Displays read-only Sales Rep/Org info and Commission Milestone/Advance details.
+       - **`PropertyInfoTab`:** Displays read-only, pre-formatted property ownership information from the `Property_Database_Ownership_Info` field.
+       - **`TasksTab.js`:** Displays read-only task list. Add Task functionality not implemented.
+       - **`ActivityTab`:** Displays a read-only log of project activities from the `project.Activities` array.
+       - **`CommunicationsTab`:** Provides UI for sending SMS messages and predefined Email Templates.
+       - **`InvestorsTab`:** Displays read-only investor-related data. Edit functionality not implemented.
+     - **Tab Switching:** Clicking a tab in `BaseTabs` (rendered by `ProjectDetailModal`) updates `modalStore.activeTab`, which causes `ProjectDetailModal` to render the corresponding tab component.
+     - **Updates (Initiated from Header):** Stage/Tranche/Funded/Tag changes initiated in `ModalHeader` call actions in `projectsStore`, which handle API calls, logging, and notifications.
+   - **Updates (Initiated from Overview Tab):**
+     - **Add Note:** `OverviewTab` calls `notesStore.addNewNote`.
+     - **Add Issue:** `OverviewTab` calls `projectsStore.addProjectIssue`.
+     - **Resolve Issue:** `IssueItem` calls `projectsStore.resolveProjectIssue`.
+     - **Update Event:** `EventItem` calls `projectsStore.updateProjectEvent`.
+   - **Updates (Initiated from Contacts Tab):**
+     - **Add Contact:** `ContactsTab` -> `contactsStore.addProjectContact` -> `ZohoAPIService.addRecord` (`FORM_CONTACTS`). If first contact, also triggers `contactsStore.setProjectMainOwner`.
+     - **Update Contact:** `ContactsTab` -> `contactsStore.updateProjectContact` -> `ZohoAPIService.updateRecordById` (`REPORT_CONTACTS`).
+     - **Delete Contact:** `ContactsTab` -> `contactsStore.deleteProjectContact` -> `ZohoAPIService.deleteRecordById` (`REPORT_CONTACTS`).
+     - **Set Main Owner:** `ContactsTab` -> `contactsStore.setProjectMainOwner` -> Updates Project record (`REPORT_PROJECTS`, `FIELD_PROJECT_CONTACT_NAME_LOOKUP`) -> Updates Contact records (`REPORT_CONTACTS`, `Primary_Contact_Type1`).
+   - **Updates (Initiated from Documents Tab):**
+     - **Upload Document:** `DocumentsTab` (via `MultipleFileUploadForm`) -> `documentsStore.uploadDocument` -> Multi-step: `ZohoAPIService.addRecord` (`FORM_DOCUMENTS`) -> `ZohoAPIService.uploadFile` (`REPORT_DOCUMENTS`) -> `ZohoAPIService.updateRecordById` (`REPORT_DOCUMENTS`).
+     - **Update Document:** `DocumentItem` -> `DocumentsTab` -> `documentsStore.updateDocument` -> `ZohoAPIService.updateRecordById` (`REPORT_DOCUMENTS`).
+     - **Delete Document:** `DocumentItem` -> `DocumentsTab` -> `documentsStore.deleteDocument` -> `ZohoAPIService.deleteRecordById` (`REPORT_DOCUMENTS`).
+     - **Trigger WorkDrive Upload:** `DocumentItem` -> `DocumentsTab` -> `documentsStore.triggerWorkDriveUpload` -> `ZohoAPIService.updateRecordById` (`REPORT_DOCUMENTS`, trigger field).
+     - **Trigger Send to Investor:** `DocumentItem` -> `DocumentsTab` -> `documentsStore.triggerSendToInvestor` -> `ZohoAPIService.updateRecordById` (`REPORT_DOCUMENTS`, trigger field).
+     - **Preview Document:** `DocumentItem` -> Calculates URL (Direct, WD, Embed, Google Viewer) -> `modalStore.openPreview`.
+     - **Compare Documents:** `DocumentsTab` toggles mode -> `DocumentItem` emits toggle -> `DocumentsTab` updates `modalStore.comparisonDocIds` -> `modalStore.openComparison` (when 2 selected).
+     - **Create Folders:** `DocumentsTab` -> `projectsStore.triggerFolderCreation`.
+   - **Updates (Initiated from Survey Tab - Planned):**
+     - **Save Survey:** `SurveyTab` -> Constructs payload -> Calls `updateRecord` or `createRecord` (API calls TBD).
+   - **Updates (Initiated from Systems Tab):**
+     - **Update System Overview:** `SystemsTab` -> `projectsStore.updateSystemOverview`.
+     - **Add Material:** `SystemsTab` (via `MaterialForm`) -> `materialStore.addMaterial` -> `ZohoAPIService.addRecord` (`FORM_BILL_OF_MATERIALS`).
+     - **Update Material:** `SystemsTab` (via `MaterialForm`) -> `materialStore.updateMaterial` -> `ZohoAPIService.updateRecordById` (`REPORT_BILL_OF_MATERIALS`).
+     - **Delete Material:** `MaterialItem` -> `SystemsTab` -> `materialStore.deleteMaterial` -> `ZohoAPIService.deleteRecordById` (`REPORT_BILL_OF_MATERIALS`).
+   - **Updates (Initiated from Permitting Tab):**
+     - **Add/Update Permit:** `PermittingTab` -> `permittingStore.addPermitRecord`/`updatePermitRecord` -> `ZohoAPIService.addRecord` (`FORM_PERMITTING`) or `ZohoAPIService.updateRecordById` (`REPORT_PERMITTING`).
+   - **Updates (Initiated from Communications Tab):**
+     - **Send SMS:** `CommunicationsTab` -> `communicationsStore.sendSms`.
+     - **Send Email Template:** `EmailTemplatesSection` -> `communicationsStore.sendEmailTemplate`.
+
+## 6. Workflow: Notifications
+   - **Fetching:** `notificationsStore.fetchNotifications` is called on init (`initService`) and then periodically via polling (`setInterval` in `notificationsStore.startPolling`). It first gets the unread count, then fetches records if count > 0.
+   - **Display:**
+     - Unread count shown in `NotificationBell`.
+     - List of unread notifications shown in `NotificationDropdown` (rendered by `NotificationItem`).
+     - New notifications (detected by comparing fetched IDs with `processedNotificationIds` Set) trigger top-right alerts via `uiStore.addNewNotificationAlert` which renders `NewNotificationAlert` components.
+   - **Interaction:**
+     - Clicking a `NotificationItem` emits `item-click` -> `NotificationDropdown` calls `notificationsStore.handleNotificationClick`.
+     - `handleNotificationClick` marks the notification as read (`markAsRead` action) and navigates to the relevant project/tab in the modal (`modalStore.openModal`, `modalStore.setActiveTab`).
+     - Clicking "Mark All Read" in `NotificationDropdown` calls `notificationsStore.markAllAsRead` (uses bulk update API).
+
+## 7. CRUD Operations (Examples from Stores & Components)
+   - **Adding Note:** `OverviewTab` -> `notesStore.addNewNote` -> `ZohoAPIService.addRecord` (`FORM_NOTES`).
+     - **Attachments:** `notesStore.addNewNote` loops through files -> `ZohoAPIService.addRecord` (`FORM_NOTE_ATTACHMENTS`) -> `ZohoAPIService.uploadFile` -> `ZohoAPIService.updateRecordById` (trigger field).
+   - **Adding Issue:** `OverviewTab` -> `projectsStore.addProjectIssue` -> `ZohoAPIService.addRecord` (`FORM_ISSUES`).
+   - **Resolving Issue:** `IssueItem` -> `projectsStore.resolveProjectIssue` -> `ZohoAPIService.updateRecordById` (`REPORT_ISSUES`).
+   - **Updating Event Date/Status:** `EventItem` -> `projectsStore.updateProjectEvent` -> `ZohoAPIService.updateRecordById` (`REPORT_PROJECTS`).
+   - **Adding Contact:** `ContactsTab` -> `contactsStore.addProjectContact` -> `ZohoAPIService.addRecord` (`FORM_CONTACTS`). Includes logic to auto-set as main owner if first contact.
+   - **Updating Contact:** `ContactsTab` -> `contactsStore.updateProjectContact` -> `ZohoAPIService.updateRecordById` (`REPORT_CONTACTS`). Constructs payload dynamically.
+   - **Deleting Contact:** `ContactsTab` -> `contactsStore.deleteProjectContact` -> `ZohoAPIService.deleteRecordById` (`REPORT_CONTACTS`).
+   - **Setting Main Owner:** `ContactsTab` -> `contactsStore.setProjectMainOwner` -> Updates Project record (`REPORT_PROJECTS`, `FIELD_PROJECT_CONTACT_NAME_LOOKUP`) -> Updates Contact records (`REPORT_CONTACTS`, `Primary_Contact_Type1`).
+   - **Uploading Document:** `DocumentsTab` -> `documentsStore.uploadDocument` -> Multi-step: Create record (`FORM_DOCUMENTS`), Upload file (`REPORT_DOCUMENTS`), Update status (`REPORT_DOCUMENTS`).
+   - **Updating Document Metadata:** `DocumentsTab` -> `documentsStore.updateDocument` -> `ZohoAPIService.updateRecordById` (`REPORT_DOCUMENTS`).
+   - **Deleting Document:** `DocumentsTab` -> `documentsStore.deleteDocument` -> `ZohoAPIService.deleteRecordById` (`REPORT_DOCUMENTS`).
+   - **Updating/Creating Survey:** `SurveyTab` constructs payload -> (API Calls for `updateRecord` on `PM_Kanban_Surveys` or `createRecord` on `Add_Survey_Result` are **not yet implemented**).
+   - **Updating System Overview:** `SystemsTab` -> `projectsStore.updateSystemOverview`.
+   - **Adding Material:** `SystemsTab` -> `materialStore.addMaterial` -> `ZohoAPIService.addRecord` (`FORM_BILL_OF_MATERIALS`).
+   - **Updating Material:** `SystemsTab` -> `materialStore.updateMaterial` -> `ZohoAPIService.updateRecordById` (`REPORT_BILL_OF_MATERIALS`).
+   - **Deleting Material:** `SystemsTab` -> `materialStore.deleteMaterial` -> `ZohoAPIService.deleteRecordById` (`REPORT_BILL_OF_MATERIALS`).
+   - **Adding Permit Record:** `PermittingTab` -> `permittingStore.addPermitRecord` -> `ZohoAPIService.addRecord` (`FORM_PERMITTING`).
+   - **Updating Permit Record:** `PermittingTab` -> `permittingStore.updatePermitRecord` -> `ZohoAPIService.updateRecordById` (`REPORT_PERMITTING`).
+   - **Updating Stage/Tranche (Modal Header/Drag Drop):** Triggers `projectsStore.updateProjectStage/Tranche` action which now includes `Previous_Stage_ID` in the API payload.
+   - **Updating Tags (Modal Header):** Add/Remove actions in `ModalHeader` implement optimistic UI updates locally and trigger `projectsStore.updateProjectTags` action.
+   - **Updating Funded Status (Modal Header):** Checkbox change in `ModalHeader` triggers `projectsStore.updateProjectFundedStatus` action.
+   - **Initiating Call:** `KanbanCard` calls `ZohoAPIService.updateRecordById` directly, then `ZohoAPIService.navigateParentUrl`.
+   - **Fetching Lookups:** Uses `ZohoAPIService.getRecords` with report names like `REPORT_SALES_REPS`.
+   - **User Impersonation:**
+     - Likely triggered from `DevToolbar`.
+     - Calls `userStore.impersonateUser(userId)` or `userStore.revertImpersonation()`.
+     - Actions look up target user in `lookupsStore.users` and update `userStore.currentUser` and `userStore.isImpersonating` state.
+   - **Sending SMS:** `CommunicationsTab` -> `communicationsStore.sendSms` -> `ZohoAPIService.addRecord` (`FORM_COMMUNICATION`).
+   - **Sending Email Template:** `EmailTemplatesSection` (within `CommunicationsTab`) -> `communicationsStore.sendEmailTemplate` -> `ZohoAPIService.addRecord` (`FORM_COMMUNICATION` with trigger field).
+   - **Updating Weekly Email Opt-In:** `CommunicationsTab` toggle -> `projectsStore.updateWeeklyEmailOptIn`.
+   - **Marking Notification Read:** `notificationsStore.markAsRead`/`markAllAsRead` -> `ZohoAPIService.updateRecordById`/`updateRecords` (`REPORT_NOTIFICATIONS`).
+
+## 8. Workflow: Tranche View
+   - **Switching:** `KanbanToolbar` toggle calls `uiStore.setBoardViewMode('tranches')`.
+   - **Rendering:** `KanbanBoard` detects `uiStore.boardViewMode` and renders columns based on `lookupsStore.tranches` and `projectsByTranche` grouping, including an 'Unassigned' column.
+
+## 9. Cross-Cutting Concerns & Observations
+   - **Technology Choice:** Use of CDNs simplifies setup but creates reliance on external services and specific versions. Lack of a build step prevents optimizations like tree-shaking, minification of custom code, and use of newer JS features requiring transpilation.
+   - **API Style Mix:** Composition API predominantly used in the Overview tab, Modal Header, and Navbar components. Options API used elsewhere (Kanban board, stores).
+   - **Configuration:** Centralized (`constants.js`, `options.js`). Includes `IS_DEVELOPMENT` flag.
+   - **Utilities:** Good separation (`helpers.js`, `processors.js`, `localStorage.js`).
+   - **Initialization Strategy:** Efficient Init Record use. Conditional development logging added. Notification polling started.
+   - **State Management Complexity:** Stores are domain-specific, but complex getters (`filteredSortedProjects`) and cross-store interactions exist. Modal state effectively managed by `modalStore`. Header component interacts with multiple stores (`lookupsStore`, `projectsStore`, `uiStore`). OverviewTab interacts with multiple stores (`notes`, `projects`, `lookups`, `user`, `ui`) for its various functionalities. `contactsStore` relies heavily on `modalStore` for context and refreshes. `notificationsStore` interacts with `uiStore` for alerts and `modalStore` for navigation.
+   - **API Abstraction:** (`zohoCreatorAPI.js`) Good.
+   - **Error Handling:** Consistent pattern using `errorLogService`. `logErrorToZoho` calls now include `widgetName` context.
+   - **Logging:** Separate services (`activityLogService`, `errorLogService`). `errorLogService` includes `logInfoToZoho` for informational/debug logging. Conditional logging based on `IS_DEVELOPMENT` implemented for widget access and modal opening. All logs include `widgetName` context.
+   - **Activity Logging:** Confirmed to run in the background (fire-and-forget).
+   - **Optimistic Updates:** Used for stage/tranche drag-and-drop and tag add/remove in `ModalHeader`.
+   - **Data Processing:** Centralized in `processors.js`. Comprehensive processing in `processProjectDetailsData` handles complex structures like notes/attachments/events.
+   - **User Context:** (`userStore`) Handled well, including impersonation.
+   - **Persistence:** `localStorage` used effectively for UI state (sort, stage view, column collapse).
+   - **Component Logic:** Overview tab children are generally well-focused presentation components, leveraging computed properties and helpers for display logic. Inline editing added to `EventItem`.
+   - **Attachment Handling:** The multi-step process in `notesStore.addNewNote` (Create Record -> Upload -> Update Trigger) is complex and relies on backend workflows.
+   - **Security:** Hardcoded private key in `NoteItem.js` for constructing Google Viewer URLs is a significant security concern.
+   - **Security:** Hardcoded private key in `DocumentItem.js` used for constructing Google Viewer URLs via `REPORT_PUBLISHED_DOCUMENTS` is a significant security concern.
+   - **Performance:** Search type-ahead in `KanbanToolbar` filters the entire `projectsStore.projectList` on every keystroke (debounced), which could be slow with very large project lists. Notification polling (`notificationsStore`) adds regular background API calls.
+   - **Missing Implementation:** Survey update/create API calls in `SurveyTab.js` are not implemented.
+   - **Missing Implementation:** Edit functionality in `InvestorsTab.js` is not implemented (placeholder `alert`).
+   - **Missing Implementation:** Add/Edit task functionality in `TasksTab.js` is not implemented (placeholder `alert`).
+   - **Inconsistency:** Mix of Composition API and Options API.
+   - **Refactoring Artifact:** Removed contact CRUD from `projectsStore`.
+   - **Refactoring Artifact:** Commented-out `MilestonesInvestorsTab` import in `InvestorsTab.js`.
+   - **Potential Complexity:** Attachment handling logic in `OverviewTab`. Preview logic in `DocumentItem.js`.
+   - **Notification System:** Added `notificationsStore` with polling mechanism. Potential for increased API usage depending on polling frequency and user activity.
+   - **Stage Update:** `updateProjectStage` action now correctly updates `Previous_Stage_ID`.
+   - **Recommendation:** **Address hardcoded private keys in `NoteItem.js` and `DocumentItem.js` immediately.** Refactor previews to use secure, server-generated URLs or alternative secure methods (like fetching blob and rendering). Do not construct public URLs with private keys on the client-side.
+   - **Recommendation:** Ensure consistent use of constants. Verify and centralize assumed API names from `documentsStore.js`.
+   - **Recommendation:** Consider brief loading state for fire-and-forget logging.
+   - **Recommendation:** Document Init Record structure.
+   - **Recommendation:** Ensure consistent error handling.
+   - **Recommendation:** Implement the planned survey update/create API calls in `SurveyTab.js`, likely routing through a store (e.g., `projectsStore` or a new `surveyStore`).
+   - **Recommendation:** Review `projectsStore.fetchProjectDetails` responsibility.
+   - **Recommendation:** Consider loading indicators for impersonation.
+   - **Recommendation:** Simplify user name lookup in `activityLogService`.
+   - **Recommendation:** Standardize on Composition API or Options API.
+   - **Recommendation:** Consider optimizing `KanbanToolbar` search if performance becomes an issue (e.g., server-side search if possible, or more targeted client-side indexing/filtering).
+   - **Recommendation:** Evaluate the robustness of the attachment upload process; consider combining steps via a Zoho Function if possible.
+   - **Recommendation:** Ensure `IS_DEVELOPMENT` flag is set to `false` for production builds to disable verbose logging.
+   - **Recommendation:** Evaluate the impact of notification polling on API limits and performance.
+
+## 10. Summary of Issues & Recommendations
+   - **Security Risk:** Hardcoded private key in `NoteItem.js`.
+   - **Security Risk:** Hardcoded private key in `DocumentItem.js` used for constructing Google Docs Viewer URLs via `REPORT_PUBLISHED_DOCUMENTS`. **Immediate attention required.**
+   - **Potential Issue:** CDN dependency.
+   - **Potential Issue:** Complexity of `projectsStore.filteredSortedProjects` getter.
+   - **Potential Issue:** Search performance in `KanbanToolbar` with large datasets.
+   - **Potential Issue:** API usage from notification polling.
+   - **Potential Issue:** Potential race condition fetching query params.
+   - **Potential Issue:** Inconsistent constant usage (check needed).
+   - **Potential Issue:** Lack of optimistic updates for most actions.
+   - **Potential Issue:** Tight coupling `userStore` / `lookupsStore` init.
+   - **Potential Issue:** `activityLogService` user name fallback.
+   - **Potential Issue:** Fire-and-forget logging.
+   - **Potential Issue:** Attachment URL processing assumption.
+   - **Potential Issue:** Direct API call from `KanbanCard`.
+   - **Potential Issue:** Complexity and potential partial failure modes of the multi-step attachment upload process in `notesStore.addNewNote`.
+   - **Potential Issue:** Complexity and potential partial failure modes of the multi-step document upload process in `documentsStore.uploadDocument`.
+   - **Potential Issue:** Use of assumed API field names in `documentsStore.js` (e.g., `Revision_Number`, `File_Uploaded`, `User_Lookup`, `TRIG_Upload_to_WorkDrive`, `Trigger_Send_to_Inv`). These should be verified and ideally moved to `constants.js`.
+   - **Potential Issue:** Inconsistent report usage for documents (`REPORT_PUBLISHED_DOCUMENTS` for preview URLs in `DocumentItem`, `FORM_DOCUMENTS`/`REPORT_DOCUMENTS` elsewhere). Needs verification if intended.
+   - **Potential Issue:** Hardcoded logo URL in `EmailTemplatesSection.js` preview.
+   - **Missing Implementation:** Survey update/create API calls in `SurveyTab.js` are not implemented.
+   - **Missing Implementation:** Edit functionality in `InvestorsTab.js` is not implemented (placeholder `alert`).
+   - **Missing Implementation:** Add/Edit task functionality in `TasksTab.js` is not implemented (placeholder `alert`).
+   - **Inconsistency:** Mix of Composition API and Options API.
+   - **Refactoring Artifact:** Removed contact CRUD from `projectsStore`.
+   - **Refactoring Artifact:** Commented-out `MilestonesInvestorsTab` import in `InvestorsTab.js`.
+   - **Potential Complexity:** Attachment handling logic in `OverviewTab`. Preview logic in `DocumentItem.js`.
+   - **Violation:** Use of browser `alert` in placeholder functions (`InvestorsTab.js`, `TasksTab.js`).
+   - **Recommendation:** Consider brief loading state for fire-and-forget logging.
+   - **Recommendation:** Document Init Record structure.
+   - **Recommendation:** Ensure consistent error handling.
+   - **Recommendation:** Implement the planned survey update/create API calls in `SurveyTab.js`, likely routing through a store (e.g., `projectsStore` or a new `surveyStore`).
+   - **Recommendation:** Review `projectsStore.fetchProjectDetails` responsibility.
+   - **Recommendation:** Consider loading indicators for impersonation.
+   - **Recommendation:** Simplify user name lookup in `activityLogService`.
+   - **Recommendation:** Standardize on Composition API or Options API.
+   - **Recommendation:** Consider optimizing `KanbanToolbar` search if performance becomes an issue (e.g., server-side search if possible, or more targeted client-side indexing/filtering).
+   - **Recommendation:** Evaluate the robustness of the attachment upload process; consider combining steps via a Zoho Function if possible.
+   - **Recommendation:** Disable development logging (`IS_DEVELOPMENT` flag) for production builds.
+   - **Recommendation:** Tune notification polling interval (`POLLING_INTERVAL_MS` in `notificationsStore`) based on testing and API usage.
+
+## 11. Points of Confusion / Areas Needing Clarification
+   - **Answered:** Init Record contents, Filter lookup trigger, Toolbar functionality, Activity Logging timing.
+   - Are `Base*` components a shared library?
+   - Where does contact CRUD logic reside? (Answered: `contactsStore`)
+   - What is the exact structure returned by `DataProcessors`?
+   - Does `lookupsStore.fetchTeamUsers` act as a fallback? (Answered: Yes, if Init Data fails)
+   - Are `FORM_LOGS`/`FORM_ACTIVITIES` link names correct?
+   - What specific tab components are implemented beyond `OverviewTab`, `ContactsTab`, `DocumentsTab`, `SurveyTab`, `SystemsTab`, `PermittingTab`, `CommissionsTab`, `PropertyInfoTab`, `ActivityTab`, `CommunicationsTab`, `InvestorsTab`, `TasksTab`?
+   - How are `FilePreview`/`FileComparison` triggered/managed? (Answered: Via `modalStore`)
+   - What other actions exist in `notesStore` (if any)? Fetching, updating, deleting notes? (Answered: Primarily `addNewNote`)
+   - What is the purpose of the `FIELD_NOTE_ATTACHMENT_TRANSFER_TRIGGER` field and the associated backend workflow?
+   - How is the `Primary_Contact_Type1` field managed across different actions (add, update, set owner) in `contactsStore`? (Partially answered by `contactsStore` analysis).
+   - Confirm the correct API field names used within `documentsStore.js` (e.g., `Revision_Number`, `File_Uploaded`, `User_Lookup`, `TRIG_Upload_to_WorkDrive`, `Trigger_Send_to_Inv`).
+   - Verify the intended usage of `REPORT_PUBLISHED_DOCUMENTS` vs `REPORT_DOCUMENTS` for document operations and previews.
+   - What mechanism triggers the `FileComparison` component rendering? (Likely related to `modalStore.openComparison` called from `DocumentsTab`).
+   - Where should the survey update/create logic reside (new `surveyStore`, `projectsStore`, direct API call)?
+   - Confirm if `projectsStore.updateSystemOverview` correctly handles the `Is_Approved` boolean field when sending to Zoho.
+   - Confirm the data source and expected structure/completeness of `project.Survey_Results` used by `SurveyTab.js`.
+   - Verify the assumption that `project.Permitting[0]` always contains the relevant record for `PermittingTab.js`.
+   - What is the intended edit functionality for the `InvestorsTab.js`?
+   - What is the intended add/edit/completion functionality for the `TasksTab.js`?
+   - Confirm notification polling interval suitability.
+
+## 12. File Analysis Summaries
+   - **`app/widget.html`:** (No significant changes)
+   - **`app/App.js`:** (No significant changes relevant to recent updates)
+   - **`app/services/initService.js`:** (Updated) Orchestrates initialization. Now includes conditional info logging (if `IS_DEVELOPMENT`) after user fetch and starts notification polling (`notificationsStore.startPolling()`) after successful phase 1 data load. Error logs now include `widgetName` context.
+   - **`app/views/WidgetView.js`:** (Updated) Root Vue component. Now renders `BaseNavbar` and the `NewNotificationAlert` container for top-right alerts.
+   - **`app/store/projectsStore.js`:** (Updated) Manages project state. `updateProjectStage` action now includes `Previous_Stage_ID` in API payload. All `logErrorToZoho` calls updated to include `widgetName` context.
+   - **`app/store/lookupsStore.js`:** (No significant changes)
+   - **`app/store/userStore.js`:** (No significant changes)
+   - **`app/store/uiStore.js`:** (Updated) Manages global UI state. Added `newAlerts` state and corresponding `addNewNotificationAlert`/`removeNewNotificationAlert` actions to handle top-right alerts triggered by `notificationsStore`.
+   - **`app/store/modalStore.js`:** (Updated) Manages modal state. `openModal` action now includes conditional info logging (if `IS_DEVELOPMENT`) after successful data fetch. Error logs now include `widgetName` context.
+   - **`app/store/contactsStore.js`:** (No significant changes)
+   - **`app/store/documentsStore.js`:** (No significant changes)
+   - **`app/store/materialStore.js`:** (No significant changes)
+   - **`app/store/permittingStore.js`:** (No significant changes)
+   - **`app/store/communicationsStore.js`:** (No significant changes)
+   - **`app/store/notesStore.js`:** (No significant changes)
+   - **`app/store/notificationsStore.js`:** (New)
+     - **Purpose:** Manages fetching, polling, and state for user notifications.
+     - **Key Technologies:** Pinia (Options API), JavaScript.
+     - **Dependencies:** `ZohoAPIService`, Stores (`userStore`, `modalStore`, `uiStore`), `errorLogService`, `constants`.
+     - **State:** `notifications` (unread), `isLoading`, `error`, `pollingIntervalId`, `lastFetchedTimestamp`, `processedNotificationIds`, `initialFetchComplete`.
+     - **Getters:** `unreadCount`, `unreadNotifications`.
+     - **Actions:** `fetchNotifications` (handles count check, polling logic, alerts via `uiStore`), `markAsRead`, `markAllAsRead` (uses bulk update), `handleNotificationClick` (handles navigation), `startPolling`, `stopPolling`.
+     - **Observations:** Implements background polling (`setInterval`). Uses a Set (`processedNotificationIds`) to track shown notifications and trigger alerts only for new ones. Bulk update used for efficiency in `markAllAsRead`. Handles navigation to specific project/tab on notification click. Error logs include `widgetName` context.
+   - **`app/services/zohoCreatorAPI.js`:** (No significant changes)
+   - **`app/services/errorLogService.js`:** (Updated) Provides error and info logging. Added `logInfoToZoho` function. Both functions now use `Log_Source: "Widget"` and accept `widgetName` in `contextInfo` which is added to `Context_Details`.
+   - **`app/services/activityLogService.js`:** (No significant changes)
+   - **`app/config/constants.js`:** (Updated) Centralizes static values. Added `IS_DEVELOPMENT` flag.
+   - **`app/config/options.js`:** (No significant changes)
+   - **`app/utils/helpers.js`:** (No significant changes)
+   - **`app/utils/processors.js`:** (No significant changes)
+   - **`app/utils/localStorage.js`:** (No significant changes)
+   - **`app/components/kanban/KanbanBoard.js`:** (No significant changes)
+   - **`app/components/kanban/KanbanColumn.js`:** (No significant changes)
+   - **`app/components/kanban/KanbanCard.js`:** (No significant changes)
+   - **`app/components/kanban/KanbanBoardSkeleton.js`:** (No significant changes)
+   - **`app/components/kanban/DevToolbar.js`:** (No significant changes)
+   - **`app/components/kanban/KanbanToolbar.js`:** (No significant changes)
+   - **`app/components/modal/ProjectDetailModal.js`:** (No significant changes)
+   - **`app/components/modal/ProjectDetailModalSkeleton.js`:** (No significant changes)
+   - **`app/components/modal/ModalHeader.js`:** (Updated) Renders modal top section. Updated `processedTags` computed property to display "Inactive Tag" for tags not found in active lookups.
+   - **`app/components/modal/Counters.js`:** (Updated) Displays time-since badges. Added logic to calculate and display "Days in Current Stage" using data from the project prop (`Days_in_Current_Stage` field assumed) and specific badge coloring logic.
+   - **`app/components/modal/tabs/overview/OverviewTab.js`:** (No significant changes)
+   - **`app/components/modal/tabs/overview/NoteItem.js`:** (No significant changes)
+   - **`app/components/modal/tabs/overview/IssueItem.js`:** (No significant changes)
+   - **`app/components/modal/tabs/overview/EventItem.js`:** (Updated) Added inline editing for event date and status via `VueDatePicker` and `select`. Triggers `projectsStore.updateProjectEvent` on save.
+   - **`app/components/modal/tabs/overview/SalesRepInfoCard.js`:** (No significant changes)
+   - **`app/components/modal/tabs/overview/LatestActivityPreview.js`:** (No significant changes)
+   - **`app/components/modal/tabs/contacts/ContactsTab.js**: (No significant changes)
+   - **`app/components/modal/tabs/contacts/ContactCard.js**: (No significant changes)
+   - **`app/components/modal/tabs/contacts/ContactForm.js**: (No significant changes)
+   - **`app/components/modal/tabs/documents/DocumentItem.js**: (No significant changes)
+   - **`app/components/modal/tabs/documents/DocumentChecklist.js**: (No significant changes)
+   - **`app/components/modal/tabs/documents/DocumentTypeGroup.js**: (No significant changes)
+   - **`app/components/modal/tabs/documents/DocumentsTab.js**: (No significant changes)
+   - **`app/components/modal/tabs/survey/SurveyTab.js**: (No significant changes)
+   - **`app/components/modal/tabs/systems/MaterialItem.js**: (No significant changes)
+   - **`app/components/modal/tabs/systems/MaterialForm.js**: (No significant changes)
+   - **`app/components/modal/tabs/systems/SystemsTab.js**: (No significant changes)
+   - **`app/components/modal/tabs/permitting/PermittingTab.js**: (No significant changes)
+   - **`app/components/modal/tabs/commissions/CommissionsTab.js**: (No significant changes)
+   - **`app/components/modal/tabs/propertyInfo/PropertyInfoTab.js**: (No significant changes)
+   - **`app/components/modal/tabs/tasks/TasksTab.js**: (No significant changes)
+   - **`app/components/modal/tabs/activity/ActivityTab.js**: (No significant changes)
+   - **`app/components/modal/tabs/communications/CommunicationsTab.js**: (No significant changes)
+   - **`app/components/modal/tabs/communications/CommItem.js**: (No significant changes)
+   - **`app/components/modal/tabs/communications/EmailTemplatesSection.js**: (No significant changes)
+   - **`app/components/modal/tabs/investors/InvestorsTab.js**: (No significant changes)
+   - **`app/components/modal/FilePreview.js**: (No significant changes)
+   - **`app/components/modal/FileComparison.js**: (No significant changes)
+   - **`app/components/navbar/NotificationBell.js**: (New)
+     - **Purpose:** Displays the bell icon and unread notification count, opens the dropdown on click.
+     - **Key Technologies:** Vue 3 (Composition API), Pinia.
+     - **Dependencies:** `BaseButton`, `BaseBadge`, `NotificationDropdown`, Stores (`notificationsStore`).
+     - **Exports:** Vue component definition.
+     - **Observations:** Manages dropdown visibility state. Fetches notifications on mount via `notificationsStore`. Uses computed properties for unread count. Handles click-outside logic to close dropdown.
+   - **`app/components/navbar/NotificationDropdown.js**: (New)
+     - **Purpose:** Renders the dropdown list of unread notifications.
+     - **Key Technologies:** Vue 3 (Options API), Pinia.
+     - **Dependencies:** `NotificationItem`, Stores (`notificationsStore`).
+     - **Props:** `isVisible` (boolean).
+     - **Exports:** Vue component definition.
+     - **Observations:** Displays notifications from `notificationsStore`. Includes loading/empty states. Provides "Mark All Read" button triggering store action. Handles notification item clicks via emit. Uses transition effect.
+   - **`app/components/navbar/NotificationItem.js**: (New)
+     - **Purpose:** Renders a single notification item within the dropdown.
+     - **Key Technologies:** Vue 3 (Options API).
+     - **Dependencies:** `BaseAvatar`, `useTimeAgo` (likely via global VueUse).
+     - **Props:** `notification` (object).
+     - **Emits:** `item-click`.
+     - **Observations:** Displays notification message, relative time, and sender initials/icon. Emits click event for parent handling.
+   - **`app/components/navbar/UserProfileMenu.js**: (New)
+     - **Purpose:** Displays the user avatar and name, provides a dropdown menu with profile/logout actions.
+     - **Key Technologies:** Vue 3 (Composition API), Pinia.
+     - **Dependencies:** `BaseAvatar`, Stores (`userStore`).
+     - **Exports:** Vue component definition.
+     - **Observations:** Manages dropdown visibility. Fetches user details from `userStore`. Provides placeholder links/actions. Handles click-outside logic.
+   - **`app/components/navbar/UserProfileName.js**: (New)
+     - **Purpose:** Simple component to display the current user's name.
+     - **Key Technologies:** Vue 3 (Composition API), Pinia.
+     - **Dependencies:** Stores (`userStore`).
+     - **Exports:** Vue component definition.
+     - **Observations:** Reads user name from `userStore` via computed property.
+   - **`app/components/common/BaseNavbar.js**: (New)
+     - **Purpose:** Provides a consistent layout and styling for the main application navigation bar.
+     - **Key Technologies:** Vue 3 (Options API).
+     - **Dependencies:** Child components (`UserProfileName`, `NotificationBell`, `UserProfileMenu`).
+     - **Props:** `variant` (string, e.g., 'light'), `maxWidth` (string, e.g., 'full').
+     - **Slots:** `left`, `center`, `right`.
+     - **Exports:** Vue component definition.
+     - **Observations:** Uses slots for customizable content sections. Includes default right-side content (Notifications, User Menu). Applies styling based on `variant` prop.
+   - **`app/components/common/NewNotificationAlert.js**: (New)
+     - **Purpose:** Displays a toast-like alert notification in the top-right corner.
+     - **Key Technologies:** Vue 3 (Composition API), VueUse (`useTimeoutFn`).
+     - **Dependencies:** None external.
+     - **Props:** `id`, `type`, `title`, `message`, `duration`.
+     - **Emits:** `dismiss`.
+     - **Observations:** Self-dismisses after `duration`. Provides manual dismiss button. Applies styling based on `type` prop.
+
+## 13. Inferred Directory Structure (Updated)
+```
+app/
+├── widget.html
+├── App.js
+├── config/
+│   ├── constants.js
+│   └── options.js
+├── services/
+│   ├── zohoCreatorAPI.js
+│   ├── initService.js
+│   ├── errorLogService.js
+│   └── activityLogService.js
+├── store/
+│   ├── uiStore.js
+│   ├── lookupsStore.js
+│   ├── userStore.js
+│   ├── projectsStore.js
+│   ├── modalStore.js
+│   ├── notesStore.js
+│   ├── contactsStore.js
+│   ├── documentsStore.js
+│   ├── materialStore.js
+│   ├── permittingStore.js
+│   ├── communicationsStore.js
+│   ├── notificationsStore.js  # Added
+│   └── ... # Other potential stores
+├── utils/
+│   ├── processors.js
+│   ├── localStorage.js
+│   └── helpers.js
+├── views/
+│   └── WidgetView.js
+├── components/
+│   ├── common/              # Base components
+│   │   ├── BaseNavbar.js      # Added
+│   │   ├── NewNotificationAlert.js # Added
+│   │   └── ...
+│   ├── kanban/
+│   │   └── ...
+│   ├── modal/
+│   │   └── ...
+│   ├── navbar/              # Added
+│   │   ├── NotificationBell.js
+│   │   ├── UserProfileMenu.js
+│   │   ├── UserProfileName.js
+│   │   ├── NotificationItem.js
+│   │   └── NotificationDropdown.js
+│   └── ...
+└── ...
+```
+
+## 14. Base Components & UI Style
+   - **Purpose:** The `app/components/common/` directory contains reusable UI components that implement a consistent design system across the application. These components encapsulate styling, behavior, and accessibility features while maintaining a uniform look and feel.
+
+   - **Registration Pattern:**
+     - Registered globally in `App.js` with the prefix `Base*` to easily identify them in templates
+     - Used extensively throughout the application as building blocks for more complex UIs
+     - Designed to be reused across multiple Zoho Creator widgets beyond the Kanban board
+
+   - **Styling Approach:**
+     - Based on Tailwind CSS utility classes
+     - Uses blue as the primary accent color (specifically Tailwind's `blue-500` or `blue-600`)
+     - Consistently follows a web-first design philosophy with responsive accommodations
+     - Implements proper focus states, hover effects, and active states for interactive elements
+
+   - **Key Base Components:**
+     - **`BaseTextArea`:** Extends the native textarea with consistent styling, error handling, character count, autogrow functionality, and accessibility attributes.
+       - **Props:** `modelValue` (v-model support), `label`, `placeholder`, `error`, `rows`, `maxLength`, `required`, `autogrow`, `disabled`
+       - **Events:** `update:modelValue`, `input`, `blur`
+       - **Features:** Character counter, error display, visual feedback for required/invalid fields
+
+     - **`BaseListContainer`:** Creates a standardized container for displaying lists of items with consistent spacing, borders, and shadows.
+       - **Props:** `title`, `isCollapsible`, `isCollapsed`, `hasDividers`, `hasShadow`, `hasBorder`
+       - **Slots:** `header` (for custom header content), `default` (list items), `empty` (fallback when no items)
+       - **Features:** Toggle collapse functionality, conditional borders between items
+
+     - **`BaseGridList`:** Implements a responsive grid layout for displaying cards or tiles with configurable columns and gap spacing.
+       - **Props:** `columns` (responsive column count), `gap`, `items` (data array for iteration)
+       - **Slots:** `default` (with scoped slot for rendering each item), `empty` (fallback when no items)
+       - **Features:** Responsive breakpoints (1-4 columns depending on screen size), consistent spacing
+
+     - **`BaseNavbar`:** (New) Provides a consistent layout and styling for the main application navigation bar, with slots for content and default right-aligned notification/user menu items.
+       - **Props:** `variant` ('light'), `maxWidth` ('full')
+       - **Slots:** `left`, `center`, `right`
+
+     - **Other Components:** `BaseCard`, `BaseBadge`, `BaseModal`, `BaseStats`, `BaseTable`, `BaseAvatar`, `BaseButton`, `BaseDialog`, `BaseDrawer`, `BaseLayout`, `BaseToggle`, `BaseDivider`, `BaseCalendar`, `NewNotificationAlert` (though not prefixed with `Base`)
+
+   - **Observed Usage Patterns:**
+     - **Form Controls:** `BaseTextArea`, `BaseTextInput`, `BaseSelectMenu`, and `BaseToggle` used consistently in forms throughout the application
+     - **Layout Components:** `BaseCard`, `BaseListContainer`, and `BaseGridList` form the foundation of most content areas. `BaseNavbar` provides top-level structure.
+     - **Interactive Elements:** `BaseButton`, `BaseTabs`, and `BaseModal` provide consistent user interaction patterns
+     - **Data Display:** `BaseTable`, `BaseBadge`, and `BaseAvatar` used for displaying structured content and status indicators
+     - **Notifications:** `NewNotificationAlert` used for top-right alerts; `NotificationBell`/`Dropdown`/`Item` for the dropdown menu.
+
+   - **Component Composition Approach:**
+     - Most application features are built by composing these base components rather than creating one-off styling
+     - Consistent props API across components (e.g., `modelValue`/`update:modelValue` for form controls)
+     - Slot-based customization allows flexible usage while maintaining consistent styling
+
+   - **Recommendations:**
+     - **Documentation:** Create a component library documentation site to showcase available components and their API
+     - **Standardization:** Continue refactoring any remaining custom styling to leverage these base components
+     - **Expansion:** Consider adding additional specialized components for common patterns (date pickers, multi-select, etc.)
+     - **Testing:** Implement unit tests for these critical base components to ensure reliability
+     - **Design System:** Formalize the implicit design system these components represent into explicit guidelines
+
+## 15. Summary & Conclusion
+
+This analysis has provided a comprehensive examination of the Kanban Widget codebase (`nxgn_kanban_vx`), revealing a well-structured Vue 3 application with a clear architecture and separation of concerns.
+
+### Key Architecture Characteristics
+- **Component-Based Design:** The application follows a component-based architecture with Vue 3, utilizing a mix of Options API and Composition API.
+- **State Management:** Pinia stores effectively separate domain concerns (projects, lookups, UI, user, modal, contacts, documents, notes, notifications, etc.).
+- **Layered Architecture:**
+  - UI Components (views, Kanban components, modal tabs, navbar)
+  - Services (API wrapper, initialization, logging)
+  - Stores (state, actions, getters)
+  - Utilities (processors, helpers, localStorage)
+- **Component Reuse:** Extensive use of base components creates a consistent UI throughout the application.
+
+### Strengths
+1. **Well-Organized Codebase:** Clear separation between components, stores, services, and utilities.
+2. **Centralized API Interactions:** All Zoho Creator API calls are routed through a wrapper service.
+3. **Efficient Data Loading:** Two-phase loading strategy with initial record optimizes startup performance.
+4. **Consistent Error Handling & Logging:** Standardized approach to error/info logging and user notifications. Conditional development logging added.
+5. **UI Component Library:** Extensive set of reusable base components ensures consistent styling and behavior.
+6. **Modular Store Design:** Domain-specific Pinia stores prevent the state management from becoming a monolith.
+7. **Notification System:** Added real-time notification fetching and display.
+
+### Critical Issues
+1. **Security Risk:** Hardcoded private keys used for Google Docs Viewer in `NoteItem.js` and `DocumentItem.js` require immediate attention.
+2. **Dependency on CDNs:** The application relies heavily on external CDNs for core libraries, creating potential availability risks.
+3. **Inconsistent Component API Style:** Mixture of Options API and Composition API throughout the codebase.
+4. **Browser Alert Usage:** Placeholder functions in `InvestorsTab.js` and `TasksTab.js` use browser alerts instead of the established notification system.
+5. **Multi-step Upload Processes:** The attachment and document upload workflows involve multiple API calls with potential for partial failures.
+
+### Priority Recommendations
+1. **Immediate Security Fixes:** Remove hardcoded private keys and implement secure URL generation for document previews.
+2. **Code Standardization:** Either commit fully to the Composition API for new components or maintain the Options API pattern consistently.
+3. **Build Process Implementation:** Add a proper build step (Vite, Webpack) to reduce CDN dependencies and enable optimization.
+4. **Robust Error Recovery:** Enhance the multi-step upload processes with better rollback mechanisms for partial failures.
+5. **Design System Formalization:** Document the implicit design system represented by the base components for easier onboarding and consistency.
+6. **Disable Dev Logging:** Ensure `IS_DEVELOPMENT` flag is `false` in production.
+
+### Development Progress
+The widget shows a clear progression from concept to implementation, with the Kanban board functionality complete, a notification system added, and the project detail modal actively under development. While the basic structure and API integrations are in place for all tabs, some areas still have placeholder or to-be-implemented functionality (particularly in Survey, Tasks, and Investors tabs).
+
+Overall, the codebase demonstrates solid architecture decisions and follows best practices for component-based design, but has several important areas for improvement in security, consistency, and error handling that should be addressed to ensure a robust production-ready application.

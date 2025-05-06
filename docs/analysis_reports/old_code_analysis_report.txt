@@ -1,0 +1,920 @@
+# Legacy Kanban Widget Analysis Report
+
+## 1. Introduction & Overview
+   - Purpose of the report: To perform a deep analysis of the legacy Zoho Creator Kanban widget codebase (provided as `.txt` files) to understand its structure, functionality, data flow, technology stack, identify issues, and suggest improvements.
+   - Brief description of the widget's goal: Provide a Kanban board interface for managing solar installation projects, allowing users to view project details in a modal, perform CRUD operations, and potentially view projects grouped by tranches. Cards represent projects, columns represent stages.
+   - Overall assessment summary:
+     - The legacy Kanban widget successfully delivers core functionality for visualizing and interacting with project data within the Zoho Creator environment. It employs React v17 (using `React.createElement` directly, indicating a likely absence of a standard build process) and leverages the Zoho Creator Widget SDK extensively for API interactions.
+     - Key strengths include comprehensive data fetching for various Zoho entities (Projects, Contacts, Lookups), robust CRUD operation helpers, and a feature-rich project details modal with multiple tabs covering various aspects of project management (Overview, Documents, Contacts, Sales, Permitting, etc.).
+     - However, the codebase exhibits significant technical debt characteristic of legacy applications or those built without modern frontend tooling and best practices. Major weaknesses include:
+       - **Lack of Build Step:** Reliance on `React.createElement` makes development cumbersome and prevents leveraging modern JavaScript features or optimizations.
+       - **Large, Complex Components:** Components like `ProjectDetailsModal`, `KanbanBoard`, `DocumentsTab`, and `NotesSection` have grown overly complex, managing excessive state and logic, making them difficult to maintain and test.
+       - **Prop Drilling:** State and callbacks are passed down deeply through multiple component layers, particularly within the modal, leading to tightly coupled components and making refactoring challenging.
+       - **Inconsistent State Management:** Primarily uses `useState`, leading to state concentration in container components, but also uses Context (`ToastContext`) inconsistently. Libraries like Zustand/React Query were included but seemingly unused in the analyzed core components.
+       - **Code Duplication:** Significant repetition exists, especially in data formatting (dates, currency), API call patterns, and UI logic (e.g., document metadata editing, WorkDrive interactions).
+       - **Mixing Concerns:** Presentation logic (data formatting, badge generation) is often mixed directly within UI components instead of being abstracted into helpers.
+       - **Potential Performance Issues:** Filtering/sorting large datasets on the client-side and reprocessing data structures on every render (e.g., in Tranche view) could lead to performance degradation.
+       - **Fragile Implementations:** Some features rely on potentially fragile patterns like parsing semi-structured text fields (`CallView` description) or using trigger fields for backend operations.
+       - **Inconsistencies:** Variations in date formatting, phone number handling, and UI patterns (e.g., multiple save buttons in `InvestorsTab`) exist across different sections.
+     - **Conclusion:** While functional, the legacy codebase is difficult to maintain, extend, and debug due to its outdated practices, complexity, and lack of structure. A rebuild using a modern framework like Vue with the Composition API, TypeScript, and a proper build process is highly recommended to address these issues, improve developer experience, enhance performance, and establish a more scalable foundation for future development. The analysis documented in this report provides a detailed blueprint of the existing functionality and data structures required for such a rebuild.
+
+## 2. Core Technologies & Architecture
+   - **Identified Frontend Framework/Libraries:**
+     - React v17.0.2: Used for UI rendering (via `React.createElement`).
+     - ReactDOM v17.0.2: Renders React components to the DOM.
+     - Zustand v4.3.7: State management library (imported, usage TBC).
+     - Lucide Icons (`lucide-react@0.294.0`): Icon library (used in `KanbanCard`, potentially others).
+     - TanStack React Query v4.29.19: Data fetching/caching library (Provider imported, usage TBC).
+     - React Select v5.7.0: Dropdown/select component library (Used in `Toolbarjs.txt`).
+     - Zoho Creator Widget SDK v2.0: Essential for widget-platform communication.
+     - Tailwind CSS v2.2.19: Imported in `stylescss.txt`. Used extensively for styling.
+     - Font Awesome v5.15.3: Imported in `stylescss.txt`. Used for icons (`fas fa-...`, `far fa-...`).
+   - **State Management approach:**
+     - Primarily `React.useState` used extensively within components (`AppContent`, `KanbanBoard`, `KanbanColumn`, `Toolbar`, `ProjectDetailsModal`, `ModalHeader`) for managing local UI state and data.
+     - React Context API (`ToastContextjs.txt`) for global notifications.
+     - **Assumption:** Zustand/React Query usage still TBC (not seen used directly in major components analyzed so far).
+   - **API Interaction patterns:**
+     - **Zoho SDK Usage:** Extensive use of the global `ZOHO.CREATOR` object (`DATA`, `API`, `FILE`, `UTIL`).
+     - **Helper Abstraction:** CRUD, file uploads, navigation, custom API calls, and specific updates (stage, tranche) are abstracted into helper functions.
+     - **Data Transformation:** Mapping in `dataFetchingjs.txt`. File processing in `fileUtilsjs.txt`.
+     - **Error Handling:** Basic logging (`errorHandlingjs.txt`). `try...catch` used. Toast integration varies.
+     - **Custom APIs:** Used for WorkDrive, email (`customAPIjs.txt`).
+     - **Multi-Step Processes:** File uploads (`fileUploadjs.txt`, `attachmentUploadjs.txt`).
+     - **Trigger Fields:** Used for backend actions.
+     - **Polling:** Used in `appjs.txt`.
+   - **Key Utility/Helper Functions identified (from imports/scripts):**
+     - `utils/zohoInit.js`: `initializeZoho`
+     - `utils/errorHandling.js`: `logError`
+     - `utils/dataFetching.js`: GET operations and data processing.
+     - `utils/zohoApijs.txt`: `getDocTypes`.
+     - `utils/queryParams.js`: `getQueryParams`.
+     - `utils/userInfo.js`: User info fetching.
+     - `utils/recordUpdates.js`: Generic/specific record updates.
+     - `utils/recordCreationjs.txt`: `createRecord`.
+     - `utils/deleteRecordjs.txt`: Record deletion.
+     - `utils/navigation.js`: `navigateToURL`.
+     - `utils/attachmentUploadjs.txt`: Note attachment uploads/creation.
+     - `utils/customAPIjs.txt`: Custom API calls (WorkDrive, email).
+     - `utils/fileUploadjs.txt`: General document uploads.
+     - `utils/fileUtilsjs.txt`: File validation/processing.
+     - `utils/stagecardUpdate.js`: `updateProjectStage`, `updateProjectTranche`. (**Resolves previous confusion**)
+   - **Build process / dependencies:**
+     - No build step apparent. Relies on ES Modules loaded directly. CSS loaded via `<link>` (inferred, based on `widgethtml.txt` loading JS components).
+
+## 3. Workflow: Initial Load & Kanban Board Display
+   - **How initial data (projects, stages, lookups) is fetched:** (Largely unchanged, relies on `appjs.txt`, `dataFetchingjs.txt`, `userInfojs.txt`, `queryParamsjs.txt`)
+     - `initializeApp` -> `initializeZoho` -> `fetchInitialData` (`dataFetchingjs`) -> `process...` functions (`dataFetchingjs`, uses `userInfojs` for current user) -> `fetchKanbanProjects` (`dataFetchingjs`) -> `organizeProjectsByStage` (`dataFetchingjs`) -> Update `AppContent` state.
+   - **Rendering the Kanban board structure (`KanbanBoard`, `KanbanColumn`):** (Updated)
+     - `AppContent` renders `KanbanBoard` (`KanbanBoardjs.txt`).
+     - `KanbanBoard` renders `KanbanBoardSkeleton` (`KanbanBoardSkeletonjs.txt`) during initial load, showing a pulsing placeholder structure.
+     - Once loaded, `KanbanBoard` filters stages and iterates to render `KanbanColumn` (`KanbanColumnjs.txt`) for each visible stage.
+     - `KanbanColumn` renders its header (title, counts, collapse icon) and, if not collapsed, maps its `cards` prop to render `KanbanCard` components.
+     - `KanbanColumn` manages `isDropTarget` state for visual feedback during drag-over.
+   - **Rendering individual project cards (`KanbanCard`):** (Updated)
+     - `KanbanCard` (`KanbanCardjs.txt`) receives project data (`card` prop) and renders the details using significant internal formatting logic (dates, badges, truncation).
+     - Displays contact name, address, system size, project type (Res/Com), various status badges (Install Date, IC, Permit, Survey, Work Required, Yield), sales rep name, and days since sold.
+     - Includes interactive phone/email icons triggering API calls (`updateUserCallStatus`) or navigation (`navigateToURL`).
+     - Sets `draggable=true` and provides `onDragStart` handler.
+     - Uses Tailwind, Font Awesome, and Lucide icons for styling.
+     - Passed `onDoubleClick` handler from `KanbanColumn` (originating from `KanbanBoard`) to trigger modal opening.
+   - **Toolbar functionality (`Toolbar`):** (Updated)
+     - `KanbanBoard` renders `Toolbar` (`Toolbarjs.txt`) and passes state/callbacks.
+     - `Toolbar` implements controls using standard HTML (`input`, `select`, `button`) and `react-select` for multi-select filters.
+     - Includes search input (with basic type-ahead dropdown), view toggles (All/Sales/Install/Tranche), filter controls (toggles for CashDeal/NeedHelp, multi-selects for Tags, Work, Rep, Org, Type), sort controls, Reset button, Refresh button, and displays last updated time and total system size.
+     - Manages internal state for filter type/selection dropdowns, calling back to `KanbanBoard` via props (`onSearch`, `onFilter`, `onSort`, etc.).
+   - **Data flow for displaying board content:** (Updated)
+     - `initializeApp` -> `dataFetchingjs.txt` -> `AppContent` state -> Props (`projects`, `stages`, lookups, etc.) passed to `KanbanBoard` -> `KanbanBoard` filters/sorts data (`getFilteredCards`), renders `Toolbar`, and renders `KanbanColumn`s -> `KanbanColumn` renders `KanbanCard`s.
+   - **Observed issues/best practices specific to board rendering and initial load:** (Updated)
+     - **Complexity:** Significant presentation logic (badge generation, formatting) within `KanbanCard.js`. Extracting helpers could improve readability.
+     - **State Management:** Duplicated filter/sort state between `AppContent` and `KanbanBoard`. Complex state management within `Toolbar` for driving filter dropdowns.
+     - **Best Practice:** Skeleton loader (`KanbanBoardSkeleton`) provides good initial loading UX.
+     - **Potential Issue:** Performance of filtering/sorting (`getFilteredCards` in `KanbanBoard`) might degrade with a very large number of cards, as it runs on every render cycle related to filter/sort changes.
+     - **Potential Issue:** Toolbar's type-ahead search filters based on the full `projects` list passed down, which could be large and slow down the search UI feedback.
+
+## 4. Workflow: Viewing/Editing Project Details (Modal)
+   - **Triggering the modal opening:** (Unchanged - Double-click on `KanbanCard`)
+   - **Fetching detailed project data:** (Unchanged - `handleProjectClick` in `AppContent` calls `fetchProjectDetails`)
+   - **Modal structure (`ProjectDetailsModal`, `ModalHeader`):** (Updated)
+     - `AppContent` conditionally renders `ProjectDetailsModal` (`ProjectDetailsModaljs.txt`).
+     - `ProjectDetailsModal` renders the overall modal container and structure.
+     - It renders `ModalHeader` (`ModalHeaderjs.txt`) at the top.
+     - `ModalHeader` displays contact info, key project details (stage, tranche, size, dates, payment, type), address, tags, action buttons (Email, Call, More Actions, Refresh, Close), counters, and the tab navigation menu.
+     - `ProjectDetailsModal` then renders the content area for the currently active tab using the `getTabContent` function.
+     - Includes a loading overlay displayed when the `project` prop is initially null.
+     - Renders child modals (`IssueModal`, `TagModal`) conditionally based on state.
+     - The `modal-root` div in `widgethtml.txt` might still be intended for portal rendering, but the implementation seems to use fixed positioning within the main app div.
+   - **Tab Structure and Navigation within the modal:** (Updated)
+     - `ProjectDetailsModal` manages the `activeTab` state.
+     - The tab menu is rendered by `ModalHeader`. Clicking a tab button calls `setActiveTab` in `ModalHeader`, which updates the state in `ProjectDetailsModal` via props (implicitly, as state is managed in `ProjectDetailsModal`).
+     - `ProjectDetailsModal` uses a `switch` statement (`getTabContent`) based on `activeTab` state to render the corresponding tab component (e.g., `OverviewTab`, `ContactTab`, `DocumentsTab`, `SurveyTab`, `SystemsTab`, `PermittingTab`, `SalesRepTab`, `ActivityTab`, `CommunicationTab`, `InvestorsTab`).
+   - **Detailed Analysis per Tab (as files become available):** (Updated)
+     - **Overview Tab (`OverviewTab.js`):**
+       - Rendered by `getTabContent` in `ProjectDetailsModal` when `activeTab` is 'overview'.
+       - Acts as a container, arranging several child components in a two-column layout with a full-width bottom section.
+       - Left Column: Renders `EventsSection` and a preview of the latest activity (linking to Activity tab).
+       - Right Sidebar: Renders `SalesRepInfo`, `WorkRequirementBars`, `IssuesSection`, and `CommSection`.
+       - Bottom Section: Renders `NotesSection`.
+       - `EventsSection` displays key project milestones (Survey, Work types, Install, Inspection), allowing inline status updates and date scheduling/clearing.
+       - `SalesRepInfo` displays the assigned sales rep's details with interactive contact buttons.
+       - `WorkRequirementBars` provides a compact visual summary of required pre-installation work (Roof, Tree, PU).
+       - `CommSection` shows a preview of the most recent calls, linking to the full Communications tab.
+       - Passes relevant slices of `project` data and callbacks down to these child components.
+     - **Contacts Tab:** (TBC)
+       - Rendered by `ContactTabjs.txt` when `activeTab` is 'contact'.
+       - Displays a list of contacts from `project.contacts` using `ContactItem` component.
+       - Provides search and filtering (by type) for contacts.
+       - Includes an expandable form to add new contacts, capturing name, type, contact info, business details, and billing address.
+       - `ContactItem` handles display, inline editing, deletion, and setting a contact as the project's main owner.
+     - **Documents Tab:** (Updated)
+       - Rendered by `DocumentsTabjs.txt` when `activeTab` is 'documents'.
+       - Displays a header with title, count, WorkDrive folder actions, and search.
+       - Shows a collapsible `DocumentChecklist`.
+       - Provides drag-and-drop / button upload functionality (leading to `MultipleFileUploadForm`).
+       - Lists documents grouped by type using `DocumentTypeDrawer` component, which displays versions in a table-like format.
+       - Lists untyped documents using `DocumentContent` component.
+       - Both `DocumentTypeDrawer` and `DocumentContent` handle display, inline editing of metadata, downloading, previewing (via parent state `previewDoc`), and WorkDrive interactions (upload/send triggers).
+     - **Survey Tab:** (TBC)
+       - Rendered by `SurveyTabjs.txt` when `activeTab` is 'survey'.
+       - Displays details from the most recent survey record (`project.surveys[0]`).
+       - Allows editing of survey fields (Assessment Date, Roof Type/Condition, Panel Size, Required Work flags, Summary Notes).
+       - Includes a button to view the Survey Report PDF via URL.
+       - Handles creating a new survey record if one doesn't exist when saving.
+       - Clearly explains the effect of the "Send Final Summary" checkbox.
+     - **System Tab:** (TBC)
+       - Rendered by `SystemsTabjs.txt` when `activeTab` is 'systems'.
+       - Displays an overview section with key system metrics (kW STC, Output, Usage, Yield, Offset, Approval Status).
+       - An "Edit" button in the overview section opens the `SystemApprovalModal`.
+       - `SystemApprovalModal` allows editing kW STC, Annual Output, Annual Usage, component quantities, and the system approval checkbox. Saves updates to both project and material records.
+       - Displays a list of materials/components (`project.materials`) grouped by category (Module, Inverter, Battery, Other).
+       - Calculates and displays the total cost of materials.
+       - An "Add Material" button opens the `AddMaterialForm` (Missing File).
+       - Provides inline editing (Manufacturer, Model, Quantity) and deletion for each material item, using dropdowns populated from `equipmentData`.
+     - **Permitting Tab:** (TBC)
+       - Rendered by `PermittingTabjs.txt` when `activeTab` is 'permitting'.
+       - Displays details from the most recent permit record (`project.permits[0]`).
+       - Allows editing of permit and interconnection details (Status, Number, Submission/Approval Dates, Tags, Problem Status).
+       - Handles creating a new permit record if one doesn't exist when saving.
+     - **Sales Rep Tab:** (TBC)
+       - Rendered by `SalesRepTabjs.txt` when `activeTab` is 'salesRep'.
+       - Displays current Sales Rep info (Name, Email, Phone, Org) with contact buttons.
+       - Allows changing the project's assigned Sales Rep via a dropdown.
+       - Includes an "Edit Sales Rep" action menu triggering `EditSalesRepModal`.
+       - `EditSalesRepModal` allows editing core rep details (Name, Email, Phone, Commission Rates) and updates the `PM_Kanban_Sales_Reps` report.
+       - Displays Commission Milestones (Advance, M1, M2, M3) with editable amounts (except M3) and status (Pending/Paid).
+       - M3 amount is calculated based on system size and selected commission rate.
+       - Allows selection of the Active Commission Rate type (Regular, Commercial, Shared) for the project, saved to the project record.
+       - Displays calculated pending/paid totals and the rep's rate values.
+       - Includes the `CommissionNotes` component for viewing/adding commission-specific notes.
+     - **Property Info Tab:** (Rendered directly in `ProjectDetailsModal`)
+     - **Activity Tab:** (Updated)
+       - Rendered by `ActivitiesTabjs.txt` when `activeTab` is 'activity'.
+       - Displays a chronological list of activities from `project.activities`.
+       - Shows activity description, author, platform (with corresponding icon), and timestamp.
+     - **Communications Tab:** (Updated)
+       - Rendered by `CommunicationTabjs.txt` when `activeTab` is 'communications'.
+       - Displays filterable list (SMS, Call, Email) of communications.
+       - Provides interface to send new SMS messages.
+       - Includes `EmailTemplatesSection` to send templated emails.
+       - Uses direct Zoho API calls for sending SMS and refreshing data.
+       - Renders individual communications using `CommItemjs.txt`.
+       - `CommItem` currently only renders 'Call' types via an internal `CallView` component. Email and SMS rendering are not implemented.
+       - `CallView` formats call details (type, time, duration, user, contact) and parses the `Description` field (assuming `key: value` lines) into an expandable details section.
+     - **Investors Tab:** (Updated)
+       - Rendered by `InvestorsTabjs.txt` when `activeTab` is 'investors'.
+       - Displays PPA configuration section (Is PPA toggle, PPA Rate dropdown, Rate Year dropdown, Domestic Content toggle, Redball Submission Date input/display).
+       - Updates are saved via a top-level Save button within the tab, calling `updateRecord` for `PM_Kanban_Projects` with relevant fields (`Is_PPA`, `PPA_Rate`, `Rate_Year`, `Domestic_Content`, `Submitted_to_Redball`).
+       - Displays calculated results based on project data (System Size, Applicable Rate, Project Cost).
+       - Renders the `MilestonesInvestorsTab` component to handle milestone payment details.
+       - Contains internal helper functions for formatting currency and dates (`formatCurrency`, `formatDate`, `formatDateForInput`).
+       - Manages local state for form data (`formData`) and edit states (`isEditingRedball`).
+       - Tracks unsaved changes (`hasChanges`) to conditionally show the Save button.
+       - Disables editing of PPA-related fields if the "PPA Project" toggle is off.
+   - **Data flow within the modal:** (Updated)
+     - `ProjectDetailsModal` passes `project` data and numerous state variables/callbacks (related to notes, issues, events) down to `OverviewTab`.
+     - `OverviewTab` further distributes this data/callbacks to its child components (`NotesSection`, `IssuesSection`, `EventsSection`, etc.).
+   - **Observed issues/best practices specific to the modal:** (Updated)
+     - **Prop Drilling:** The pattern of passing data/callbacks down from `ProjectDetailsModal` -> `OverviewTab` -> child section components (`NotesSection`, `IssuesSection`, etc.) exemplifies prop drilling. This is especially evident with `IssueModal`, which relies on its parent for state management (issue text, selected users, dropdown visibility, etc.) and action handling (`onSubmit`, `onClose`). `DocumentsTab` also passes down state/callbacks for previews.
+
+## 5. Workflow: CRUD Operations (Examples)
+   - **Adding a Note/Issue:** (Updated)
+     - **Note Creation:** Handled within `NotesSection.js`.
+       - Uses `textarea` for input, supports file attachments (drag-drop/button) via `attachmentUpload.js` utilities.
+       - Manages user tagging (`selectedUsers` state) and team-only status (`notifySales` state).
+       - On submit (`handleNoteSubmit`), calls `createNoteWithAttachments` or `createRecord("Add_Note")`.
+       - Calls `handleAddNote` callback (passed from parent) to refresh data.
+     - **Note Reply:** Handled within `NoteItem.js`.
+       - Shows reply input section when reply button clicked.
+       - On submit, calls `handleAddReply` callback (passed from parent, likely originating in `NotesSection`?) which calls `createRecord("Add_Note")` with `Replied_To` field set.
+     - **Issue Creation:** Triggered from `IssuesSection` (via `onRaiseIssue` callback to `OverviewTab` -> `ProjectDetailsModal`). Opens `IssueModal`.
+       - `IssueModal` is a controlled component, state is managed in `ProjectDetailsModal`.
+       - Allows entering issue text, tagging users (excluding self and sales reps), and opting to notify sales.
+       - Submission calls `handleAddIssue` callback in `ProjectDetailsModal` (passed via props), which likely calls `createRecord("Add_Issue")`.
+   - **Uploading a Document:** (Updated - Handled in `DocumentsTab`)
+     - User interacts with drag-drop area or hidden file input in `DocumentsTab`.
+     - `handleFileUpload` / `handleDrop` in `DocumentsTab` captures file(s) and opens `MultipleFileUploadForm` (Missing component).
+     - `handleMultipleFileUpload` in `DocumentsTab` iterates through files configured in the form, calls `uploadDocumentWithFile` utility for each, tracks progress, shows toasts, and refreshes data via `onRefresh` callback.
+     - An alternative single-upload `UploadForm` exists within `DocumentsTab` but seems less used in the main flow.
+   - **Updating Project Stage:** (Unchanged - Handled in `ModalHeader`)
+   - **Updating Project Tranche:** (Unchanged - Handled in `ModalHeader` / `TranchesKanbanBoard`)
+   - **Adding/Removing Tags:** (Unchanged - Handled in `ModalHeader`)
+   - **Updating Funded By Redball:** (Unchanged - Handled in `ModalHeader`)
+   - **Initiating Call/Email:** (Unchanged - Handled by `ModalHeader`, `KanbanCard`)
+   - **Resolving Issues:** (Updated)
+     - Triggered from `IssuesSection` (via `onResolveIssue` callback to `OverviewTab` -> `ProjectDetailsModal`).
+     - Calls `handleResolveIssue` in `ProjectDetailsModal`, which calls `updateRecord("PM_Kanban_Issues")` (or similar report/form name) with the issue ID.
+   - **Other Operations via Custom API:** (Unchanged)
+   - **Data flow and API calls for CRUD:** (Updated Note/Reply/Issue flow)
+     - New Note: `NotesSection` UI -> `handleNoteSubmit` -> `createNoteWithAttachments`/`createRecord` -> `handleAddNote` callback (refresh).
+     - Reply: `NoteItem` UI -> `handleAddReply` callback -> `createRecord` -> Refresh.
+     - New Issue: `IssuesSection` -> `onRaiseIssue` -> `ProjectDetailsModal` opens `IssueModal` -> `IssueModal` UI -> `onSubmit` -> `ProjectDetailsModal`'s `handleAddIssue` -> `createRecord` -> Refresh.
+     - Resolve Issue: `IssuesSection` -> `onResolveIssue` -> `ProjectDetailsModal`'s `handleResolveIssue` -> `updateRecord` -> Refresh.
+     - Add Contact: `ContactTab` -> Expand Form -> Fill Details -> `handleAddContact` -> `createRecord("Add_Contact")` -> Refresh.
+     - Edit Contact: `ContactTab` -> `ContactItem` -> Options Menu -> Edit -> Modify Form -> Save -> `handleSave` in `ContactItem` -> `updateRecord("PM_Kanban_Contacts")` -> Refresh.
+     - Delete Contact: `ContactTab` -> `ContactItem` -> Options Menu -> Delete -> Confirm -> `handleDelete` in `ContactItem` -> `deleteRecord("PM_Kanban_Contacts")` -> Refresh.
+     - Set Main Owner: `ContactTab` -> `ContactItem` -> Options Menu -> Set Main Owner -> `updateRecord("PM_Kanban_Projects")` -> Refresh.
+     - **Adding Tags:** `ModalHeader` -> Add Tag Button -> `TagModal` -> Select Tag -> Add -> `handleSaveTag` in `ProjectDetailsModal` -> `updateRecord("PM_Kanban_Projects")`.
+   - **Observed issues/best practices specific to data modification:** (Updated)
+     - Document metadata updates (name, type, revision status) are handled via inline forms within `DocumentsTab`, `DocumentTypeDrawer`, and `DocumentContent`, calling `updateRecord`.
+     - WorkDrive interactions (upload, send to investor) are triggered by setting specific fields (`TRIG_Upload_to_WorkDrive`, `Trigger_Send_to_Inv`) via `updateRecord` calls within `DocumentTypeDrawer` and `DocumentContent`.
+
+## 6. Workflow: Tranche View (If Applicable)
+   - **How tranche data is handled:** (Updated & Confirmed)
+     - `KanbanBoard.js` conditionally renders `TranchesKanbanBoard.js` when `isTranchesView` is true.
+     - `TranchesKanbanBoard.js` receives the stage-based `projects` data and the `tranchesData` lookup.
+     - It internally processes the projects using `getTranchesColumns` function: flattens the project list and then filters/groups projects into columns based on matching `card.tranche.ID` with `tranche.id` from `tranchesData`.
+   - **Differences from the main project Kanban view:** (Updated)
+     - Columns represent Tranches (using `tranchesData`) instead of Stages.
+     - Drag-and-drop functionality is implemented locally within `TranchesKanbanBoard` (`handleDrop`) and specifically calls `updateProjectTranche` instead of `updateProjectStage`.
+     - It reuses the `KanbanColumn` component, passing the tranche object as the `stage` prop.
+     - It uses the `getFilteredCards` function passed down from `KanbanBoard` to apply search/filter/sort criteria to the cards within each tranche column.
+   - **Observed issues/best practices specific to tranches:** (Updated)
+     - **Data Processing:** Reprocessing the entire project list on every render of `TranchesKanbanBoard` (`getTranchesColumns`) could be inefficient if the project list is large. Memoization could help.
+     - **Drag-and-Drop State:** Manages its own drag state (`draggedCard`, `sourceTranche`), separate from the main `KanbanBoard`.
+     - **Optimistic UI Flaw:** The optimistic update logic in `handleDrop` seems incorrect as it tries to update the stage-based `projects` structure passed from the parent.
+
+## 7. Cross-Cutting Concerns & Observations
+   - **State Management:** (Updated)
+     - `useState` dominates. Heavy state concentration in container components (`AppContent`, `KanbanBoard`, `ProjectDetailsModal`).
+     - React Context (`ToastContext`) used for notifications.
+     - Significant prop drilling observed, especially for modal states (`IssueModal` state managed entirely by `ProjectDetailsModal`).
+   - **API Interaction:**
+     - **Specific Updates:** `stagecardUpdatejs.txt` provides dedicated functions for stage/tranche updates, separate from the generic `recordUpdatesjs.txt`.
+     - **Comprehensive Coverage:** Utilities now cover GET, CREATE, UPDATE, DELETE, File Upload, Custom API calls, and Navigation.
+     - **Zoho SDK Methods:** Demonstrates use of a wider range of SDK functionalities (`DATA`, `API`, `FILE`, `UTIL`, `invokeCustomApi`).
+     - **Data Mapping/Processing:** Complex mapping in `dataFetchingjs.txt`. File validation/processing in `fileUtilsjs.txt`.
+     - **Write Operations:** Handled by dedicated helpers (`recordUpdates.js`, `recordCreation.js`, `deleteRecord.js`, `attachmentUpload.js`, `fileUpload.js`, `customAPI.js`).
+     - **Efficiency:** `Promise.all` used for initial lookups. Pagination used for project list. Polling used in `appjs.txt`. Timeout implemented for a custom API call in `customAPIjs.txt`.
+     - **Error Handling:** Basic logging via `errorHandling.js`. `try...catch` used widely in utilities. Toast integration in some helpers.
+     - **Dependencies:** Clear dependencies between utilities (e.g., `attachmentUpload` uses `userInfo`).
+     - **Zoho Reports/Forms Used:** (Updated based on new files)
+        - Read Reports: `PM_Kanban_Projects`, `Kanban_Projects`, `PM_Kanban_Contacts`, `PM_Kanban_Equipment`, `PM_Kanban_Tags`, `PM_Kanban_Stages`, `PM_Tranches_Report`, `PM_Kanban_Users`, `PM_Kanban_Sales_Reps`, `All_Subcontractor_Availabilities`, `All_Document_Types`.
+        - Write Forms/Reports: `Add_Note_Attachment`, `PM_Kanban_Note_Attachments`, `Add_Note`, `Add_Document`, `All_Documents`, `PM_Kanban_Users`. (Also other forms/reports implied by generic CRUD helpers targeting various `reportName`s/`formName`s).
+     - **Custom APIs Used:** `Create_WorkDrive_Folder`, `Upload_to_WorkDrive`, `Send_Email_to_Client`.
+   - **UI Components & Styling:** (Updated)
+     - **Component Hierarchy (Overview Tab):** `ProjectDetailsModal` -> `OverviewTab` -> (`EventsSection`, `NotesSection` -> `NoteItem` -> `NoteAttachment`, `IssuesSection`, `SalesRepInfo`, `WorkRequirementBars`, `CommSection`). `ProjectDetailsModal` also renders `IssueModal` conditionally.
+     - **Component Hierarchy (Documents Tab):** `ProjectDetailsModal` -> `DocumentsTab` -> (`DocumentChecklist`, `MultipleFileUploadForm` (Missing), `DocumentTypeDrawer` -> `DocumentContent`, `DocumentContent` (for untyped)).
+     - **Component Hierarchy (Preview):** `ProjectDetailsModal` or `AppContent` (likely) -> `PDFPreview` (triggered by `setPreviewDoc` state).
+     - **Component Hierarchy (Activities Tab):** `ProjectDetailsModal` -> `ActivitiesTab`.
+     - **Component Hierarchy (Survey Tab):** `ProjectDetailsModal` -> `SurveyTab`.
+     - **Component Hierarchy (Contacts Tab):** `ProjectDetailsModal` -> `ContactTab` -> `ContactItem`.
+     - **Component Hierarchy (Permitting Tab):** `ProjectDetailsModal` -> `PermittingTab`.
+     - **Component Hierarchy (Systems Tab):** `ProjectDetailsModal` -> `SystemsTab` -> (`SystemApprovalModal`, `AddMaterialForm` (Missing)).
+     - **Component Hierarchy (Modals):** `ProjectDetailsModal` renders `IssueModal`, `TagModal`, and likely others (`SystemApprovalModal` is rendered by `SystemsTab`).
+     - **Component Hierarchy (Investors Tab):** `ProjectDetailsModal` -> `InvestorsTab` -> `MilestonesInvestorsTab`.
+     - **Component Hierarchy (Communications Tab):** `ProjectDetailsModal` -> `CommunicationTab` -> (`EmailTemplatesSection`, `CommItem` -> `CallView`).
+     - **Styling:** `NoteItem` uses avatar generation logic (initials, background color hash). `NoteAttachment` provides image/file previews.
+     - `WorkRequirementBars` uses specific styling (negative margin, rounded corners) suggesting integration below another element, likely `KanbanCard` and/or within the modal `OverviewTab`.
+   - **Helper Functions/Utilities:** (Unchanged)
+   - **Code Structure & Organization:** (Updated)
+     - `OverviewTab` acts purely as a layout container, delegating functionality to child section components.
+     - `NotesSection` contains significant logic for note creation and display organization (threading, show more/less).
+     - `NoteItem` handles rendering of a single note/reply and its associated reply input logic.
+     - `NoteAttachment` handles rendering and preview/download logic for attachments.
+     - `IssuesSection` displays unresolved issues and provides triggers for resolution/creation.
+     - `IssueModal` encapsulates the UI for creating a new issue, but relies on parent state.
+     - `EventsSection` handles display and updates for project milestones.
+     - `SalesRepInfo` displays rep details and contact actions.
+     - `CommSection` provides a preview of recent calls.
+     - `WorkRequirementBars` is a focused presentational component for required work.
+     - `DocumentsTab` orchestrates document display, upload, checklist, and actions.
+     - `DocumentChecklist` provides a read-only status summary.
+     - `DocumentTypeDrawer` displays grouped documents in a collapsible drawer.
+     - `DocumentContent` renders a single document entry with actions.
+     - `ActivitiesTab` displays a simple list of project activities.
+     - `SurveyTab` displays and allows editing of the latest site survey results.
+     - `ContactTab` handles adding, filtering, and displaying contacts.
+     - `ContactItem` displays, edits, deletes, and manages owner status for a single contact.
+     - `PermittingTab` displays and allows editing of permit and interconnection information.
+     - `SystemsTab` displays system overview and manages material components (add/edit/delete).
+     - `SystemApprovalModal` handles editing system metrics and material quantities.
+     - `TagModal` provides a simple dropdown to select and add a single tag.
+     - `InvestorsTab` manages PPA configuration and displays overview cards.
+     - `MilestonesInvestorsTab` manages the display and editing of investor milestone payments (M1, M2, M3) including amounts and dates, with progress summary and projected values.
+     - `CommunicationTab` orchestrates the display of communications, SMS sending, and email template usage.
+     - `CommItem` acts as a dispatcher based on communication type, currently delegating only calls to `CallView`.
+     - `CallView` handles the detailed rendering and interaction (expand/collapse) for a single call record.
+   - **Asynchronous Operations:** (Unchanged)
+
+## 8. Summary of Issues & Recommendations
+   - This section consolidates the issues identified throughout the analysis and provides recommendations, particularly in the context of a potential rebuild using Vue/Composition API.
+   - **Issues:**
+     - **1. Outdated Frontend Practices:**
+       - Direct use of `React.createElement` instead of JSX.
+       - Lack of a build process (inferred).
+       - Reliance on older React patterns (predominantly class-like functional components with `useState`).
+     - **2. Component Complexity & Size:**
+       - Overly large components with too many responsibilities (e.g., `ProjectDetailsModal`, `KanbanBoard`, `DocumentsTab`, `NotesSection`, `SalesRepTab`).
+       - State management concentrated heavily within these large container components.
+     - **3. Prop Drilling:**
+       - Excessive passing of props (state and callbacks) through multiple layers of components, particularly evident in the modal's tab structure (e.g., `ProjectDetailsModal` -> `OverviewTab` -> `NotesSection` -> `NoteItem`; `IssueModal` state entirely parent-controlled).
+     - **4. Code Duplication:**
+       - Repeated logic for data formatting (dates, currency, phone numbers) across multiple components (`KanbanCard`, `ModalHeader`, `NoteItem`, `SurveyTab`, `ContactTab`, `InvestorsTab`, `CommItem`).
+       - Duplicated logic for API interactions, especially inline editing patterns and WorkDrive trigger field updates (`DocumentsTab`, `DocumentTypeDrawer`, `DocumentContent`).
+     - **5. Inconsistent State Management:**
+       - Primarily `useState`, but context (`ToastContext`) used for specific global state (notifications).
+       - Included state management libraries (Zustand, React Query) appear unused in core components.
+     - **6. Mixing Concerns:**
+       - UI components often contain significant presentation/formatting logic (`KanbanCard`, `ModalHeader`, `NoteItem`).
+       - Data fetching and processing logic currently reside together (`dataFetching.js`), rather than separating fetching (API calls) from transformation (processing).
+     - **7. Potential Performance Bottlenecks:**
+       - Client-side filtering/sorting of potentially large project lists (`getFilteredCards` in `KanbanBoard`).
+       - Reprocessing data structures on every render (e.g., `getTranchesColumns` in `TranchesKanbanBoard`, note threading in `NotesSection`).
+     - **8. Fragile Implementations & Data Handling:**
+       - Parsing semi-structured text fields (e.g., `CallView` description in `CommItem`).
+       - Reliance on trigger fields and potentially polling for complex backend interactions (WorkDrive uploads/sends).
+       - Inconsistent handling of data types (e.g., string booleans, date formats between UI and API).
+       - Use of static/hardcoded lists for potentially dynamic data (contact types, PPA rates/years, tag options in `PermittingTab`).
+       - Unclear data synchronization logic in optimistic UI updates (`TranchesKanbanBoard`).
+     - **9. UI/UX Inconsistencies:**
+       - Multiple save buttons within a single tab (`InvestorsTab` vs `MilestonesInvestorsTab`).
+       - Varying interaction patterns for editing data across different tabs.
+     - **10. Incomplete Features / Dead Code:**
+       - Unused component definitions (`AddEventModal` in `EventsSection`).
+       - Unused utility imports in several files.
+       - Seemingly unused components (`DocumentsSectionjs.txt`).
+       - Incomplete rendering logic (`CommItem` for Email/SMS).
+       - Commented-out code (`ProjectDetailsModal`).
+     - **11. Missing Abstraction:**
+       - Lack of centralized utility functions for common tasks like date/currency formatting.
+       - API interaction logic sometimes duplicated or handled directly in components instead of using utility functions (`CommunicationTab`).
+   - **Recommendations (for Rebuild):**
+     - **1. Adopt Modern Tooling:** Utilize Vue 3 with Composition API, TypeScript, and a standard build tool (like Vite). Use Single File Components (`.vue`).
+     - **2. Component Design:**
+       - Break down large components into smaller, focused, reusable components following Composition API best practices.
+       - Leverage `script setup` for cleaner component structure.
+       - Aim for clear separation of concerns within components (template, script, style).
+     - **3. State Management:**
+       - Implement a centralized state management solution (like Pinia) suitable for Vue 3.
+       - Define stores for different domains (e.g., projects, lookups, UI state, user).
+       - Avoid prop drilling; access shared state directly from components via stores.
+       - Use TanStack Query (Vue Query) for managing server state (API data fetching, caching, synchronization).
+     - **4. Refactor Utilities:**
+       - Consolidate general utility functions (date/currency formatting, etc.) into `app/utils/helpers.js` (as per General Rule #3).
+       - Create dedicated data processing functions in `app/utils/processors.js` to transform raw Zoho API responses into the structures needed by the Vue stores/components (as per General Rule #3). Separate fetching logic from processing logic.
+       - Refactor API interaction utilities (`zohoAPI.js`, `recordUpdates.js`, etc.) for clarity and consistency, ensuring they handle errors robustly and integrate with the notification system.
+     - **5. Improve Data Handling:**
+       - Fetch lookup data (tags, users, stages, etc.) once and store it in Pinia stores for efficient access across components.
+       - Implement robust error handling and loading states for all API interactions, using Vue Query's built-in mechanisms.
+       - Avoid client-side processing of large datasets where possible; leverage Zoho report criteria or server-side filtering if feasible. Use Vue's `computed` properties effectively for derived state.
+       - Replace fragile text parsing with more structured data handling if possible (requires backend changes) or implement safer parsing methods.
+       - Investigate alternatives to trigger fields/polling for WorkDrive interactions if Zoho API offers better methods.
+       - Standardize data types (e.g., consistently use booleans, numbers, Date objects) within the Vue application state.
+     - **6. Enhance UI/UX:**
+       - Ensure consistent UI patterns for editing, saving, loading states, and error notifications across all sections. Use the established notification system (Toast).
+       - Consolidate save actions where logical (e.g., within the Investors tab).
+       - Adhere to style guide (General Rule #10: Use Blue accent color).
+     - **7. Code Quality & Maintainability:**
+       - Remove dead code and unused dependencies.
+       - Add TypeScript for type safety.
+       - Establish clear component hierarchies and data flow patterns.
+       - Write unit/integration tests for critical components and utility functions.
+     - **8. Backend Collaboration:**
+       - Collaborate with the Zoho backend team to ensure API responses are as structured and consistent as possible to minimize frontend processing complexity.
+       - Clarify ambiguities regarding report names (`PM_Kanban_Projects` vs `Kanban_Projects`) and API behaviors (e.g., trigger fields).
+
+## 9. Points of Confusion / Areas Needing Clarification
+   - Why `React.createElement`? (No build step?)
+   - Role of Zustand/React Query? (Used elsewhere?)
+   - Polling Mechanism: Why this approach for folder creation?
+   - `modal-root` div: For React Portals?
+   - Why `zohoApijs.txt` separate for one function?
+   - Different Report Names (`PM_Kanban_Projects` vs `Kanban_Projects`)? Same form?
+   - `queryParams.users`: How populated? Reliable?
+   - `ZOHO.CREATOR.API.deleteRecord` vs `DATA.deleteRecord`: Why different?
+   - `Transfer_Trigger` field: What does it achieve?
+   - Redundant `init()` calls: Necessary?
+   - Filter/Sort State Sync: How is synchronization ensured?
+   - Optimistic UI in Modal/Tranches: Consistency/Correctness?
+   - Folder Creation Trigger: Why different logic?
+   - Commented Code: Why?
+   - **Reply Handling:** Where is the `handleAddReply` function defined that `NoteItem` calls? (Likely passed down from `NotesSection` or `OverviewTab`, but not explicitly shown as a prop for `NotesSection`).
+   - **PDF Preview in `NoteAttachment`:** Is the `PDFPreview` component actually used, or only the image preview modal?
+   - **Issue Resolution API Call:** Does `handleResolveIssue` in `ProjectDetailsModal` call `updateRecord` targeting `Add_Issue` form or `PM_Kanban_Issues` report? (Needs verification).
+   - **`AddEventModal` in `EventsSectionjs.txt`:** Is this component used elsewhere, or is it legacy/incomplete?
+   - **Document Opening Method:** Why does `DocumentsSectionjs.txt` use `ZOHO.CREATOR.UTIL.navigateParentURL` to open a record summary page, while `DocumentsTabjs.txt` uses `navigateToURL` with direct file paths?
+   - **WorkDrive Upload Trigger:** Is using a trigger field (`TRIG_Upload_to_WorkDrive`, `Trigger_Send_to_Inv`) and polling the preferred/only way to interact with these WorkDrive actions from the widget?
+   - **Document Preview Rendering:** Where is the `PDFPreview` component actually rendered based on the `previewDoc` state?
+   - **`ActivitiesTabjs.txt`:**
+     - **Purpose:** Displays a list of activities for the project.
+     - **Key Technologies:** React v17.
+     - **Dependencies:** `react`.
+     - **Props:** `project`.
+     - **Observations:** Simple read-only display. Formats date/time. Uses icons based on the activity Platform.
+   - **`SurveyTabjs.txt`:**
+     - **Purpose:** Displays and edits site survey results.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordUpdates`, `recordCreation`, `navigation`), context (`useToast`).
+     - **Props:** `project`, `fetchModalData`.
+     - **Observations:** Handles view/edit modes. Uses local form state. Updates existing or creates new survey record (`PM_Kanban_Surveys`/`Add_Survey_Result`). Requires specific date formatting for API calls. Uses helper components for Yes/No fields.
+   - **`ContactTabjs.txt`:**
+     - **Purpose:** Displays project contacts, allows adding new contacts, filtering, and searching.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`), Lucide Icons.
+     - **Dependencies:** `react`, `lucide-react`, `./ContactItem.js`, utils (`recordCreation`).
+     - **Props:** `project`, `onRefresh`.
+     - **Observations:** Manages add contact form state. Filters contacts locally. Uses static list for contact type filter. Includes phone formatting on creation.
+   - **`ContactItemjs.txt`:**
+     - **Purpose:** Displays a single contact card with inline editing, deletion, and 'Set as Main Owner' functionality.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`, `useRef`), Lucide Icons.
+     - **Dependencies:** `react`, `lucide-react`, utils (`recordUpdates`, `deleteRecord`), `./Toast.js`.
+     - **Props:** `contact`, `project`, `onRefresh`, `contactTypes`.
+     - **Observations:** Manages local edit state. Handles update/delete API calls for contact (`PM_Kanban_Contacts`) and project (`PM_Kanban_Projects` for main owner). Uses Toast for feedback.
+   - **`PermittingTabjs.txt`:**
+     - **Purpose:** Displays and edits permit and interconnection information.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordUpdates`, `recordCreation`), context (`useToast`).
+     - **Props:** `project`, `fetchModalData`.
+     - **Observations:** Handles view/edit modes, similar to `SurveyTab`. Uses local form state. Updates existing or creates new permit record (`PM_Kanban_Permits`/`Add_Permitting`). Requires date formatting. Uses extensive status-to-color mapping for badges. Uses hardcoded tag options in edit mode.
+   - **`SystemsTabjs.txt`:**
+     - **Purpose:** Displays system overview and component details. Handles adding, editing, deleting materials and triggering system approval modal.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`), Lucide Icons.
+     - **Dependencies:** `react`, `lucide-react`, `./SystemApprovalModal.js`, `./AddMaterialForm.js` (Missing), utils (`deleteRecord`, `recordUpdates`).
+     - **Props:** `project`, `fetchModalData`, `equipmentData`.
+     - **Observations:** Groups materials by category. Manages inline editing state for materials. Relies on `equipmentData` for dropdowns. Calculates total cost. References missing `AddMaterialForm`.
+   - **`SystemApprovalModaljs.txt`:**
+     - **Purpose:** Modal for editing system metrics (kW, output, usage), material quantities, and approval status.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordUpdates`).
+     - **Props:** `isOpen`, `onClose`, `system`, `materials`, `onUpdate`.
+     - **Observations:** Edits both project record (`PM_Kanban_Projects`) and potentially multiple material records (`PM_Kanban_Materials`) in one save action. Tracks modifications to update efficiently.
+   - **`TagModaljs.txt`:**
+     - **Purpose:** Modal dialog for selecting a single tag to add.
+     - **Key Technologies:** React v17.
+     - **Dependencies:** `react`.
+     - **Props:** `isOpen`, `onClose`, `selectedTag`, `setSelectedTag`, `availableTags`, `onSubmit`.
+     - **Observations:** Simple controlled component. Sorts available tags alphabetically. Relies on parent (`ProjectDetailsModal`) for state and submission logic.
+   - **`AddMaterialFormjs.txt`:**
+     - **Purpose:** Modal form for adding a new material/component to the project.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordCreation`).
+     - **Props:** `isOpen`, `onClose`, `equipmentData`, `existingMaterials`, `projectId`, `systemId` (unused?), `onMaterialAdded`.
+     - **Observations:** Dynamically populates Manufacturer/Model dropdowns based on selected Category and `equipmentData`. Filters available categories. Calculates prices automatically. Calls `createRecord` on submit.
+   - **`SalesRepTabjs.txt`:**
+     - **Purpose:** Displays sales rep details, commission milestones, and commission notes. Allows changing rep, editing details, editing milestones, and adding notes.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`), Lucide Icons.
+     - **Dependencies:** `react`, `lucide-react`, utils (`recordUpdates`, `navigation`, `updateUserCallStatus`), components (`CommissionNotes`, `EditSalesRepModal`).
+     - **Props:** `project`, `salesReps`, `fetchModalData`, `users`, `currentUser`.
+     - **Observations:** Complex component managing multiple states (rep selection, milestones, rates). Calculates M3 commission. Includes contact actions. Triggers edit modal.
+   - **`CommissionNotesjs.txt`:**
+     - **Purpose:** Section for viewing and adding commission-specific notes.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordCreation`, `queryParams` - unused).
+     - **Props:** `project`, `fetchModalData`, `users`, `currentUser`.
+     - **Observations:** Filters notes by 'Commissions' context. Sorts notes. Handles note creation via `createRecord`.
+   - **`EditSalesRepModaljs.txt`:**
+     - **Purpose:** Modal for editing core sales rep details (Name, Contact, Rates).
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordUpdates`), context (`useToast`).
+     - **Props:** `isOpen`, `onClose`, `salesRep`, `onSave`, `fetchModalData`.
+     - **Observations:** Standard edit modal. Updates `PM_Kanban_Sales_Reps` report. Handles nested Name field for API.
+   - **`InvestorsTabjs.txt`:**
+     - **Purpose:** Displays and allows editing of PPA configuration and Redball submission date. Renders the milestone payments section.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordUpdates`), context (`useToast`), `./MilestonesInvestorsTab.js`.
+     - **Props:** `project`, `fetchModalData`.
+     - **Observations:** Manages local state for PPA form data and edit status. Updates `PM_Kanban_Projects` record. Uses hardcoded PPA rates/years. Contains date/currency formatting helpers.
+   - **`MilestonesInvestorsTab.js`:**
+     - **Purpose:** Displays and allows editing of investor milestone payment amounts and dates (M1, M2, M3). Shows projected payments and summary totals/progress.
+     - **Key Technologies:** React v17 (`useState`).
+     - **Dependencies:** `react`, utils (`recordUpdates`), context (`useToast`).
+     - **Props:** `project`, `fetchModalData`, `isPPAEnabled`.
+     - **Observations:** Manages local state for milestone data and edit status. Updates `PM_Kanban_Projects` record. Includes date/currency formatting helpers and calculation logic. Editing is disabled if `isPPAEnabled` prop is false.
+   - **`CommItemjs.txt`:**
+     - **Purpose:** Renders a single communication item based on its type (currently only 'Call').
+     - **Key Technologies:** React v17 (`useState`).
+     - **Dependencies:** `react`.
+     - **Props:** `comm`.
+     - **Observations:** Uses internal `CallView` for calls. Formats call details, determines status/styling, parses description for details. Email/SMS views are placeholders. Contains local formatting helpers.
+
+## 10. File Analysis Summaries
+   - `widgethtml.txt`: (No changes)
+   - `appjs.txt`: (No changes)
+   - `dataFetchingjs.txt`: (No changes)
+   - `zohoApijs.txt`: (No changes)
+   - `userInfojs.txt`: (No changes)
+   - `queryParamsjs.txt`: (No changes)
+   - `recordUpdatesjs.txt`: (No changes)
+   - `recordCreationjs.txt`: (No changes)
+   - `deleteRecordjs.txt`: (No changes)
+   - `navigationjs.txt`: (No changes)
+   - `errorHandlingjs.txt`: (No changes)
+   - `attachmentUploadjs.txt`: (No changes)
+   - `customAPIjs.txt`: (No changes)
+   - `fileUploadjs.txt`: (No changes)
+   - `fileUtilsjs.txt`: (No changes)
+   - `stagecardUpdatejs.txt`: (No changes)
+   - **`stylescss.txt`:**
+     - **Purpose:** Provides CSS styling for the widget.
+     - **Key Technologies:** CSS, Tailwind CSS v2.2.19 (@import), Font Awesome v5.15.3 (@import).
+     - **Dependencies (Imports):** Imports Tailwind and Font Awesome via CDN URLs.
+     - **Exports:** None (CSS styles).
+     - **Observations:** Contains extensive custom classes for layout, components (Kanban, modal, toast), drag-drop states, animations, and responsive design. Includes some overrides for default Zoho styles. Uses Tailwind utility classes extensively within its custom definitions (implicitly).
+   - **`ToastContextjs.txt`:**
+     - **Purpose:** Creates and provides a React Context for managing and displaying global toast notifications.
+     - **Key Technologies:** React v17 (createContext, useContext, useState, useCallback).
+     - **Dependencies (Imports):** `react`, `../components/Toast.js`.
+     - **Exports:** `ToastProvider` (component), `useToast` (hook).
+     - **Observations:** Standard React Context pattern. Manages toast state (message, type, visibility) and renders the `Toast` component.
+   - **`Toastjs.txt`:**
+     - **Purpose:** React component responsible for rendering individual toast notifications.
+     - **Key Technologies:** React v17 (`useEffect`).
+     - **Dependencies (Imports):** `react`.
+     - **Exports:** `Toast` (default component).
+     - **Props:** `message`, `type`, `isVisible`, `onClose`.
+     - **Observations:** Uses `useEffect` for auto-dismissal timer (except for 'loading'). Uses Tailwind CSS classes and Font Awesome icon classes (`fas fa-...`) for styling based on the `type` prop.
+   - **`KanbanBoardjs.txt`:**
+     - **Purpose:** Main container component for the Kanban view. Renders the toolbar, columns, cards, and skeleton loader. Handles drag-and-drop logic, filtering, sorting, searching, view switching (between project stages and tranches), and column collapsing.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`, `useRef`).
+     - **Dependencies (Imports):** `react`, `../utils/navigation.js` (navigateToURL), `../utils/errorHandling.js` (logError), `./KanbanColumn.js`, `./KanbanCard.js`, `../utils/stagecardUpdate.js` (updateProjectStage, updateProjectTranche), `./Toolbar.js`, `../utils/dataFetching.js` (fetchKanbanProjects - likely unused directly here, passed from parent), `./KanbanBoardSkeleton.js`, `../contexts/ToastContext.js` (useToast), `./TranchesKanbanBoard.js`.
+     - **Exports:** `KanbanBoard` (default component).
+     - **Observations:** Complex component with significant state management (`useState`) and logic for UI interactions (drag-drop, filters, sort). Implements optimistic UI updates for drag-and-drop. Conditionally renders `TranchesKanbanBoard`. Uses `React.createElement`.
+   - **`KanbanColumnjs.txt`:**
+     - **Purpose:** Renders a single vertical stage column in the Kanban board.
+     - **Key Technologies:** React v17 (`useState`).
+     - **Dependencies (Imports):** `react`, `../utils/errorHandling.js` (logError - unused), `./KanbanCard.js`.
+     - **Exports:** `KanbanColumn` (default component).
+     - **Props:** `stage`, `title`, `cards`, `isCollapsed`, `onDrop`, `onDragStart`, `onToggleCollapse`, `onCardClick`.
+     - **Observations:** Manages drop target visual state. Renders header with counts/total size. Maps `cards` prop to render `KanbanCard` components. Handles drag/drop events, calling parent callbacks.
+   - **`KanbanCardjs.txt`:**
+     - **Purpose:** Renders an individual project card.
+     - **Key Technologies:** React v17. Uses Lucide icons.
+     - **Dependencies (Imports):** `react`, `./WorkRequirementBars.js`, `../utils/navigation.js` (navigateToURL), `../utils/recordUpdates.js` (updateUserCallStatus), `lucide-react` (User, DollarSign).
+     - **Exports:** `KanbanCard` (default component).
+     - **Props:** `card`, `view` (unused?), `onDragStart`, `onDragEnd` (unused?), `onDoubleClick`, `onError` (unused?).
+     - **Observations:** Contains extensive data formatting and badge generation logic. Handles phone/email icon clicks. Implements drag start logic. Uses `React.createElement`.
+   - **`KanbanBoardSkeletonjs.txt`:**
+     - **Purpose:** Provides a visual placeholder (loading skeleton) for the Kanban board.
+     - **Key Technologies:** React v17.
+     - **Dependencies (Imports):** `react`.
+     - **Exports:** `KanbanBoardSkeleton` (default component).
+     - **Observations:** Uses hardcoded structure and Tailwind's `animate-pulse` for styling. Purely presentational.
+   - **`Toolbarjs.txt`:**
+     - **Purpose:** Renders the interactive toolbar above the Kanban board, providing search, filtering, sorting, view switching, and refresh controls.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`). Uses `react-select` library.
+     - **Dependencies (Imports):** `react`, `react-select` (implicitly via global/CDN).
+     - **Exports:** `Toolbar` (default component).
+     - **Props:** Receives numerous state values and callbacks from `KanbanBoard`.
+     - **Observations:** Complex component managing local state for filter dropdowns. Uses `react-select` heavily. Implements various UI controls. Calls back to parent (`KanbanBoard`) to update application state/trigger actions.
+   - **`ProjectDetailsModaljs.txt`:**
+     - **Purpose:** Main container component for the detailed project view modal. Manages modal state, renders the header and conditionally renders different tab components based on user selection.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`, `useMemo`).
+     - **Dependencies (Imports):** `react`, utilities (`navigation`, `queryParams`, `errorHandling`, `dataFetching`, `recordUpdates`, `stagecardUpdate`, `recordCreation`, `zohoApi`), components (`WorkRequirementBars`, `EventsSection`, `NoteItem`, `DocumentsTab`, `IssuesSection`, `ActivitiesTab`, `SystemsTab`, `NotesSection`, `IssueModal`, `SalesRepInfo`, `CommunicationTab`, `CommSection`, `TagModal`, `SalesRepTab`, `OverviewTab`, `Counters`, `ModalHeader`, `PermittingTab`, `Toast`, `ContactTab`, `SurveyTab`, `CommissionNotes`, `InvestorsTab`, `PDFPreview`), context (`useToast`). (Many component imports are commented out).
+     - **Exports:** `ProjectDetailsModal` (default component).
+     - **Observations:** Very large component handling state for active tab, note/issue/tag adding, etc. Uses a `switch` statement to render tab content dynamically. Fetches doc types on mount. Manages its own `projectData` state, syncing with props. Contains significant commented-out code.
+   - **`ModalHeaderjs.txt`:**
+     - **Purpose:** Renders the top section of the project details modal, including contact info, key project details, action buttons, tag management, stage/tranche selection, counters, and tab navigation.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`, `useRef`). Uses Lucide icons.
+     - **Dependencies (Imports):** `react`, `lucide-react`, `./Counters.js`.
+     - **Exports:** `ModalHeader` (default component).
+     - **Props:** Receives extensive project data and callbacks from `ProjectDetailsModal`.
+     - **Observations:** Complex component responsible for displaying many data points and handling multiple user interactions (button clicks, dropdown selections). Manages local state for action menu and dropdown search terms.
+   - **`TranchesKanbanBoard.js`:**
+     - **Purpose:** Renders the Kanban board view grouped by Tranches instead of Stages.
+     - **Key Technologies:** React v17 (`useState`).
+     - **Dependencies (Imports):** `react`, `./KanbanColumn.js`, `../contexts/ToastContext.js` (useToast), `../utils/stagecardUpdate.js` (updateProjectTranche).
+     - **Exports:** `TranchesKanbanBoard` (default component).
+     - **Props:** Receives stage-based `projects`, `tranchesData`, callbacks, state flags from `KanbanBoard`.
+     - **Observations:** Reprocesses project data to group by tranche. Reuses `KanbanColumn`. Implements specific drag-and-drop logic for updating project tranches, including optimistic UI (potentially flawed) and toast notifications.
+   - **`OverviewTabjs.txt`:**
+     - **Purpose:** Layout container for the Overview tab within the Project Details Modal.
+     - **Key Technologies:** React v17.
+     - **Dependencies (Imports):** `react`, `./WorkRequirementBars.js`, `./EventsSection.js`, `./NotesSection.js`, `./IssuesSection.js`, `./SalesRepInfo.js`, `./CommSection.js`.
+     - **Exports:** `OverviewTab` (default component).
+     - **Props:** Receives `project` data and numerous callbacks/state variables related to notes, issues, events from `ProjectDetailsModal`.
+     - **Observations:** Arranges child components (`EventsSection`, `NotesSection`, `IssuesSection`, `SalesRepInfo`, etc.) in a two-column layout. Passes props down. Includes a latest activity preview.
+   - **`NotesSectionjs.txt`:**
+     - **Purpose:** Displays the list of notes (filtered for 'General' context) and provides the interface for creating new notes with attachments and user tags.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`, `useRef`).
+     - **Dependencies (Imports):** `react`, `./NoteItem.js`, `../utils/recordCreation.js` (createRecord), `../utils/queryParams.js` (getQueryParams), `../utils/userInfo.js` (getCurrentUser), `../utils/attachmentUpload.js` (createNoteWithAttachments, validateAttachments), `./NoteAttachment.js`.
+     - **Exports:** `NotesSection` (default component).
+     - **Props:** Receives `project` data, note input state/setters, user list, `currentUser`, and various callbacks from `OverviewTab`.
+     - **Observations:** Contains logic for note creation (calling utils), file attachment handling (drag-drop, validation), user tagging dropdown, note threading, and show more/less notes functionality.
+   - **`NoteItemjs.txt`:**
+     - **Purpose:** Renders a single note or reply, including content, author info, attachments, tags, and reply functionality.
+     - **Key Technologies:** React v17.
+     - **Dependencies (Imports):** `react`, `./NoteAttachment.js`.
+     - **Exports:** `NoteItem` (default component).
+     - **Props:** Receives `note` data, `isReply` flag, callbacks, reply state, `users` list, reply count, etc.
+     - **Observations:** Handles display logic for author avatar/initials, tagged users, attachments (using `NoteAttachment`), team/sales status. Conditionally renders reply input section.
+   - **`NoteAttachmentjs.txt`:**
+     - **Purpose:** Renders a preview tile for a note attachment (image or file icon) and handles click events for previewing or downloading.
+     - **Key Technologies:** React v17 (`useState`).
+     - **Dependencies (Imports):** `react`, `../utils/navigation.js` (navigateToURL), `./PDFPreview.js`.
+     - **Exports:** `NoteAttachment` (default component).
+     - **Props:** `attachment` data.
+     - **Observations:** Displays image directly or file icon. Image click opens full-screen preview modal. File click triggers download via `navigateToURL`. Includes URL processing logic. PDF preview seems partially implemented/potentially unused.
+   - **`IssuesSectionjs.txt`:**
+     - **Purpose:** Renders the list of unresolved issues within the `OverviewTab`. Provides buttons to trigger issue resolution and opening the issue creation modal.
+     - **Key Technologies:** React v17.
+     - **Dependencies (Imports):** `react`.
+     - **Exports:** `IssuesSection` (default component).
+     - **Props:** `issues`, `onResolveIssue`, `onRaiseIssue`.
+     - **Observations:** Filters issues locally to show only unresolved ones. Displays issue details (content, author, date, tags, sales notification status). Calls parent callbacks (`onResolveIssue`, `onRaiseIssue`) for actions.
+   - **`IssueModaljs.txt`:**
+     - **Purpose:** Modal dialog component for creating a new issue.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`, `useRef`).
+     - **Dependencies (Imports):** `react`, `../utils/userInfo.js` (indirectly via `currentUser` prop).
+     - **Exports:** `IssueModal` (default component).
+     - **Props:** Numerous state values and setters passed from parent (`ProjectDetailsModal`) including `isOpen`, `onClose`, `issueInput`, `setIssueInput`, `selectedUsers`, `setSelectedUsers`, `users`, `onSubmit`, `showUserDropdown`, `setShowUserDropdown`, `currentUser`, `notifySales`, `setNotifySales`.
+     - **Observations:** Fully controlled component relying on parent state (prop drilling). Implements UI for issue description, user tagging (with filtering), notify sales checkbox. Includes click-outside handling for the user dropdown.
+   - **`EventsSectionjs.txt`:**
+     - **Purpose:** Displays project milestones (Survey, Work, Install, Inspection) in the `OverviewTab`. Allows inline status changes and date scheduling/clearing/booking.
+     - **Key Technologies:** React v17 (`useState`, `useMemo`).
+     - **Dependencies (Imports):** `react`, `../utils/recordUpdates.js` (`updateRecord`), `../utils/navigation.js` (`navigateToURL`). (Others imported but seemingly unused: `recordCreation`, `queryParams`, `dataFetching`).
+     - **Exports:** `EventsSection` (default component).
+     - **Props:** `project`, `onEventAdded` (callback).
+     - **Observations:** Driven by a configuration array (`EVENT_TYPES`) mapping UI to data/API fields. Contains significant logic for handling status updates and date changes via API calls (`updateRecord`). Includes specific URL generation for external survey booking (`navigateToURL`). Manages local loading states. Contains an apparently unused `AddEventModal` component definition.
+   - **`DocumentsTabjs.txt`:**
+     - **Purpose:** Main component for the Documents tab. Handles display, upload (single/multi, drag-drop), search, checklist, editing, and WorkDrive interactions.
+     - **Key Technologies:** React v17 (`useState`, `useRef`, `useEffect`, `useMemo`).
+     - **Dependencies:** `react`, utils (`navigation`, `recordUpdates`, `fileUpload`, `customAPI` - trigger only, `zohoApi` - unused), components (`DocumentTypeDrawer`, `DocumentContent`, `DocumentChecklist`, `MultipleFileUploadForm` - missing), context (`useToast`).
+     - **Props:** `project`, `onRefresh`, `currentUser`, `users`, `previewDoc`, `setPreviewDoc`, `docTypes`, `isLoadingDocTypes`.
+     - **Observations:** Very complex state management. Groups documents by type. Uses child components for structure. Implements drag-drop. Contains duplicated editing/WorkDrive logic. References missing `MultipleFileUploadForm`.
+   - **`DocumentChecklistjs.txt`:**
+     - **Purpose:** Displays a collapsible checklist of required document types.
+     - **Key Technologies:** React v17 (`useState`).
+     - **Dependencies:** `react`.
+     - **Props:** `project`, `docTypes`, `className`.
+     - **Observations:** Filters `docTypes` based on `Include_In_Checklist`. Calculates completion status based on existing documents in `project.documents`. Purely presentational.
+   - **`DocumentTypeDrawerjs.txt`:**
+     - **Purpose:** Renders a collapsible drawer for a specific document type, listing its versions.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`, `useRef`).
+     - **Dependencies:** `react`, `./DocumentContent.js`, context (`useToast`), utils (`navigation`, `recordUpdates`), `./PDFPreview.js` (missing).
+     - **Props:** `doc` (grouped data), `onRefresh`, `handleFileClick`, `projectId`, `workDriveFolderId`, `currentUser`, `users`, `docTypes`, `onToggle`, `isExpanded`, `previewDoc`, `setPreviewDoc`.
+     - **Observations:** Displays versions in a table format. Contains duplicated editing/WorkDrive logic. Handles 'View More'. References missing `PDFPreview`.
+   - **`DocumentContentjs.txt`:**
+     - **Purpose:** Renders a single document entry with details and actions.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`, `useRef`).
+     - **Dependencies:** `react`, utils (`recordUpdates`, `navigation`, `customAPI` - unused), context (`useToast`).
+     - **Props:** `doc` (single document), `isLatestVersion`, `onRefresh`, `handleFileClick`, `projectId`, `workDriveFolderId`, `currentUser`, `users`, `docTypes`, `previewDoc`, `setPreviewDoc`.
+     - **Observations:** Contains significant duplicated editing/WorkDrive logic. Handles preview triggering via callback. Actions dropdown logic seems incomplete.
+   - **`DocumentsSectionjs.txt`:** (Analyzed, but appears unused in main modal flow)
+     - **Purpose:** Renders a summary list of documents, linking to Zoho record summary view.
+     - **Key Technologies:** React v17.
+     - **Dependencies:** `react`, Zoho SDK (`ZOHO.CREATOR.UTIL`).
+     - **Props:** `documents`, `showAll`, `setActiveTab`.
+     - **Observations:** Different functionality (links to Zoho summary) and likely intended for a different UI context than `DocumentsTab`. Not imported by `ProjectDetailsModal` or `DocumentsTab`.
+   - **`MultipleFileUploadFormjs.txt`:**
+     - **Purpose:** Modal form for configuring and initiating uploads of multiple files.
+     - **Key Technologies:** React v17 (`useState`, `useRef`).
+     - **Dependencies:** `react`, `../utils/fileUtils.js` (`processFile`).
+     - **Props:** `files`, `onClose`, `onUpload`, `documentTypes`, `currentUser` (unused?), `isUploading`, `uploadProgress`.
+     - **Observations:** Manages file configurations (type, revision). Allows adding more files via drag-drop/button within the modal. Provides bulk actions. Calls back (`onUpload`) to parent (`DocumentsTab`) to handle actual uploads. Displays progress based on parent state.
+   - **`PDFPreviewjs.txt`:**
+     - **Purpose:** Simple modal overlay component to display a PDF using an iframe.
+     - **Key Technologies:** React v17.
+     - **Dependencies:** `react`.
+     - **Props:** `pdfData`, `fileName`, `onClose`, `onDownload`.
+     - **Observations:** Presentational component. Relies on parent for PDF source (`pdfData`) and action callbacks (`onClose`, `onDownload`).
+   - **`ActivitiesTabjs.txt`:**
+     - **Purpose:** Displays a list of activities for the project.
+     - **Key Technologies:** React v17.
+     - **Dependencies:** `react`.
+     - **Props:** `project`.
+     - **Observations:** Simple read-only display. Formats date/time. Uses icons based on the activity Platform.
+   - **`SurveyTabjs.txt`:**
+     - **Purpose:** Displays and edits site survey results.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordUpdates`, `recordCreation`, `navigation`), context (`useToast`).
+     - **Props:** `project`, `fetchModalData`.
+     - **Observations:** Handles view/edit modes. Uses local form state. Updates existing or creates new survey record (`PM_Kanban_Surveys`/`Add_Survey_Result`). Requires specific date formatting for API calls. Uses helper components for Yes/No fields.
+   - **`ContactTabjs.txt`:**
+     - **Purpose:** Displays project contacts, allows adding new contacts, filtering, and searching.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`), Lucide Icons.
+     - **Dependencies:** `react`, `lucide-react`, `./ContactItem.js`, utils (`recordCreation`).
+     - **Props:** `project`, `onRefresh`.
+     - **Observations:** Manages add contact form state. Filters contacts locally. Uses static list for contact type filter. Includes phone formatting on creation.
+   - **`ContactItemjs.txt`:**
+     - **Purpose:** Displays a single contact card with inline editing, deletion, and 'Set as Main Owner' functionality.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`, `useRef`), Lucide Icons.
+     - **Dependencies:** `react`, `lucide-react`, utils (`recordUpdates`, `deleteRecord`), `./Toast.js`.
+     - **Props:** `contact`, `project`, `onRefresh`, `contactTypes`.
+     - **Observations:** Manages local edit state. Handles update/delete API calls for contact (`PM_Kanban_Contacts`) and project (`PM_Kanban_Projects` for main owner). Uses Toast for feedback.
+   - **`PermittingTabjs.txt`:**
+     - **Purpose:** Displays and edits permit and interconnection information.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordUpdates`, `recordCreation`), context (`useToast`).
+     - **Props:** `project`, `fetchModalData`.
+     - **Observations:** Handles view/edit modes, similar to `SurveyTab`. Uses local form state. Updates existing or creates new permit record (`PM_Kanban_Permits`/`Add_Permitting`). Requires date formatting. Uses extensive status-to-color mapping for badges. Uses hardcoded tag options in edit mode.
+   - **`SystemsTabjs.txt`:**
+     - **Purpose:** Displays system overview and component details. Handles adding, editing, deleting materials and triggering system approval modal.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`), Lucide Icons.
+     - **Dependencies:** `react`, `lucide-react`, `./SystemApprovalModal.js`, `./AddMaterialForm.js` (Missing), utils (`deleteRecord`, `recordUpdates`).
+     - **Props:** `project`, `fetchModalData`, `equipmentData`.
+     - **Observations:** Groups materials by category. Manages inline editing state for materials. Relies on `equipmentData` for dropdowns. Calculates total cost.
+   - **`SystemApprovalModaljs.txt`:**
+     - **Purpose:** Modal for editing system metrics (kW, output, usage), material quantities, and approval status.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordUpdates`).
+     - **Props:** `isOpen`, `onClose`, `system`, `materials`, `onUpdate`.
+     - **Observations:** Edits both project record (`PM_Kanban_Projects`) and potentially multiple material records (`PM_Kanban_Materials`) in one save action. Tracks modifications to update efficiently.
+   - **`TagModaljs.txt`:**
+     - **Purpose:** Modal dialog for selecting a single tag to add.
+     - **Key Technologies:** React v17.
+     - **Dependencies:** `react`.
+     - **Props:** `isOpen`, `onClose`, `selectedTag`, `setSelectedTag`, `availableTags`, `onSubmit`.
+     - **Observations:** Simple controlled component. Sorts available tags alphabetically. Relies on parent (`ProjectDetailsModal`) for state and submission logic.
+   - **`AddMaterialFormjs.txt`:**
+     - **Purpose:** Modal form for adding a new material/component to the project.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordCreation`).
+     - **Props:** `isOpen`, `onClose`, `equipmentData`, `existingMaterials`, `projectId`, `systemId` (unused?), `onMaterialAdded`.
+     - **Observations:** Dynamically populates Manufacturer/Model dropdowns based on selected Category and `equipmentData`. Filters available categories. Calculates prices automatically. Calls `createRecord` on submit.
+   - **`SalesRepTabjs.txt`:**
+     - **Purpose:** Displays sales rep details, commission milestones, and commission notes. Allows changing rep, editing details, editing milestones, and adding notes.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`), Lucide Icons.
+     - **Dependencies:** `react`, `lucide-react`, utils (`recordUpdates`, `navigation`, `updateUserCallStatus`), components (`CommissionNotes`, `EditSalesRepModal`).
+     - **Props:** `project`, `salesReps`, `fetchModalData`, `users`, `currentUser`.
+     - **Observations:** Complex component managing multiple states (rep selection, milestones, rates). Calculates M3 commission. Includes contact actions. Triggers edit modal.
+   - **`CommissionNotesjs.txt`:**
+     - **Purpose:** Section for viewing and adding commission-specific notes.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordCreation`, `queryParams` - unused).
+     - **Props:** `project`, `fetchModalData`, `users`, `currentUser`.
+     - **Observations:** Filters notes by 'Commissions' context. Sorts notes. Handles note creation via `createRecord`.
+   - **`EditSalesRepModaljs.txt`:**
+     - **Purpose:** Modal for editing core sales rep details (Name, Contact, Rates).
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordUpdates`), context (`useToast`).
+     - **Props:** `isOpen`, `onClose`, `salesRep`, `onSave`, `fetchModalData`.
+     - **Observations:** Standard edit modal. Updates `PM_Kanban_Sales_Reps` report. Handles nested Name field for API.
+   - **`InvestorsTabjs.txt`:**
+     - **Purpose:** Displays and allows editing of PPA configuration and Redball submission date. Renders the milestone payments section.
+     - **Key Technologies:** React v17 (`useState`, `useEffect`).
+     - **Dependencies:** `react`, utils (`recordUpdates`), context (`useToast`), `./MilestonesInvestorsTab.js`.
+     - **Props:** `project`, `fetchModalData`.
+     - **Observations:** Manages local state for PPA form data and edit status. Updates `PM_Kanban_Projects` record. Uses hardcoded PPA rates/years. Contains date/currency formatting helpers.
+   - **`MilestonesInvestorsTab.js`:**
+     - **Purpose:** Displays and allows editing of investor milestone payment amounts and dates (M1, M2, M3). Shows projected payments and summary totals/progress.
+     - **Key Technologies:** React v17 (`useState`).
+     - **Dependencies:** `react`, utils (`recordUpdates`), context (`useToast`).
+     - **Props:** `project`, `fetchModalData`, `isPPAEnabled`.
+     - **Observations:** Manages local state for milestone data and edit status. Updates `PM_Kanban_Projects` record. Includes date/currency formatting helpers and calculation logic. Editing is disabled if `isPPAEnabled` prop is false.
+   - **`CommItemjs.txt`:**
+     - **Purpose:** Renders a single communication item based on its type (currently only 'Call').
+     - **Key Technologies:** React v17 (`useState`).
+     - **Dependencies:** `react`.
+     - **Props:** `comm`.
+     - **Observations:** Uses internal `CallView` for calls. Formats call details, determines status/styling, parses description for details. Email/SMS views are placeholders. Contains local formatting helpers.
+
+## 11. Outstanding Assumptions
+   - Zustand/React Query usage still TBC.
+   - `KanbanColumn` iterates projects and renders `KanbanCard`.
+   - `ModalHeaderjs.txt` is likely used within `ProjectDetailsModal.js`.
+   - *(More assumptions may be added)*
+
+## 12. Inferred Directory Structure
+```
+app folder.
+├── widgethtml.txt
+├── styles
+│   └── style.css (Referenced in HTML)
+├── utils
+│   ├── zohoInit.js (Referenced in HTML)
+│   ├── navigation.js (Referenced in HTML, Analyzed)
+│   ├── queryParams.js (Referenced in HTML, Analyzed)
+│   ├── errorHandling.js (Referenced in HTML, Analyzed)
+│   ├── stagecardUpdate.js (Referenced in HTML, Analyzed)
+│   ├── dataFetching.js (Imported by appjs.txt, Analyzed)
+│   ├── recordUpdates.js (Imported by appjs.txt, Analyzed)
+│   ├── userInfo.js (Imported by appjs.txt, attachmentUploadjs.txt, Analyzed)
+│   ├── zohoApi.js (Analyzed as zohoApijs.txt)
+│   ├── recordCreation.js (Analyzed)
+│   ├── deleteRecord.js (Analyzed)
+│   ├── attachmentUpload.js (Analyzed)
+│   ├── customAPI.js (Analyzed)
+│   ├── fileUpload.js (Analyzed)
+│   └── fileUtils.js (Analyzed)
+├── components
+│   ├── ErrorBoundary.js (Referenced in HTML)
+│   ├── WorkRequirementBars.js (Referenced in HTML)
+│   ├── EventsSection.js (Referenced in HTML, Imported by OverviewTabjs.txt, Analyzed)
+│   ├── NoteItem.js (Referenced in HTML)
+│   ├── DocumentsSection.js (Referenced in HTML)
+│   ├── DocumentsTab.js (Imported by ProjectDetailsModaljs.txt, Analyzed)
+│   ├── DocumentChecklist.js (Imported by DocumentsTabjs.txt, Analyzed)
+│   ├── DocumentTypeDrawer.js (Imported by DocumentsTabjs.txt, Analyzed)
+│   ├── DocumentContent.js (Imported by DocumentsTabjs.txt, DocumentTypeDrawerjs.txt, Analyzed)
+│   ├── KanbanCard.js (Referenced in HTML, Imported by KanbanColumnjs.txt, Analyzed)
+│   ├── KanbanColumn.js (Referenced in HTML, Imported by KanbanBoardjs.txt, Analyzed)
+│   ├── KanbanBoard.js (Referenced in HTML, Analyzed)
+│   ├── ProjectDetailsModal.js (Referenced in HTML, Analyzed)
+│   ├── SystemApprovalModal.js (Referenced in HTML)
+│   ├── PDFPreview.js (Imported by appjs.txt)
+│   ├── Toast.js (Imported by ToastContextjs.txt, Analyzed)
+│   ├── Toolbar.js (Imported by KanbanBoardjs.txt, Analyzed)
+│   ├── KanbanBoardSkeleton.js (Imported by KanbanBoardjs.txt, Analyzed)
+│   └── TranchesKanbanBoard.js (Imported by KanbanBoardjs.txt)
+│   ├── OverviewTab.js (Imported by ProjectDetailsModaljs.txt, Analyzed)
+│   ├── NotesSection.js (Imported by OverviewTabjs.txt, Analyzed)
+│   ├── NoteAttachment.js (Imported by NoteItemjs.txt, NotesSectionjs.txt, Analyzed)
+│   ├── IssuesSection.js (Imported by OverviewTabjs.txt, ProjectDetailsModaljs.txt, Analyzed)
+│   ├── SalesRepInfo.js (Imported by OverviewTabjs.txt)
+│   ├── CommSection.js (Imported by OverviewTabjs.txt)
+│   ├── IssueModal.js (Imported by ProjectDetailsModaljs.txt, Analyzed)
+│   ├── Counters.js (Imported by ModalHeaderjs.txt)
+│   ├── ModalHeader.js (Imported by ProjectDetailsModaljs.txt, Analyzed)
+│   ├── PermittingTab.js (Imported by ProjectDetailsModaljs.txt, Analyzed)
+│   ├── ContactTab.js (Imported by ProjectDetailsModaljs.txt, Analyzed)
+│   ├── SurveyTab.js (Imported by ProjectDetailsModaljs.txt, Analyzed)
+│   ├── ActivitiesTab.js (Imported by ProjectDetailsModaljs.txt, Analyzed)
+│   ├── SystemsTab.js (Imported by ProjectDetailsModaljs.txt, Analyzed)
+│   ├── SalesRepTab.js (Imported by ProjectDetailsModaljs.txt, Analyzed)
+│   ├── CommunicationTab.js (Imported by ProjectDetailsModaljs.txt)
+│   ├── TagModal.js (Imported by ProjectDetailsModaljs.txt, Analyzed)
+│   ├── CommissionNotes.js (Imported by ProjectDetailsModaljs.txt, SalesRepTabjs.txt, Analyzed)
+│   ├── InvestorsTab.js (Imported by ProjectDetailsModaljs.txt)
+│   └── MilestonesInvestorsTab.js (Imported by InvestorsTabjs.txt, Analyzed)
+│   ├── WorkRequirementBars.js (Imported by KanbanCardjs.txt, OverviewTabjs.txt, ProjectDetailsModaljs.txt, Analyzed)
+│   └── SalesRepInfo.js (Imported by OverviewTabjs.txt, Analyzed)
+│   ├── MultipleFileUploadForm.js (Imported by DocumentsTabjs.txt, Analyzed)
+│   └── PDFPreview.js (Imported by DocumentTypeDrawerjs.txt, NoteAttachmentjs.txt, Analyzed)
+│   ├── AddMaterialForm.js (Imported by SystemsTabjs.txt, Analyzed)
+│   └── EditSalesRepModal.js (Imported by SalesRepTabjs.txt, Analyzed)
+│   ├── CommItem.js (Imported by CommunicationTab.js - inferred, Analyzed)
+├── contexts
+│   └── ToastContext.js (Imported by appjs.txt, Analyzed)
+└── app.js (Referenced in HTML, Analyzed)
+
+```
+*(Note: This structure is inferred from script tags in `widgethtml.txt` and import paths. Actual structure might differ slightly. File extensions assumed to be `.js` where not specified in analysis files.)*
+
+## Appendix: Analyzed Files
+   - `docs/old_code/widgethtml.txt`
+   - `docs/old_code/appjs.txt`
+   - `docs/old_code/dataFetchingjs.txt`
+   - `docs/old_code/zohoApijs.txt`
+   - `docs/old_code/userInfojs.txt`
+   - `docs/old_code/queryParamsjs.txt`
+   - `docs/old_code/recordUpdatesjs.txt`
+   - `docs/old_code/recordCreationjs.txt`
+   - `docs/old_code/deleteRecordjs.txt`
+   - `docs/old_code/navigationjs.txt`
+   - `docs/old_code/errorHandlingjs.txt`
+   - `docs/old_code/attachmentUploadjs.txt`
+   - `docs/old_code/customAPIjs.txt`
+   - `docs/old_code/fileUploadjs.txt`
+   - `docs/old_code/fileUtilsjs.txt`
+   - `docs/old_code/stagecardUpdatejs.txt`
+   - `docs/old_code/stylescss.txt`
+   - `docs/old_code/ToastContextjs.txt`
+   - `docs/old_code/Toastjs.txt`
+   - `docs/old_code/KanbanBoardjs.txt`
+   - `docs/old_code/KanbanColumnjs.txt`
+   - `docs/old_code/KanbanCardjs.txt`
+   - `docs/old_code/KanbanBoardSkeletonjs.txt`
+   - `docs/old_code/Toolbarjs.txt`
+   - `docs/old_code/ProjectDetailsModaljs.txt`
+   - `docs/old_code/ModalHeaderjs.txt`
+   - `docs/old_code/TranchesKanbanBoardjs.txt`
+   - `docs/old_code/OverviewTabjs.txt`
+   - `docs/old_code/NotesSectionjs.txt`
+   - `docs/old_code/NoteItemjs.txt`
+   - `docs/old_code/NoteAttachmentjs.txt`
+   - `docs/old_code/IssuesSectionjs.txt`
+   - `docs/old_code/IssueModaljs.txt`
+   - `docs/old_code/EventsSectionjs.txt`
+   - `docs/old_code/CommSectionjs.txt`
+   - `docs/old_code/SalesRepInfojs.txt`
+   - `docs/old_code/WorkRequirementBarsjs.txt`
+   - `docs/old_code/DocumentsTabjs.txt`
+   - `docs/old_code/DocumentContentjs.txt`
+   - `docs/old_code/DocumentTypeDrawerjs.txt`
+   - `docs/old_code/DocumentChecklistjs.txt`
+   - `docs/old_code/DocumentsSectionjs.txt` (Analyzed, likely unused)
+   - `docs/old_code/MultipleFileUploadFormjs.txt`
+   - `docs/old_code/PDFPreviewjs.txt`
+   - `docs/old_code/ActivitiesTabjs.txt`
+   - `docs/old_code/SurveyTabjs.txt`
+   - `docs/old_code/ContactTabjs.txt`
+   - `docs/old_code/ContactItemjs.txt`
+   - `docs/old_code/PermittingTabjs.txt`
+   - `docs/old_code/SystemApprovalModaljs.txt`
+   - `docs/old_code/SystemsTabjs.txt`
+   - `docs/old_code/TagModaljs.txt`
+   - `docs/old_code/AddMaterialFormjs.txt`
+   - `docs/old_code/SalesRepTabjs.txt`
+   - `docs/old_code/CommissionNotesjs.txt`
+   - `docs/old_code/EditSalesRepModaljs.txt`
+   - `docs/old_code/InvestorsTabjs.txt`
+   - `docs/old_code/MilestonesInvestorsTab.js`
+   - `docs/old_code/CommItemjs.txt`

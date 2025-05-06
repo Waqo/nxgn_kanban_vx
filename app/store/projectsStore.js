@@ -392,7 +392,7 @@ export const useProjectsStore = defineStore('projects', {
        } 
        // If START_IN_DEMO_MODE is false, finalCriteria remains null (no filters applied)
        
-       console.log(`Projects Store (Pinia): Fetching projects with criteria: ${finalCriteria}`);
+       // console.log(`Projects Store (Pinia): Fetching projects with criteria: ${finalCriteria}`);
 
       try {
         // ... (while loop for fetching)
@@ -450,7 +450,7 @@ export const useProjectsStore = defineStore('projects', {
             return;
         }
         
-        const originalStageId = project.New_Stage?.ID;
+        const originalStageId = project.New_Stage?.ID || null;
         const originalStageTitle = project.New_Stage?.title || 'Unknown Stage';
         const newStageTitle = newStage.title;
         
@@ -463,12 +463,21 @@ export const useProjectsStore = defineStore('projects', {
         this._updateProjectStageOptimistic({ projectId, newStageId, newStageTitle });
 
         try {
-           await ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, { data: { [FIELD_PROJECT_STAGE_LOOKUP]: newStageId } });
-           // --- Log Activity (Fire and Forget) ---
-           logActivity(projectId, `Stage updated to '${newStageTitle}'`); 
-           
-           uiStore.removeNotification(loadingNotificationId);
-           uiStore.addNotification({ type: 'success', message: `Project moved to ${newStageTitle}` });
+            // Prepare payload with BOTH stage and previous stage
+            const updatePayload = {
+                data: {
+                    [FIELD_PROJECT_STAGE_LOOKUP]: newStageId,
+                    'Previous_Stage_ID': originalStageId // Add the previous stage ID here (Use Constant if defined)
+                }
+            };
+
+            // Make the API call with the combined payload
+            await ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, updatePayload);
+            // --- Log Activity (Fire and Forget) ---
+            logActivity(projectId, `Stage updated to '${newStageTitle}'`); 
+            
+            uiStore.removeNotification(loadingNotificationId);
+            uiStore.addNotification({ type: 'success', message: `Project moved to ${newStageTitle}` });
         } catch (error) {
            console.error("Projects Store (Pinia): Failed to update project stage:", error);
            // --- ADD Log error to Zoho --- 
@@ -476,7 +485,8 @@ export const useProjectsStore = defineStore('projects', {
              operation: 'updateProjectStage',
              projectId: projectId,
              newStageId: newStageId,
-             details: 'API call failed during stage update.'
+             details: 'API call failed during stage update.',
+             widgetName: "Kanban Widget"
            });
            // --- END Log error ---
            uiStore.removeNotification(loadingNotificationId);
@@ -528,7 +538,8 @@ export const useProjectsStore = defineStore('projects', {
               operation: 'updateProjectTranche',
               projectId: projectId,
               newTrancheId: newTrancheId, // Log the target ID (could be null)
-              details: 'API call failed during tranche update.'
+              details: 'API call failed during tranche update.',
+              widgetName: "Kanban Widget"
             });
             // --- END Log error --- 
             uiStore.removeNotification(loadingNotificationId);
@@ -615,7 +626,8 @@ export const useProjectsStore = defineStore('projects', {
               operation: 'updateProjectTags',
               projectId: projectId,
               tagIds: tagIds, // Log the attempted tag IDs
-              details: 'API call failed during tag update.'
+              details: 'API call failed during tag update.',
+              widgetName: "Kanban Widget"
             });
             // --- END Log error --- 
             uiStore.addNotification({ type: 'error', title: 'Error', message: `Failed to update tags: ${error.message}` });
@@ -662,7 +674,8 @@ export const useProjectsStore = defineStore('projects', {
               operation: 'updateProjectFundedStatus',
               projectId: projectId,
               isFunded: isFunded, 
-              details: 'API call failed during funded status update.'
+              details: 'API call failed during funded status update.',
+              widgetName: "Kanban Widget"
             });
             // --- END Log error --- 
             uiStore.addNotification({ type: 'error', title: 'Error', message: `Failed to update funding status: ${error.message}` });
@@ -716,7 +729,8 @@ export const useProjectsStore = defineStore('projects', {
               operation: 'updateWeeklyEmailOptIn',
               projectId: projectId,
               optInStatus: optInStatus, 
-              details: 'API call failed during weekly email opt-in update.'
+              details: 'API call failed during weekly email opt-in update.',
+              widgetName: "Kanban Widget"
             });
             // --- END Log error --- 
             uiStore.addNotification({ type: 'error', title: 'Error', message: `Failed to update weekly email status: ${error.message}` });
@@ -793,7 +807,8 @@ export const useProjectsStore = defineStore('projects', {
               operation: 'updateSystemOverview',
               projectId: projectId,
               systemData: systemData, // Log the data attempted
-              details: 'API call failed during system overview update.'
+              details: 'API call failed during system overview update.',
+              widgetName: "Kanban Widget"
             });
             // --- END Log error --- 
             uiStore.addNotification({ type: 'error', title: 'Error', message: `Failed to update system overview: ${error.message}` });
@@ -839,7 +854,8 @@ export const useProjectsStore = defineStore('projects', {
             logErrorToZoho(error, { 
               operation: 'triggerFolderCreation',
               projectId: projectId, 
-              details: 'API call failed when triggering folder creation.'
+              details: 'API call failed when triggering folder creation.',
+              widgetName: "Kanban Widget"
             });
             // --- END Log error --- 
              uiStore.removeNotification(loadingNotificationId);
@@ -900,7 +916,8 @@ export const useProjectsStore = defineStore('projects', {
               issueContent: issueContent, // Log the content
               notifySales: notifySales,
               taggedUserIds: taggedUserIds,
-              details: 'API call failed when adding project issue.'
+              details: 'API call failed when adding project issue.',
+              widgetName: "Kanban Widget"
             });
             // --- END Log error --- 
              uiStore.removeNotification(loadingNotificationId);
@@ -961,7 +978,8 @@ export const useProjectsStore = defineStore('projects', {
             logErrorToZoho(error, { 
               operation: 'resolveProjectIssue',
               issueId: issueId, 
-              details: 'API call failed when resolving project issue.'
+              details: 'API call failed when resolving project issue.',
+              widgetName: "Kanban Widget"
             });
             // --- END Log error --- 
              uiStore.removeNotification(loadingNotificationId);
@@ -1017,7 +1035,8 @@ export const useProjectsStore = defineStore('projects', {
               operation: 'updateProjectSalesRep',
               projectId: projectId,
               newSalesRepId: newSalesRepId,
-              details: 'API call failed during Sales Rep update.'
+              details: 'API call failed during Sales Rep update.',
+              widgetName: "Kanban Widget"
             });
             uiStore.removeNotification(loadingNotificationId);
             uiStore.addNotification({ type: 'error', title: 'Update Failed', message: `Failed to assign Sales Rep: ${error.message}` });
@@ -1086,7 +1105,8 @@ export const useProjectsStore = defineStore('projects', {
                projectId: projectId,
                eventType: eventType,
                payloadAttempted: payload, // Log the payload we tried to send
-               details: 'API call failed during project event update.'
+               details: 'API call failed during project event update.',
+               widgetName: "Kanban Widget"
              });
              uiStore.addNotification({ type: 'error', title: 'Update Error', message: `Failed to update ${eventType}: ${error.message}` });
              throw error; // Re-throw so the component knows it failed
@@ -1167,7 +1187,8 @@ export const useProjectsStore = defineStore('projects', {
               operation: 'addTask',
               projectId: projectId,
               payloadAttempted: payload, 
-              details: 'API call failed when adding project task.'
+              details: 'API call failed when adding project task.',
+              widgetName: "Kanban Widget"
             });
              uiStore.removeNotification(loadingNotificationId);
              uiStore.addNotification({ type: 'error', title: 'Action Failed', message: `Failed to add task: ${error.message || 'Unknown error'}` });
@@ -1228,7 +1249,8 @@ export const useProjectsStore = defineStore('projects', {
               operation: 'updateTaskStatus',
               taskId: taskId,
               newStatus: newStatus,
-              details: 'API call failed when updating task status.'
+              details: 'API call failed when updating task status.',
+              widgetName: "Kanban Widget"
             });
             uiStore.removeNotification(loadingNotificationId);
             uiStore.addNotification({ type: 'error', title: 'Action Failed', message: `Failed to update task status: ${error.message || 'Unknown error'}` });

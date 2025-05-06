@@ -59,7 +59,7 @@ const ContactsTab = {
             // console.log('ContactsTab: Contacts from prop:', this.project.Contacts);
             // *** Implement new sorting logic ***
             const contactsToSort = this.project?.Contacts || [];
-            console.log('ContactsTab: ContactData:', contactsToSort);
+          // console.log('ContactsTab: ContactData:', contactsToSort);
             return contactsToSort.slice().sort((a, b) => {
                 const typeOrder = {
                     'Owner 1': 1,
@@ -124,7 +124,7 @@ const ContactsTab = {
         startEditing(contactId) {
             const contact = this.contacts.find(c => c.ID === contactId);
             if (!contact) return;
-            console.log("Start editing contact:", contact);
+          // console.log("Start editing contact:", contact);
             // Remove Primary_Contact_Type1 mapping
             this.editedContactForm = {
                 First_Name: contact.Name?.first_name || '',
@@ -156,7 +156,7 @@ const ContactsTab = {
         async handleAddContactSubmit(formData) { 
             const contactsStore = useContactsStore();
             this.isSubmitting = true; 
-            console.log('Submitting New Contact from Form:', formData); // formData no longer has Primary_Contact_Type1
+          // console.log('Submitting New Contact from Form:', formData); // formData no longer has Primary_Contact_Type1
             try {
                 await contactsStore.addProjectContact({
                     projectId: this.project.ID,
@@ -174,7 +174,7 @@ const ContactsTab = {
             
             const contactsStore = useContactsStore();
             this.isSubmitting = true; 
-            console.log('Submitting Edit Contact from Form:', this.isEditingContactId, formData); // formData no longer has Primary_Contact_Type1
+          // console.log('Submitting Edit Contact from Form:', this.isEditingContactId, formData); // formData no longer has Primary_Contact_Type1
              try {
                 await contactsStore.updateProjectContact({
                     contactId: this.isEditingContactId,
@@ -192,7 +192,7 @@ const ContactsTab = {
              // *** FIX: Use contactsStore ***
              const contactsStore = useContactsStore();
              const uiStore = useUiStore();
-             console.log('Executing Delete Contact:', contactId);
+           // console.log('Executing Delete Contact:', contactId);
              try {
                  await contactsStore.deleteProjectContact({ contactId });
                  if (this.isEditingContactId === contactId) {
@@ -208,7 +208,7 @@ const ContactsTab = {
              // *** FIX: Use contactsStore ***
              const contactsStore = useContactsStore();
              const uiStore = useUiStore();
-             console.log('Executing Set Main Owner:', contactId);
+           // console.log('Executing Set Main Owner:', contactId);
              try {
                  await contactsStore.setProjectMainOwner({
                      projectId: this.project.ID,

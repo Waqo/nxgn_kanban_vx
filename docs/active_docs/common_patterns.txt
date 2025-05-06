@@ -1,0 +1,47 @@
+# Common Patterns & Usage Guidelines for Zoho Creator Widgets
+
+## Purpose
+This document outlines common patterns, architectural choices, and UI/UX guidelines to ensure consistency, maintainability, and a unified user experience across all custom Zoho Creator widgets within the NexGen Portal application. Adhering to these guidelines will streamline development and simplify future updates.
+
+## 1. Core Principles (Reference `general_rules`)
+Always adhere to the core principles defined in `general_rules`:
+- **API Usage:** Strictly follow `docs/active_docs/zoho_Api.txt` for all Zoho API interactions.
+- **Directory Structure:** Keep `docs/active_docs/project_directory.txt` updated with any file additions or movements.
+- **Data Flow:** Document all data flows (API -> Processor -> Store -> Component) in `docs/active_docs/data_flow.txt`.
+- **Error Handling:** Use the system-wide notification system. **Never** use browser `alert()`.
+- **Vue.js:** Use the **Composition API** for all new Vue components. Avoid the Options API.
+- **Clarity:** Never assume. Ask if unsure about requirements, existing code, or data flow.
+
+## 2. Widget Architecture & Scope
+- **Single Responsibility:** Aim for each widget to serve a primary purpose (e.g., Dashboard, Project List, Project Details, Settings). Avoid overloading a single widget with too many distinct functionalities.
+- **Zoho UI Avoidance:** Custom widgets are preferred over default Zoho Creator UI elements (forms, reports) to maintain a consistent look and feel.
+
+## 3. UI/UX Patterns
+- **Styling:** Use Tailwind CSS utility classes as the primary styling method. Define reusable custom classes in `widget.html` or a dedicated CSS file only when necessary.
+- **Component Library:** Identify and build reusable UI components (e.g., buttons, modals, tables, cards, input fields) and store them in a shared directory (e.g., `src/components/common/`).
+- **Navigation:**
+    - Within a widget: Use Vue Router or simple conditional rendering (`v-if`) for different views if needed.
+    - Between widgets: Rely on Zoho Creator's standard widget navigation.
+- **Data Display:**
+    - **Lists (e.g., Projects, Logs):** Use standardized table or list components. Implement consistent pagination or loading indicators.
+    - **Details (e.g., Project Details, Settings items):** Use standardized display components or forms. Prefer dedicated widget "pages" for complex views over deeply nested modals.
+    - **Dashboards:** Utilize reusable card and grid components.
+- **User Feedback:** Provide clear loading states, success messages, and error notifications using the designated notification system.
+
+## 4. State Management
+- **Pinia:** Use Pinia for managing state within each widget. Define stores logically based on features or data domains (e.g., `projectsStore`, `userStore`, `settingsStore`).
+- **Inter-Widget Communication:** If needed, use Zoho Platform APIs (e.g., writing to a shared module/record) or browser `localStorage`/`sessionStorage` cautiously. Document any such mechanisms clearly in `data_flow.txt`.
+
+## 5. API Interaction
+- **Abstraction Layer:** Create dedicated functions/modules (e.g., `src/api/creator.js`) to encapsulate all `ZOHO.CREATOR.API` calls. Components should import and use these functions, not call the SDK directly.
+- **Data Processing:** Use processor functions (as documented in `data_flow.txt`) to transform API data into the format needed by the stores/components.
+
+## 6. Planned Widgets & Specific Considerations
+- **Dashboard:** Role-based content display. Reusable feed, stats grid, and activity components.
+- **Projects Page:** List view component. Click action navigates to the Project Details widget.
+- **Project Details Page:** Display detailed project info. Ensure consistency with any similar modal views.
+- **Settings Page:** CRUD operations for various lookup data (Stages, Tags, Users, etc.). Use standardized forms and API calls.
+- **Profile Page:** User self-management. Standardized form for user record interaction.
+- **Dev Page:** Log viewer. Standardized list/table component for displaying log records.
+
+*This document should be updated as new patterns emerge or existing ones are refined.* 

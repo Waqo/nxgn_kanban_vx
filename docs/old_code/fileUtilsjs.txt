@@ -1,0 +1,68 @@
+const FILE_TYPE_MAP = {
+    // PDFs
+    'application/pdf': '.pdf',
+    
+    // Images
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/heic': '.heic',
+    
+    // Documents
+    'application/msword': '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+    'application/vnd.ms-excel': '.xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+    'text/plain': '.txt',
+    'text/csv': '.csv',
+    'application/csv': '.csv',
+    'application/vnd.ms-excel': '.csv',
+    
+    // Other common types
+    'application/zip': '.zip',
+    'application/x-zip-compressed': '.zip'
+};
+
+export const processFile = (file) => {
+    const fileType = file.type;
+    const fileName = file.name;
+    
+    // First check if the file already has an extension
+    const hasExtension = /\.[^.]+$/.test(fileName);
+    if (hasExtension) {
+        return {
+            file,
+            fileName,
+            isValidType: true,
+            extension: fileName.match(/\.[^.]+$/)[0]
+        };
+    }
+    
+    // If no extension, try to get it from the MIME type
+    const expectedExtension = FILE_TYPE_MAP[fileType];
+    
+    if (!expectedExtension) {
+        console.warn(`Unknown file type: ${fileType}`);
+        // Try to extract extension from filename if present
+        const extensionMatch = fileName.match(/\.[^.]+$/);
+        return {
+            file,
+            fileName,
+            isValidType: !!extensionMatch,
+            extension: extensionMatch ? extensionMatch[0] : null,
+            error: !extensionMatch ? 'Unsupported file type' : null
+        };
+    }
+
+    return {
+        file,
+        fileName: `${fileName}${expectedExtension}`,
+        isValidType: true,
+        extension: expectedExtension
+    };
+};
+
+export const validateFiles = (files) => {
+    return Array.from(files).map(file => processFile(file));
+}; 

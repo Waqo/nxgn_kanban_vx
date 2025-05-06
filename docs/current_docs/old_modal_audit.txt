@@ -1,0 +1,1097 @@
+# Old React Modal Audit Report
+
+This report details the components and functionality of the old React-based Project Details Modal, based on the provided code files.
+
+## 1. `ProjectDetailsModal` (`ProjectDetailsModaljs.txt`)
+
+*   **Purpose:** The main container component for the project details view. It manages the overall state of the modal, including the active tab, project data, and interactions between different sections.
+*   **Key Functionality:**
+    *   Manages modal visibility (`showProjectModal` in `appjs.txt`).
+    *   Fetches detailed project data (`fetchModalData` which calls `fetchProjectDetails`).
+    *   Handles tab switching (`activeTab` state).
+    *   Coordinates data refreshing (`onRefresh`, `fetchModalData`).
+    *   Manages modals for adding tags (`TagModal`) and issues (`IssueModal`).
+    *   Handles PDF preview (`PDFPreview`).
+    *   Provides context (like `currentUser`, `users`, `stages`, `equipmentData`, `tagMap`, `salesReps`, `tranchesData`, `docTypes`) to child components.
+    *   Handles global actions like closing the modal, initiating email/phone calls via `ModalHeader`.
+    *   Includes a loading overlay when `project` data is not yet available.
+    *   Uses `ToastContext` for displaying notifications.
+    *   Manages state for note input, replies, expanded notes, etc., passing these down to `OverviewTab` -> `NotesSection`.
+    *   Manages state for adding issues and related user tagging, passing down to `OverviewTab` -> `IssuesSection`.
+    *   Handles tag addition/removal logic, interacting with `updateRecord`.
+    *   Handles stage and tranche changes via `ModalHeader`, interacting with `updateRecord` and `updateProjectTranche`.
+    *   Handles "Funded By Redball" checkbox changes via `ModalHeader`.
+    *   Handles "Create Project Folders" button click via `ModalHeader`, interacting with `updateRecord`.
+    *   Fetches `docTypes` on mount using `getDocTypes`.
+*   **Sub-components:**
+    *   `ModalHeader`
+    *   `OverviewTab`
+    *   `ContactTab`
+    *   `DocumentsTab`
+    *   `SurveyTab`
+    *   `SystemsTab`
+    *   `PermittingTab`
+    *   `SalesRepTab`
+    *   `ActivitiesTab`
+    *   `CommunicationTab`
+    *   `InvestorsTab`
+    *   `IssueModal`
+    *   `TagModal`
+    *   `PDFPreview`
+    *   `Toast`
+*   **Dependencies:** `react`, utility functions (`navigateToURL`, `getQueryParams`, `logError`, `fetchProjectDetails`, `updateUserCallStatus`, `updateRecord`, `updateProjectTranche`, `createRecord`, `getDocTypes`), Contexts (`ToastContext`).
+
+## 2. `ModalHeader` (`ModalHeaderjs.txt`)
+
+*   **Purpose:** Displays the top section of the modal, including project name, key details, action buttons, and tabs. Serves as the primary interaction point for high-level project actions and navigation within the modal.
+*   **Structure:**
+    *   Uses a flex container (`flex-none`) for the overall header.
+    *   Top section has a blue gradient background (`bg-gradient-to-r from-blue-600 to-blue-700`).
+    *   Contains multiple nested flex containers to arrange elements:
+        *   Top row: Contact name + Email/Call buttons on the left; More Actions/Refresh/Close buttons on the right.
+        *   Middle row: Status dot, Stage selector, Tranche selector, Funded checkbox, System Size, Payment Option, Install Date, Sold Date, COM/RES badges.
+        *   Address row.
+        *   Tags section with header and list.
+    *   `Counters` component is rendered below the gradient section.
+    *   Tab navigation menu is rendered at the bottom.
+*   **State Management:**
+    *   `showActionsMenu`: Controls visibility of the "More Actions" dropdown.
+    *   `stageSearchTerm`: Holds the search input value for the stage dropdown.
+    *   `trancheSearchTerm`: Holds the search input value for the tranche dropdown.
+    *   Uses `useRef` (`actionMenuRef`, `stageDropdownRef`) and `useEffect` to handle clicks outside the dropdowns, closing them automatically.
+*   **Key Functionality:**
+    *   **Displays Core Info:** Shows `projectData?.contactName`, system size (`kw_STC`), payment option (`paymentOption`), install date (formatted, calculated if needed), sold date (formatted), commercial/residential status (`isCommercial`), and address (`address`).
+    *   **Contact Actions:**
+        *   Email button: Calls `handleEmailClick` (passed from parent) with `projectData`.
+        *   Call button: Calls `updateUserCallStatus` directly using `project.contactPhone` and `project.contactName`.
+    *   **External Links (More Actions Menu):**
+        *   Conditionally renders "Open in OpenSolar" button if `projectData?.os_id` exists, opening `https://app.opensolar.com/#/projects/{os_id}`.
+        *   Conditionally renders "Open in Aduu Solar" button if `projectData?.aduuPortalID` exists, opening `https://client.aduusolar.com/portal/orders/{aduuPortalID}`.
+    *   **Modal Controls:**
+        *   Refresh button: Sets `isRefreshing` (prop) to true and calls `fetchModalData` (prop).
+        *   Close button: Calls `onClose` (prop).
+    *   **Stage Management:**
+        *   Displays current stage using `getStageDisplay` (prop).
+        *   Toggles stage dropdown visibility (`isChangingStage` prop).
+        *   Dropdown includes a search input (`stageSearchTerm`).
+        *   Lists filtered stages; clicking a stage calls `handleStageChange` (prop) with the stage title.
+        *   Shows loading spinner (`animate-spin`) or error message (`stageUpdateError` prop) during stage changes.
+    *   **Tranche Management:**
+        *   Displays current tranche using `projectData?.trancheField?.Tranche_Number` or "No Tranche".
+        *   Toggles tranche dropdown visibility (`isChangingTranche` prop).
+        *   Dropdown includes search (`trancheSearchTerm`) and a "No Tranche" option.
+        *   Lists filtered tranches from `tranchesData` (prop); clicking calls `handleTrancheChange` (prop) with the tranche ID (or `null` for "No Tranche").
+    *   **Funding Status:**
+        *   Displays "Funded By Redball" checkbox, checked based on `projectData?.fundedByRedball === "true"`.
+        *   Checkbox changes call `handleFundedByRedballChange` (prop).
+    *   **Address Action:** Address text is clickable, calling `handleAddressClick` (prop) to open Google Maps.
+    *   **Tag Management:**
+        *   Displays `projectData?.processedTags` as pills with background color based on tag data.
+        *   Each tag pill has an 'X' button calling `handleRemoveTag` (prop) with the tag ID.
+        *   "Add Tag" button sets `isAddingTag` (prop) to true (likely opening `TagModal`).
+    *   **Tab Navigation:** Renders a list of tab names. Clicking a tab calls `setActiveTab` (prop) with the lowercased tab name. Applies conditional styling based on `activeTab` (prop).
+*   **Sub-components:** `Counters`.
+*   **Dependencies:** `react`, `lucide-react` icons (`Mail`, `Phone`, `MoreVertical`, `RefreshCw`, `X`, `ExternalLink`, `Plus`, `MapPin`, `ChevronDown`, `ChevronUp`), `Counters` component, various props passed from `ProjectDetailsModal` for data display and event handling.
+
+## 3. Tabs
+
+### 3.1. `OverviewTab` (`OverviewTabjs.txt`)
+
+*   **Purpose:** Provides a consolidated dashboard view of the project's key status points, recent activities, and potential blockers. Designed as the default landing tab.
+*   **Structure:**
+    *   Uses a main flex container (`flex flex-col`) to stack sections.
+    *   Within the main container, it uses two identical `div`s with `flex space-x-6 bg-blue-50 p-6 w-full` to create two main horizontal sections, each containing a two-column layout.
+    *   **Top Section:**
+        *   Left Column (`flex-1 space-y-8`): Contains `EventsSection` and the latest activity preview.
+        *   Right Column (`w-80 flex-shrink-0 space-y-6`): Contains `SalesRepInfo`, `WorkRequirementBars`, `IssuesSection`, and `CommSection`.
+    *   **Bottom Section:**
+        *   Left Column (`flex-1`): Contains `NotesSection`. (The right column is implicitly empty in this section).
+*   **Key Functionality:**
+    *   Acts primarily as a layout orchestrator, arranging its sub-components.
+    *   Passes down project data (`project`) to all relevant sub-components.
+    *   Passes down specific event handlers received from `ProjectDetailsModal` to the appropriate sub-components:
+        *   `onEventAdded` -> `EventsSection`
+        *   Note-related props (`noteInput`, `setNoteInput`, `handleAddNote`, etc.) -> `NotesSection`
+        *   Issue-related props (`handleResolveIssue`, `handleRaiseIssue`) -> `IssuesSection`
+    *   Passes `setActiveTab` down to components that might need to trigger a tab change (e.g., "View All" buttons in activity/communication previews).
+    *   Includes a preview of the latest activity:
+        *   Takes the first item from `project?.activities`.
+        *   Displays `Activity`, `Author`, and formatted `Added_Time`.
+        *   Provides a "View All" button that calls `setActiveTab('activity')`.
+*   **Sub-components:**
+    *   `EventsSection`: Displays upcoming/past project events and their statuses.
+    *   `SalesRepInfo`: Shows contact details for the assigned sales representative.
+    *   `WorkRequirementBars`: Visualizes the status of necessary pre-installation work (Tree, Roof, Panel Upgrade).
+    *   `IssuesSection`: Lists currently open issues and provides a button to raise new ones.
+    *   `CommSection`: Shows a preview of the most recent communication log.
+    *   `NotesSection`: The primary area for viewing and adding project notes and replies, including attachments and user tagging.
+*   **Dependencies:** `react`, `EventsSection`, `NotesSection`, `IssuesSection`, `SalesRepInfo`, `CommSection`, `WorkRequirementBars` (import commented out in source, but used in rendering). Helper `formatDate`.
+
+### 3.2. `ContactTab` (`ContactTabjs.txt`)
+
+*   **Purpose:** Displays and manages all contacts associated with the current project. Provides functionality to add new contacts and edit or delete existing ones.
+*   **Structure:**
+    *   Main container (`div` with `space-y-6 p-8`).
+    *   Header section: Title ("Project Contacts"), description, and "Add Contact" button.
+    *   Conditional Add Contact Form: A `div` that appears when `isAddingContact` is true, containing various input fields.
+    *   Search and Filter section: A flex container holding the search input and type filter dropdown.
+    *   Contacts List: A grid container (`grid grid-cols-1 md:grid-cols-2 gap-4`) that maps over `filteredContacts` and renders a `ContactItem` for each.
+*   **State Management:**
+    *   `searchTerm`: Holds the value of the search input.
+    *   `selectedType`: Holds the value of the contact type filter dropdown.
+    *   `isAddingContact`: Boolean flag to toggle the visibility of the add contact form.
+    *   `newContact`: Object holding the state for the add contact form fields, including nested `Name` and `Billing_Address` objects.
+    *   `showBillingAddress`: Boolean flag to toggle the visibility of billing address fields within the add contact form.
+*   **Key Functionality:**
+    *   **Display:** Renders a list of contacts using the `ContactItem` component.
+    *   **Filtering & Searching:**
+        *   Filters the `project.contacts` array based on `searchTerm` (matches first name, last name, email, or business name) and `selectedType` (matches `Contact_Type`).
+        *   Uses static `contactTypes` array for the filter dropdown (All, Owner 1, Owner 2, Other Project Contact).
+    *   **Adding Contacts:**
+        *   Toggles an inline form using the "Add Contact" button.
+        *   Form collects: First Name, Last Name, Contact Type (dropdown), Email, Phone, Mobile.
+        *   "Business Contact" checkbox (`Business_POC`) conditionally shows Job Title and Business Name inputs.
+        *   "Add Billing Address" checkbox (`showBillingAddress`) conditionally shows inputs for Address Line 1/2, City, State, Postal Code.
+        *   `handleAddContact` function:
+            *   Formats phone numbers (prepends +1 if 10 digits).
+            *   Constructs the payload for the `Add_Contact` form, including nested `Name` object and `Project` ID.
+            *   Conditionally includes `Billing_Address` object if any address fields are filled.
+            *   Removes empty phone number fields from the payload.
+            *   Calls `createRecord('Add_Contact', contactData)`.
+            *   On success, resets the form, closes it (`setIsAddingContact(false)`), and calls `onRefresh` (prop).
+    *   **Editing/Deleting Contacts:** Functionality is delegated to the `ContactItem` component.
+    *   **Refreshing Data:** Relies on the `onRefresh` prop (passed from `ProjectDetailsModal`) to be called after adding, editing, or deleting a contact to update the list.
+*   **Sub-components:** `ContactItem`.
+*   **Dependencies:** `react`, `lucide-react` icons (`Users`, `Briefcase`, `Building2`, `Mail`, `Phone`, `Smartphone`, `Search`, `Plus`, `UserCircle2`, `MoreVertical`), utility functions (`createRecord`), `ContactItem` component.
+
+### 3.3. `DocumentsTab` (`DocumentsTabjs.txt`)
+
+*   **Purpose:** Provides a comprehensive interface for managing all project-related documents, including viewing, uploading, organizing by type, and tracking against a checklist.
+*   **Structure:**
+    *   Main container (`div` with padding and max-width).
+    *   Header section (`renderHeader` function): Title, document count, WorkDrive folder buttons (conditional), search input.
+    *   `DocumentChecklist` component.
+    *   Drag & Drop / File Upload Input area.
+    *   Conditional rendering of `MultipleFileUploadForm` modal.
+    *   Mapping over `groupedDocuments.typed` to render `DocumentTypeDrawer` for each type.
+    *   Section for displaying `groupedDocuments.untyped` using `DocumentContent`.
+    *   Error Alert component (`ErrorAlert`).
+*   **State Management:**
+    *   `expandedTypes`: Object to track which document type drawers are expanded.
+    *   `isUploading`: Boolean flag for upload operations.
+    *   `errorMessage`: Stores error messages for the `ErrorAlert`.
+    *   `editingDocId`, `editFormData`: State for inline editing within `DocumentTypeDrawer` (although edit logic is primarily in `DocumentTypeDrawer` itself).
+    *   `dragActive`: Boolean for drag-and-drop UI state.
+    *   `uploadFile`, `uploadFormData`, `showUploadForm`: State for the (now seemingly unused) single upload form.
+    *   `showMultipleUploadForm`: Boolean to control the visibility of the multiple upload modal.
+    *   `selectedFiles`: Array of files selected for multiple upload.
+    *   `uploadProgress`: Object to track progress of multiple uploads.
+    *   `searchQuery`: Holds the value of the document search input.
+*   **Key Functionality:**
+    *   **Display & Organization:**
+        *   Renders the `DocumentChecklist`.
+        *   Groups documents by type (`Doc_Type.ID`) using `React.useMemo` on `project.documents`.
+        *   Renders each typed group within an expandable `DocumentTypeDrawer`.
+        *   Renders untyped documents in a separate section using `DocumentContent`.
+        *   Sorts documents within each group/untyped list by `Added_Time` (newest first).
+    *   **Search:** Filters displayed documents (both typed and untyped) based on `searchQuery` matching document name or type name.
+    *   **Uploading:**
+        *   Provides a drag-and-drop area and a hidden file input (`fileInputRef`).
+        *   `handleFileUpload`, `handleDrag`, `handleDrop`: Manage file selection and drag-and-drop, storing selected files in `selectedFiles` and opening the `MultipleFileUploadForm`.
+        *   `handleMultipleFileUpload`: Orchestrates the upload process for multiple files.
+            *   Iterates through `fileConfigs` received from the form.
+            *   Calls `uploadDocumentWithFile` utility for each file.
+            *   Updates `uploadProgress` state for UI feedback.
+            *   Uses `ToastContext` (`showToast`) for loading, success, and error notifications.
+            *   Calls `onRefresh` after uploads complete.
+    *   **WorkDrive Integration:**
+        *   Displays buttons to open Project and Investor WorkDrive folders if `project.project_folder` or `project.investor_folder` IDs exist (uses `navigateToURL`).
+        *   If folders don't exist, displays a "Create Project Folders" button (`handleCreateFolders`) that calls `updateRecord` to set `TRIG_Create_Project_Folders` to true, then calls `onRefresh` and shows toasts.
+    *   **Error Handling:** Displays errors using the `ErrorAlert` component.
+    *   **Document Actions:** Delegates actions like opening, downloading, editing, and WorkDrive operations to `DocumentTypeDrawer` and `DocumentContent`.
+    *   **PDF Preview:** Manages the `previewDoc` state (passed down from `ProjectDetailsModal`) which controls the visibility and content of the `PDFPreview` modal, likely triggered from within `DocumentTypeDrawer`/`DocumentContent`.
+*   **Sub-components:**
+    *   `DocumentChecklist`
+    *   `DocumentTypeDrawer`
+    *   `DocumentContent`
+    *   `MultipleFileUploadForm`
+    *   `ErrorAlert` (inline component)
+    *   `UploadForm` (inline component, seems unused)
+*   **Dependencies:** `react`, utility functions (`navigateToURL`, `createRecord`, `updateRecord`, `uploadDocumentWithFile`, `getDocTypes`), Contexts (`ToastContext`), custom API (`createWorkDriveFolders`), various sub-components.
+
+### 3.4. `SurveyTab` (`SurveyTabjs.txt`)
+
+*   **Purpose:** Displays and allows editing of site survey results and related information.
+*   **Structure:**
+    *   Main container `div` with padding, background, rounded corners, shadow.
+    *   Header section: Title, Last Updated time, Edit/Save button.
+    *   Placeholder section (rendered if `!survey`): Shows icon, title, and message indicating no data.
+    *   Content Grid (`grid grid-cols-1 md:grid-cols-2 gap-6`):
+        *   Survey Details Card: Contains Assessment Date input and View Report PDF button.
+        *   Survey Findings Card: Contains Roof Assessment (Type, Condition inputs) and Main Service Panel Size input.
+        *   Required Work Card (spans two columns): Contains Tree Work, Roof Work, Panel Upgrade (rendered using `renderYesNoField`) and Summary Notes textarea.
+        *   Send Final Summary Section: Conditionally renders status or checkbox based on `formData.sendFinalSummary`.
+*   **State Management:**
+    *   `isEditing`: Boolean to control edit mode.
+    *   `isSaving`: Boolean to indicate save operation in progress.
+    *   `formData`: Object holding the state for all editable survey fields, initialized from the `survey` prop (most recent survey) or `defaultFormData`.
+    *   Uses `useToast` hook for notifications.
+    *   Uses `useEffect` to populate `formData` when the `survey` prop is available/changes.
+*   **Key Functionality:**
+    *   **Display:**
+        *   Shows data from the most recent survey (`project.surveys?.[0]`).
+        *   Displays Assessment Date, Roof Type, Roof Condition, Panel Size, Tree Trimming Required, Summary Notes.
+        *   Shows Yes/No status for Tree Work, Roof Work, Panel Upgrade using colored badges (`renderStatusBadge`).
+        *   Provides a button to view the Report PDF (`formData.reportUrl`) via `navigateToURL`.
+        *   Displays the last updated time (`survey.modifiedTime`), formatted using a local `formatDate` helper.
+    *   **Editing:**
+        *   Toggles edit mode via the Edit/Save button.
+        *   When editing, inputs/selects/textareas become enabled.
+        *   Yes/No fields (`treeWorkRequired`, `roofWorkRequired`, `panelUpgradeRequired`) are rendered as dropdowns using `renderYesNoField`.
+        *   Handles input changes via `handleInputChange`.
+    *   **Saving:**
+        *   "Save Changes" button triggers `handleSave`.
+        *   Formats dates back to MM/DD/YY (`formatDateForZoho`) before sending.
+        *   If a survey record exists (`survey` prop), it calls `updateRecord` on `PM_Kanban_Surveys`.
+        *   If no survey record exists, it calls `createRecord` on `Add_Survey_Result`.
+        *   Uses `showToast` for loading/success/error messages during save.
+        *   Calls `fetchModalData` prop to refresh data after saving.
+        *   Exits edit mode (`setIsEditing(false)`).
+    *   **Send Final Summary:**
+        *   Displays a read-only status message if `formData.sendFinalSummary` is true.
+        *   Displays a checkbox in edit mode if `formData.sendFinalSummary` is false.
+        *   Checking the box and saving triggers the backend workflow via the `Send_Final_Summary` field update.
+*   **Dependencies:** `react`, utility functions (`updateRecord`, `createRecord`, `navigateToURL`), Contexts (`useToast`).
+
+### 3.5. `SystemsTab` (`SystemsTabjs.txt`)
+
+*   **Purpose:** Displays system overview metrics (size, output, usage, yield, offset) and manages the project's Bill of Materials (BOM).
+*   **Structure:**
+    *   Main container (`div` with padding and max-width).
+    *   System Overview Section: Card (`bg-white rounded-lg shadow-sm`) containing:
+        *   Header: Title, Approval Status Badge, Edit button.
+        *   Metrics Grid (`grid grid-cols-5`): Displays System Size, Annual Output, Annual Usage, Yield, Offset in individual cards.
+    *   Components Header: Title ("System Components"), Total Cost display, Add Material button.
+    *   Materials Grid (`grid grid-cols-1`):
+        *   Maps over categories ('Module', 'Inverter', etc.).
+        *   For each category with materials:
+            *   Renders a category card (`bg-white rounded-xl shadow-sm`).
+            *   Category Header: Icon, Category Name, Action Menu (`MoreVertical`).
+            *   Materials List (`divide-y`): Maps over materials in the category, rendering each using `renderMaterialItem`.
+    *   Placeholder message if no materials exist.
+    *   Conditional rendering of `AddMaterialForm` and `SystemApprovalModal`.
+*   **State Management:**
+    *   `isApprovalModalOpen`: Controls visibility of the system approval modal.
+    *   `isAddMaterialModalOpen`: Controls visibility of the add material modal.
+    *   `editingMaterialId`: Stores the ID of the material currently being edited inline.
+    *   `showActionMenu`: Stores the category name whose action menu is open (or null).
+    *   `availableManufacturers`, `availableModels`: State for the inline edit form dropdowns.
+    *   `editFormData`: State for the inline edit form fields (manufacturer, model, quantity, unitPrice, totalPrice).
+*   **Key Functionality:**
+    *   **Display:**
+        *   Shows key system metrics (kW STC, Annual Output, Annual Usage, Yield, Offset) formatted using `formatNumber`.
+        *   Displays system approval status (`project.isApproved`).
+        *   Groups materials (`project.materials`) by category (`groupedMaterials`).
+        *   Renders materials within their category, showing Manufacturer, Model, Quantity, Unit Price, Total Price.
+        *   Calculates and displays the `totalCost` of all materials.
+    *   **System Approval:** "Edit" button (`handleEditClick`) opens the `SystemApprovalModal`.
+    *   **BOM Management:**
+        *   "Add Material" button (`handleAddMaterial`) opens the `AddMaterialForm`.
+        *   `handleMaterialAdded` refreshes data (`fetchModalData`) and closes the add modal.
+        *   Action Menu per Category (`MoreVertical` icon):
+            *   Opens a dropdown listing Edit/Delete options for *each* material within that category (potential UI confusion as menu is per category, but actions are per item).
+            *   Edit option (`handleEditMaterial`) sets `editingMaterialId`, populating the inline edit form (`editFormData`) and fetching available manufacturers/models based on the material's category and manufacturer from `equipmentData`.
+            *   Delete option (`handleDeleteMaterial`) calls `deleteRecord` and refreshes.
+        *   Inline Editing (`renderMaterialItem` when `isEditing`): Replaces the material display with dropdowns for Manufacturer/Model (options based on `availableManufacturers`/`availableModels`), an input for Quantity. Unit price is derived from selected model, total price is calculated. Save button calls `updateRecord` and refreshes.
+    *   Uses `fetchModalData` prop to refresh data after adds, edits, or deletes.
+    *   Uses `useEffect` to manage state for inline editing dropdowns and calculated fields.
+    *   Uses `useEffect` to handle clicks outside the action menu.
+*   **Sub-components:**
+    *   `SystemApprovalModal`
+    *   `AddMaterialForm`
+*   **Dependencies:** `react`, `lucide-react` icons (`MoreVertical`), utility functions (`fetchProjectDetails`, `deleteRecord`, `updateRecord`), helper functions (`formatCurrency`, `formatNumber`).
+
+### 3.6. `PermittingTab` (`PermittingTabjs.txt`)
+
+*   **Purpose:** Displays and allows editing of permit and interconnection information for the project.
+*   **Structure:**
+    *   Main container `div` with padding, background, rounded corners, shadow.
+    *   Header section: Title, Last Updated time, Edit/Save button.
+    *   Content Grid (`grid grid-cols-1 md:grid-cols-2 gap-6`):
+        *   Permit Information Card: Contains fields for Permit Submitted (Status), Permit Status, Permit Number, Submission Date, Approval Date.
+        *   Interconnection Information Card: Contains fields for Interconnection Submitted (Status), Interconnection Status, Interconnection Number, Submission Date, Approval Date.
+        *   Additional Information Card (spans two columns): Contains fields for Problem Status and Tags.
+*   **State Management:**
+    *   `isEditing`: Boolean to control edit mode.
+    *   `isSaving`: Boolean to indicate save operation in progress.
+    *   `formData`: Object holding the state for all editable permitting fields, initialized from the `permit` prop (most recent permit) or `defaultFormData`.
+    *   Uses `useToast` hook for notifications.
+    *   Uses `useEffect` to populate `formData` when the `permit` prop is available/changes.
+*   **Key Functionality:**
+    *   **Display:**
+        *   Shows data from the most recent permit record (`project.permits?.[0]`).
+        *   Displays Permit Info: Submitted status, Permit Status, Permit Number, Submission Date, Approval Date.
+        *   Displays Interconnection Info: Submitted status, Interconnection Status, Interconnection Number, Submission Date, Approval Date.
+        *   Displays Additional Info: Problem Status, Tags (rendered as badges).
+        *   Uses colored status badges (`renderStatusBadge`) based on predefined mappings (`getStatusBadgeColor`) for various status fields.
+        *   Shows the last updated time (`permit.modifiedTime`), formatted using a local `formatDate` helper (which seems to have a potential bug in parsing/formatting).
+    *   **Editing:**
+        *   Toggles edit mode via the Edit/Save button.
+        *   When editing:
+            *   Status fields are rendered as dropdowns (`renderStatusField`) with predefined options.
+            *   Number fields are rendered as text inputs.
+            *   Date fields are rendered as HTML date inputs (`type="date"`).
+            *   Tags field is rendered as a multiple select box.
+        *   Handles input changes via `handleInputChange`.
+    *   **Saving:**
+        *   "Save Changes" button triggers `handleSave`.
+        *   Formats dates to MM/DD/YY (`formatDateForAPI`) before sending to Zoho.
+        *   If a permit record exists (`permit` prop), it calls `updateRecord` on `PM_Kanban_Permits`.
+        *   If no permit record exists, it calls `createRecord` on `Add_Permitting`.
+        *   Uses `showToast` for loading/success/error messages.
+        *   Calls `fetchModalData` prop to refresh data after saving.
+        *   Exits edit mode (`setIsEditing(false)`).
+    *   **Date Formatting:** Includes helpers `formatDateForAPI` (YYYY-MM-DD -> MM/DD/YY) and `formatDateForInput` (MM/DD/YY -> YYYY-MM-DD) to handle differences between HTML date input and Zoho date format.
+*   **Dependencies:** `react`, utility functions (`updateRecord`, `createRecord`), Contexts (`useToast`).
+
+### 3.7. `SalesRepTab` (`SalesRepTabjs.txt`)
+
+*   **Purpose:** Displays details about the assigned Sales Rep, manages commission milestones and rates, and provides access to commission-specific notes.
+*   **Structure:**
+    *   Main container `div` with padding, max-width, and spacing.
+    *   Sales Rep Info Card (`bg-white rounded-lg shadow-sm border`):
+        *   Header: Displays Sales Rep icon, name (as a dropdown for changing rep), action menu (`MoreVertical`), and Save Changes button (conditional).
+        *   Contact Info Section: Grid (`grid-cols-3`) showing Email, Phone, Sales Org with icons and clickable links/text.
+    *   Commission Milestones Card (`bg-white rounded-lg shadow-sm border`):
+        *   Header: Title ("Commission Milestones"), Active Commission Rate dropdown and status/save button.
+        *   Milestones List (`divide-y`): Renders rows for Advance, M1, M2, M3.
+            *   Each row displays Milestone ID (or "Advance"), Paid Date (if applicable), Amount input, and Status dropdown (Pending/Paid).
+            *   M3 row includes calculated fields: System Size, Rate, Gross, Final Commission.
+        *   Save Changes button (conditional, appears if `isMilestonesChanged`).
+    *   Summary Totals Card (`bg-gray-50 rounded-lg`): Displays Regular Rate, Commercial Rate, Shared Rate, Net Pending, and Net Paid totals.
+    *   `CommissionNotes` component.
+    *   Conditional rendering of `EditSalesRepModal`.
+*   **State Management:**
+    *   `selectedSalesRep`: ID of the sales rep selected in the dropdown (used for changing rep).
+    *   `isUpdating`: Boolean flag for sales rep update operation.
+    *   `milestones`: Array of objects holding state for each commission milestone (amount, status, paidDate).
+    *   `isMilestonesChanged`: Boolean flag indicating if milestone data has been modified.
+    *   `isMilestonesUpdating`: Boolean flag for milestone save operation.
+    *   `displayedTotals`: Object holding calculated pending and paid totals.
+    *   `showActionMenu`: Boolean to control visibility of the sales rep action menu.
+    *   `showEditModal`: Boolean to control visibility of the `EditSalesRepModal`.
+    *   `activeCommissionRate`: String storing the selected commission rate type.
+    *   `isRateChanged`: Boolean flag indicating if the active rate has changed.
+    *   `isRateSaving`: Boolean flag for active rate save operation.
+*   **Key Functionality:**
+    *   **Sales Rep Display & Selection:**
+        *   Displays current Sales Rep info (`project.salesRep`).
+        *   Provides a dropdown populated with `salesReps` prop to change the assigned rep.
+        *   `handleSalesRepUpdate` calls `updateRecord` to update `Sales_Rep` on the project, then refreshes data.
+    *   **Contact Actions:** Email/Phone buttons link to `mailto:`/`tel:` (using `navigateToURL` and `updateUserCallStatus`).
+    *   **Edit Sales Rep:** Action menu button (`handleEditClick`) opens the `EditSalesRepModal`.
+    *   **Commission Milestones:**
+        *   Displays Advance, M1, M2, M3 amounts and statuses.
+        *   Allows editing amounts and statuses (`handleAmountChange`, `handleStatusChange`).
+        *   Calculates and displays Paid Date automatically when status changes to "Paid".
+        *   M3 row shows calculations based on system size, active rate, and other paid milestones.
+        *   `handleMilestoneSave` calls `updateRecord` to save all milestone fields, then refreshes data.
+    *   **Active Commission Rate:**
+        *   Dropdown allows selecting Regular, Commercial, or Shared rate.
+        *   Selection updates `activeCommissionRate` state.
+        *   `handleRateSave` calls `updateRecord` to save the `Active_Commission_Rate` field, then refreshes.
+        *   Displays warnings or "Save Rate" button based on whether the selected rate exists for the rep and if it has been changed.
+    *   **Commission Notes:** Renders the `CommissionNotes` component, passing down necessary props.
+    *   **Totals Display:** Calculates and displays pending/paid totals based on `milestones` state.
+*   **Sub-components:**
+    *   `CommissionNotes`
+    *   `EditSalesRepModal`
+*   **Dependencies:** `react`, `lucide-react` icons (`MoreVertical`), utility functions (`updateRecord`, `getQueryParams`, `navigateToURL`, `updateUserCallStatus`), helper functions (`formatPhoneNumber`), `CommissionNotes`, `EditSalesRepModal`.
+
+### 3.8. `Property Info` (Inline in `ProjectDetailsModaljs.txt`)
+
+*   **Purpose:** Displays raw property information text.
+*   **Key Functionality:**
+    *   Renders the content of `projectData?.propertyInfo` within a `<pre>` tag for preformatted text.
+    *   Shows "No property information available" if data is missing.
+*   **Dependencies:** `react`.
+
+### 3.9. `ActivitiesTab` (`ActivitiesTabjs.txt`)
+
+*   **Purpose:** Displays a chronological list of all recorded project activities.
+*   **Structure:**
+    *   Main container `div` with padding and max-width.
+    *   Header section: Icon, Title ("Activities"), Activity Count badge.
+    *   Activities List container (`div` with `space-y-4`).
+        *   Maps over the `activities` array.
+        *   Each activity is rendered in a card (`bg-white rounded-lg shadow-sm border`).
+        *   Each card uses a flex container to position the icon and details.
+        *   Platform Icon: An icon (e.g., `fa-solar-panel`, `fa-folder`) determined by the `activity.Platform` field.
+        *   Activity Details: Activity description (`activity.Activity`), Author, Platform, and formatted Timestamp (`formatDate`).
+    *   Placeholder section (rendered if `activities` array is empty): Shows an icon, title, and message indicating no activities.
+*   **State Management:** None within the component itself. It relies entirely on the `project` prop.
+*   **Key Functionality:**
+    *   Receives `project` data as a prop.
+    *   Extracts the `activities` array from `project.activities`.
+    *   Displays the total number of activities in the header badge.
+    *   Renders each activity, showing:
+        *   A platform-specific icon (OpenSolar, WorkDrive, Creator, default).
+        *   The activity description (`Activity` field).
+        *   Metadata: Author (`Author`), Platform (`Platform`), and Timestamp (`Added_Time`, formatted using a local `formatDate` helper).
+    *   If no activities are present, displays a placeholder message.
+*   **Dependencies:** `react`.
+
+### 3.10. `CommunicationTab` (`CommunicationTabjs.txt`)
+
+*   **Purpose:** Displays a log of project communications (SMS, Calls, Emails) and allows sending new SMS messages and templated emails.
+*   **Structure:**
+    *   Main flex container (`flex flex-col h-full`).
+    *   Header: Title, Project Contact Info.
+    *   Chat Interface Container (`flex flex-col border mx-6 rounded-lg`):
+        *   Filter Group (`renderFilterGroup`): Buttons to toggle SMS, Call, Email visibility.
+        *   View More Button (`renderViewMoreButton`): Shows count and toggles full list visibility.
+        *   Communications Container (`overflow-y-auto`): Renders communication items using `renderCommunicationItem`.
+        *   Message Input Section: Textarea for composing SMS, Send SMS button.
+    *   `EmailTemplatesSection` component.
+*   **State Management:**
+    *   `expandedCalls`: Set storing IDs of expanded call logs.
+    *   `newMessage`: String state for the SMS input textarea.
+    *   `isSending`: Boolean flag for SMS send operation.
+    *   `communications`: Local copy of the communications log, updated via prop and `refreshCommunications`.
+    *   `activeFilters`: Set storing the currently active communication types (SMS, Call, Email).
+    *   `showAllItems`: Boolean to control pagination (show last 4 or all).
+    *   Uses `useToast` hook.
+*   **Key Functionality:**
+    *   **Display:**
+        *   Shows basic project contact info (Name, Phone, Email) in the header.
+        *   Filters communications based on `activeFilters`.
+        *   Sorts communications by `Added_Time` (oldest first).
+        *   Displays either the last 4 or all filtered communications based on `showAllItems`.
+        *   Uses helper functions (`renderMessage`, `renderCallItem`, `renderEmailItem`) to render different layouts based on `Communication_Type`:
+            *   SMS (`renderMessage`): Shows content, timestamp, sender/recipient, delivery status (outgoing only). Styles differently for incoming/outgoing.
+            *   Calls (`renderCallItem`): Shows basic info (In/Out, Duration, Agent). Includes an expandable section (`toggleCallExpansion`) showing Time, Contact, and Description.
+            *   Emails (`renderEmailItem`): Shows Subject, Contact, Timestamp, Type (Template/Automated), Sender.
+    *   **Filtering:** Filter buttons (`renderFilterGroup`) toggle communication types in `activeFilters` Set.
+    *   **Pagination:** "View All" / "Show Less" button (`renderViewMoreButton`) toggles `showAllItems` state.
+    *   **Refreshing:** `refreshCommunications` function fetches the latest `PM_Kanban_Communication` records for the project and updates the local `communications` state.
+    *   **Sending SMS:**
+        *   Textarea (`newMessage`) for composing.
+        *   "Send SMS" button triggers `handleSendMessage`.
+        *   Validates that `currentUser.id`, `project.id`, and `project.contactID` are present.
+        *   Calls `createRecord` on `Add_Communication` form with `Communication_Type: "SMS"`, `SMS_Type: "OUTGOING"`, `SMS_Content`, and relevant lookups (Project, User, Contact).
+        *   Refreshes communications list and clears input on success.
+        *   Uses `showToast` for notifications.
+    *   **Sending Templated Emails:** Renders the `EmailTemplatesSection` component, passing `project`, `currentUser`, and `refreshCommunications` (as `onEmailSent`).
+*   **Sub-components:** `CommItem` (imported but unused), `EmailTemplatesSection`.
+*   **Dependencies:** `react`, `lucide-react` icons (`Phone`, `ChevronDown`, `ChevronUp`, `PhoneIncoming`, `PhoneOutgoing`, `Send`, `MessageSquare`, `Mail`), utility functions (`createRecord`), Contexts (`useToast`), `EmailTemplatesSection`.
+
+### 3.11. `InvestorsTab` (`InvestorsTabjs.txt`)
+
+*   **Purpose:** Manages PPA (Power Purchase Agreement) configuration and displays investor-related milestone payment information.
+*   **Structure:**
+    *   Main container `div` with padding, max-width, and spacing.
+    *   Header section: Title ("Investor Information"), Save Changes button (conditional).
+    *   Main Content Card (`bg-white rounded-lg shadow-sm border`):
+        *   PPA Configuration Section: Title, PPA toggle, Rate Configuration grid (Rate select, Year select), Domestic Content toggle, Redball Submission Date display/edit.
+        *   Results Section: Grid (`grid-cols-3`) displaying System Size, Applicable Rate, Project Cost cards.
+        *   `MilestonesInvestorsTab` component is rendered here.
+*   **State Management:**
+    *   `formData`: Object holding state for PPA settings (isPPA, ppaRate, rateYear, isDomesticContent, redballSubmissionDate).
+    *   `hasChanges`: Boolean flag indicating if any PPA settings in `formData` differ from the `project` prop.
+    *   `isSaving`: Boolean flag for save operation loading state.
+    *   `isEditingRedball`: Boolean flag to toggle the date input for Redball Submission Date.
+    *   Uses `useToast` hook.
+    *   Uses `useEffect` to track changes between `formData` and `project` props to control the `hasChanges` state.
+*   **Key Functionality:**
+    *   **PPA Configuration:**
+        *   Displays current PPA status (`project.isPPA`).
+        *   Provides a toggle (`handlePPAToggle`) to enable/disable PPA status. Disabling PPA resets rate, year, and domestic content to defaults.
+        *   Allows selecting PPA Rate (`formData.ppaRate`) from predefined `PPA_RATES`.
+        *   Allows selecting Rate Year (`formData.rateYear`) from predefined `RATE_YEARS`.
+        *   Provides a toggle (`handleDomesticContentToggle`) for Domestic Content status (`formData.isDomesticContent`).
+        *   Displays Redball Submission Date (`formData.redballSubmissionDate`). An edit icon (`isEditingRedball`) toggles between text display and a date input.
+        *   PPA-related fields (Rate, Year, Domestic Content, Redball Date) are disabled if `formData.isPPA` is false.
+    *   **Display Calculated Results:** Shows System Size (`project.systemSize`), Applicable Rate (`project.applicableRate`), and Project Cost (`project.projectCost`).
+    *   **Saving:**
+        *   "Save Changes" button appears only when `hasChanges` is true.
+        *   `handleSave` calls `updateRecord` on `PM_Kanban_Projects` with PPA-related fields (`Is_PPA`, `PPA_Rate`, `Rate_Year`, `Domestic_Content`, `Submitted_to_Redball`).
+        *   Uses `showToast` for notifications.
+        *   Refreshes project data via `fetchModalData` prop.
+        *   Resets `hasChanges` flag.
+    *   **Milestone Payments:** Renders the `MilestonesInvestorsTab` component, passing down `project`, `fetchModalData`, and `isPPAEnabled` (derived from `formData.isPPA`).
+*   **Sub-components:** `MilestonesInvestorsTab`.
+*   **Dependencies:** `react`, utility functions (`updateRecord`), Contexts (`useToast`), `MilestonesInvestorsTab` component, helper functions (`formatCurrency`, `formatDate`, `formatDateForInput`).
+
+## 4. Key Sub-components & Sections
+
+### 4.1. `Counters` (`Countersjs.txt`)
+
+*   **Purpose:** Displays time-based counters for key project milestones.
+*   **Key Functionality:**
+    *   Calculates days since: Sold Date, Permit Submission Date, PTO Submission Date, System Turned On Date.
+    *   Displays counters as badges (`CounterBadge`).
+    *   Applies different colors (default, warning, danger, success) based on the number of days passed. System Turned On has different thresholds.
+*   **Dependencies:** `react`.
+
+### 4.2. `EventsSection` (`EventsSectionjs.txt`)
+
+*   **Purpose:** Displays and manages scheduled project events (Site Survey, Installation, etc.).
+*   **Key Functionality:**
+    *   Processes event data from project fields (e.g., `surveyBooking`, `surveyStatus`).
+    *   Displays each event type with an icon, formatted date (if scheduled), and status.
+    *   Allows changing the status of an event via a dropdown (`handleStatusChange` using `updateRecord`).
+    *   Provides a "Book" button (or inline date picker) to schedule/reschedule events (`handleSchedule`, `handleClearDate` using `updateRecord`).
+    *   Includes special handling for "Site Survey" booking, linking to an external booking URL (`handleBookSurveyClick`).
+    *   Formats dates for display and API submission.
+    *   Shows loading indicators during updates.
+*   **Dependencies:** `react`, utility functions (`createRecord`, `getQueryParams`, `getInstallerSlots`, `updateRecord`, `navigateToURL`). *Note: `AddEventModal` is defined but seems unused in favor of inline editing.*
+
+### 4.3. `NotesSection` (`NotesSectionjs.txt`)
+
+*   **Purpose:** Displays project notes and provides functionality to add new notes and replies.
+*   **Key Functionality:**
+    *   Provides a text area for composing new notes (`noteInput`).
+    *   Includes drag-and-drop and file input for attaching files (`handleDragOver`, `handleDrop`, `fileInputRef`).
+        *   Uses `validateAttachments` before adding files to state.
+        *   Displays attachment previews (`NoteAttachment`).
+    *   Provides a "Team Only" checkbox (previously "Notify Sales").
+    *   Includes a user tagging dropdown (`selectedUsers`, `showUserDropdown`), similar to `NotesSection`.
+    *   Submits new notes (`handleNoteSubmit`):
+        *   Uses `createNoteWithAttachments` if files are present.
+        *   Uses `createRecord` for notes without attachments.
+    *   Displays a list of notes (filtered for `Context: 'General'`, newest first).
+        *   Organizes notes into threads (parent notes and their replies).
+        *   Uses `NoteItem` to render each note/reply.
+    *   Limits displayed notes to 5 initially, with a "Show More Notes" button (`showAllNotes`).
+    *   Limits displayed replies per thread to 1 initially, with a "Show More Replies" button (`showAllReplies`).
+    *   Passes down reply handling functions (`handleReply`, `handleAddReply`) to `NoteItem`.
+*   **Sub-components:** `NoteItem`, `NoteAttachment`.
+*   **Dependencies:** `react`, utility functions (`createRecord`, `getQueryParams`, `getCurrentUser`, `createNoteWithAttachments`, `validateAttachments`).
+
+### 4.4. `NoteItem` (`NoteItemjs.txt`)
+
+*   **Purpose:** Renders a single note or reply within the `NotesSection`.
+*   **Key Functionality:**
+    *   Displays author's initials/avatar and name.
+    *   Shows department badge if not "Project Management".
+    *   Displays tagged users as pills.
+    *   Shows timestamp.
+    *   Displays note content (`content` or `Note`).
+    *   Renders attachments using `NoteAttachment`.
+    *   Shows "Team Only" / "Sales Notified" badge.
+    *   If not a reply, shows a "Reply" button (`onReply`) and reply count.
+    *   Shows a reply input area when `isReplying` is true, handles submission (`handleAddReply`).
+*   **Sub-components:** `NoteAttachment`.
+*   **Dependencies:** `react`.
+
+### 4.5. `NoteAttachment` (`NoteAttachmentjs.txt`)
+
+*   **Purpose:** Renders a single note attachment preview (image or file icon).
+*   **Key Functionality:**
+    *   Displays an image thumbnail if the type is 'image'.
+    *   Displays a generic file icon (or PDF icon) otherwise, showing the filename.
+    *   Handles clicks:
+        *   Opens image preview modal (`handlePreviewClick`, `previewImage` state).
+        *   Triggers file download (`handleFileClick`, `downloadFile` using `navigateToURL`).
+    *   Processes Zoho file URLs (`processUrl`) to make them accessible.
+    *   Includes an image/PDF preview modal (`PDFPreview`) with Close and Download buttons.
+*   **Sub-components:** `PDFPreview`.
+*   **Dependencies:** `react`, utility functions (`navigateToURL`).
+
+### 4.6. `IssuesSection` (`IssuesSectionjs.txt`)
+
+*   **Purpose:** Displays open issues and provides a button to raise new ones.
+*   **Key Functionality:**
+    *   Filters `project.issues` to show only unresolved issues (`!issue.isResolved`).
+    *   Provides a "Raise Issue" button which triggers `onRaiseIssue` (likely opening `IssueModal`).
+    *   Lists unresolved issues, showing:
+        *   Author and "Sales Notified" badge.
+        *   Timestamp.
+        *   Issue content (`issueContent`).
+        *   Tagged users.
+        *   A "Mark Resolved" button (`onResolveIssue`).
+    *   Shows a placeholder if no open issues exist.
+*   **Dependencies:** `react`.
+
+### 4.7. `SalesRepInfo` (`SalesRepInfojs.txt`)
+
+*   **Purpose:** Displays contact information for the assigned Sales Rep in the `OverviewTab`.
+*   **Key Functionality:**
+    *   Displays Sales Rep Name and Organization.
+    *   Provides formatted Phone button (using `formatPhoneNumber`) that triggers `updateUserCallStatus`.
+    *   Provides Email button that opens `mailto:` link via `navigateToURL`.
+*   **Dependencies:** `react`, utility functions (`navigateToURL`, `updateUserCallStatus`).
+
+### 4.8. `CommSection` (`CommSectionjs.txt`)
+
+*   **Purpose:** Displays a preview of recent calls in the `OverviewTab`.
+*   **Structure:**
+    *   Main container card (`bg-white rounded-lg shadow-sm p-4`).
+    *   Header: Title ("Recent Calls"), Total Call Count.
+    *   Calls List (`space-y-2`):
+        *   Maps over the first 4 calls.
+        *   Each call displays Subject, formatted Timestamp, and User.
+    *   Conditional "View All Calls" button (shown if more than 4 calls).
+*   **State Management:** None.
+*   **Key Functionality:**
+    *   Filters the `communications` prop to include only items where `Communication_Type` is 'Call'.
+    *   Displays the Subject, formatted `Added_Time`, and `User` for the first 4 calls.
+    *   If there are more than 4 calls, displays a "View All Calls" button that calls the `setActiveTab` prop with `'communications'`.
+*   **Dependencies:** `react`, helper `formatDate`.
+
+### 4.9. `WorkRequirementBars` (Component used in `OverviewTab`, code not provided)
+
+*   **Purpose:** Likely displays progress bars or status indicators for required work (Tree Work, Roof Work, Panel Upgrade).
+*   **Key Functionality:** (Inferred)
+    *   Reads status fields from the `project` object (e.g., `treeWorkStatus`, `roofWorkStatus`, `puWorkStatus`).
+    *   Visualizes the status, potentially using colors or bar fills.
+
+### 4.10. `ContactItem` (`ContactItemjs.txt`)
+
+*   **Purpose:** Renders a single contact card within the `ContactTab`. Handles display, editing, and deletion of an individual contact.
+*   **Structure:**
+    *   Main container card (`div` with background, border, padding, shadow).
+    *   Header section: Displays contact icon, name, type, and an options button (`MoreVertical`).
+    *   Conditional Edit Form (`editForm`): Rendered when `isEditing` is true.
+    *   Contact Details section: Displays Job Title, Business Name, Email, Phone, Mobile, and Billing Address using icons and text/links.
+    *   Options Menu (`optionsMenu`): Absolutely positioned dropdown triggered by the options button.
+    *   `Toast` component for displaying success/error messages on delete.
+*   **State Management:**
+    *   `showOptions`: Controls visibility of the options dropdown menu.
+    *   `isEditing`: Toggles between display mode and edit mode.
+    *   `editedContact`: Holds the state of the contact data during editing, initialized with the `contact` prop.
+    *   `showBillingAddress`: Controls the visibility of billing address fields *within the edit form*.
+    *   `toast`: State for the `Toast` component.
+    *   Uses `useRef` (`optionsRef`) and `useEffect` for handling clicks outside the options menu.
+*   **Key Functionality:**
+    *   **Display:**
+        *   Shows contact's full name (`First_Name`, `Last_Name`) and type (`Contact_Type`).
+        *   Displays Job Title, Business Name if available.
+        *   Displays Email, Phone, Mobile as clickable `mailto:` and `tel:` links.
+        *   Displays formatted Billing Address if available.
+    *   **Options Menu:**
+        *   Provides "Edit" button: Sets `isEditing` to true.
+        *   Provides "Set as Main Owner" button: Calls `updateRecord` on the *Project* record (`PM_Kanban_Projects`), setting the `Owner_Name` lookup field to the current contact's ID. Calls `onRefresh` on success.
+        *   Provides "Delete" button: Shows a confirmation dialog. If confirmed, calls `deleteRecord` on `PM_Kanban_Contacts` with the contact ID. Calls `onRefresh` and shows a toast message on success/failure.
+    *   **Editing:**
+        *   Renders an inline form (`editForm`) when `isEditing` is true.
+        *   Form fields are bound to the `editedContact` state.
+        *   Includes inputs for all displayable fields (Name, Type, Email, Phone, Mobile, Job Title, Business Name, Business POC checkbox).
+        *   Includes inputs for Billing Address fields.
+        *   "Save" button calls `handleSave`:
+            *   Constructs payload for `PM_Kanban_Contacts` form using `editedContact` state.
+            *   Calls `updateRecord` with the contact ID and payload.
+            *   On success, sets `isEditing` to false and calls `onRefresh`.
+        *   "Cancel" button sets `isEditing` to false, discarding changes.
+*   **Sub-components:** `Toast`.
+*   **Dependencies:** `react`, `lucide-react` icons (`Briefcase`, `Building2`, `Mail`, `Phone`, `Smartphone`, `MoreVertical`, `Check`, `X`, `Edit2`, `User`, `Trash2`), utility functions (`updateRecord`, `deleteRecord`), `Toast` component.
+
+### 4.11. `DocumentChecklist` (`DocumentChecklistjs.txt`)
+
+*   **Purpose:** Displays a checklist of required document types, indicating which ones are present for the project.
+*   **Structure:**
+    *   Main container `div` with border and rounded corners.
+    *   Clickable header `div` to toggle expansion.
+        *   Left side: Title and completion count badge.
+        *   Right side: Chevron icon indicating expansion state.
+    *   Conditional content `div` (rendered when `isExpanded` is true) containing a grid of checklist items.
+*   **State Management:**
+    *   `isExpanded`: Boolean state to control the visibility of the checklist items.
+*   **Key Functionality:**
+    *   Receives `docTypes` and `project` data as props.
+    *   Filters `docTypes` to include only items where `Include_In_Checklist` is true.
+    *   Sorts the filtered checklist items alphabetically by name.
+    *   For each checklist item, determines completion status (`getIsCompleted`) by checking if any document in `project.documents` has a matching `Doc_Type.ID`.
+    *   Calculates and displays the completion count (`completedCount`/`checklistItems.length`).
+    *   Renders each checklist item with a checkbox icon (checked if completed) and the document type name.
+    *   Toggles the `isExpanded` state when the header is clicked.
+*   **Dependencies:** `react`.
+
+### 4.12. `DocumentTypeDrawer` (`DocumentTypeDrawerjs.txt`)
+
+*   **Purpose:** Displays documents grouped by their type in an expandable drawer format. Handles rendering document versions and associated actions.
+*   **Structure:**
+    *   Main container `div` with border and relative positioning for potential dropdown overlaps.
+    *   Clickable header section:
+        *   Displays document type name and count.
+        *   Shows expand/collapse chevron icon.
+    *   Conditional content section (rendered when `isExpanded`):
+        *   Table-like structure using CSS grid (`grid-cols-12`).
+        *   Fixed table header row.
+        *   Maps over `visibleVersions` to render rows.
+        *   Each row uses grid columns for Name, Added By, Added Time, Status, Actions.
+        *   Inline edit form replaces the name display when `editingDocId` matches the version ID.
+        *   Action buttons (Open, Download, WorkDrive, Edit) are rendered in the last column.
+        *   Conditional "View More" button at the bottom.
+*   **State Management:**
+    *   `showAll`: Boolean state to control how many versions are displayed (3 or all).
+    *   `hasOpenDropdown`: Boolean to manage z-index when an action dropdown is open (passed from `DocumentActions`, though `DocumentActions` is unused).
+    *   `loadingStates`: Object to track loading status for WorkDrive uploads/sends per document ID.
+    *   `editingDocId`, `editFormData`: State for inline editing of document metadata.
+    *   `errorMessage`: State for displaying errors related to editing.
+*   **Key Functionality:**
+    *   **Display:** Shows the document type name and the number of versions. When expanded, lists document versions with details (truncated name, uploader, date, revision status).
+    *   **Expansion:** Toggles the display of document versions via the `isExpanded` prop and `onToggle` handler.
+    *   **Pagination:** Shows only the first 3 versions initially, with a button to toggle showing all versions (`showAll` state).
+    *   **Inline Editing:**
+        *   An Edit button in the actions column triggers edit mode (`handleEditClick`).
+        *   Replaces the document name display with inputs for Name, Type (dropdown using `docTypes` prop), and Is Revision checkbox.
+        *   Save button (`handleSaveEdit`) calls `updateRecord` to save changes.
+        *   Cancel button (`handleCancelEdit`) reverts state.
+    *   **Actions (per document):**
+        *   **Open/Preview:** Calls `handleViewInWorkDrive`. This function checks for `Embed_Link` or `WorkDrive_Link`. If neither exists, it triggers a WorkDrive upload (`TRIG_Upload_to_WorkDrive`) and polls `onRefresh` until a link appears. Finally, it calls `setPreviewDoc` (prop) to open the `PDFPreview` modal.
+        *   **Download:** Calls `handleFileClick` (prop) with the `File_Upload` URL.
+        *   **Upload to WorkDrive:** (Conditional) If `workDriveFolderId` exists and the document isn't already linked (`!hasWorkDriveLink`), shows a button that calls `handleUploadToWorkDrive`. This function calls `updateRecord` to set `TRIG_Upload_to_WorkDrive` to true and refreshes.
+        *   **Send to Investor:** (Conditional) If a WorkDrive link exists and the doc hasn't been sent/triggered, shows a button that calls `handleSendToInvestor`. This calls `updateRecord` to set `Trigger_Send_to_Inv` to true and refreshes.
+    *   Uses `ToastContext` for WorkDrive/Investor Portal action notifications.
+    *   Renders status badges (Revision, Latest, Sent To Investor, Processing).
+*   **Sub-components:** `PDFPreview` (indirectly via `setPreviewDoc`), `DocumentContent` (the logic is mostly inline now, `DocumentContent` component not directly used in the provided `DocumentTypeDrawer` code).
+*   **Dependencies:** `react`, utility functions (`navigateToURL`, `updateRecord`), Contexts (`ToastContext`), `PDFPreview` component.
+
+### 4.13. `DocumentContent` (`DocumentContentjs.txt`)
+
+*   **Purpose:** Renders the details and actions for a single document row, intended for use within `DocumentsTab` (for untyped docs) or potentially within `DocumentTypeDrawer` (though the drawer seems to implement this inline).
+*   **Structure:**
+    *   Main flex container.
+    *   Icon column.
+    *   Content column:
+        *   Top row: Document Name, Status Badges (Revision, Latest, Sent, Processing), Action Buttons.
+        *   Bottom row: Added Time and User.
+    *   Conditional inline edit form (replaces name/badges when editing).
+    *   Conditional action dropdown menu.
+*   **State Management:** Manages its own state for editing (`editingDocId`, `editFormData`), loading (`isUploading`, `isSendingToInvestor`), dropdown visibility (`showActionsMenu`), and errors (`errorMessage`).
+*   **Key Functionality:** Very similar to the row rendering logic within `DocumentTypeDrawer`:
+    *   Displays truncated document name, revision status, 'Latest' badge (if `isLatestVersion` prop is true), 'Sent To Investor'/'Processing' badges.
+    *   Displays added time and uploader name.
+    *   Handles inline editing (`handleEditClick`, `handleCancelEdit`, `handleSaveEdit`) for Name, Type, and Revision status, using `updateRecord`.
+    *   Provides action buttons:
+        *   Download (`handleFileClick` prop).
+        *   Open/Preview (`handleViewInWorkDrive` -> `setPreviewDoc` prop).
+        *   Edit (toggles inline form).
+        *   WorkDrive Upload (`handleUploadToWorkDrive` -> `updateRecord` trigger).
+        *   Send to Investor (`handleSendToInvestor` -> `updateRecord` trigger).
+    *   Uses `ToastContext`.
+*   **Dependencies:** `react`, utility functions (`updateRecord`, `navigateToURL`, `uploadWorkDriveFile` - though the implementation uses trigger field), Contexts (`ToastContext`).
+
+### 4.14. `CommissionNotes` (`CommissionNotesjs.txt`)
+
+*   **Purpose:** Displays and allows adding notes specifically related to commissions. Used within `SalesRepTab`.
+*   **Structure:**
+    *   Main container card (`bg-white rounded-xl border`).
+    *   Header: Icon, Title ("Commission Notes"), Note Count badge.
+    *   Add Note Section: Textarea for input, Add Note button.
+    *   Notes List Section: Maps over `commissionNotes` array.
+        *   Each note rendered in a card (`bg-gray-50 rounded-lg border`).
+        *   Note Header: Avatar/Initials, Author Name, Timestamp.
+        *   Note Body: Content displayed in a `<p>` tag.
+    *   Placeholder message if no commission notes exist.
+*   **State Management:**
+    *   `noteInput`: Holds the value of the new note textarea.
+    *   `isAddingNote`: Boolean flag for add note operation loading state.
+*   **Key Functionality:**
+    *   **Filtering:** Filters `project.notes` to include only those where `note.context` (case-insensitive, trimmed) is `'commissions'`. Sorts results by `addedTime` descending.
+    *   **Display:** Renders filtered commission notes, showing author avatar/initials (using `getInitials`), author name, formatted timestamp (`formatDate`), and note content.
+    *   **Adding Notes:**
+        *   Textarea allows composing new notes.
+        *   "Add Note" button triggers `handleNoteSubmit`.
+        *   `handleNoteSubmit` constructs payload with `Note`, `Project`, `Context: 'Commissions'`, `Author`, `User_Lookup`, `Viewed_By`, `Department`.
+        *   Calls `createRecord('Add_Note', noteData)`.
+        *   On success, clears input and calls `fetchModalData` prop to refresh.
+*   **Dependencies:** `react`, utility functions (`createRecord`, `getQueryParams`), helper functions (`getInitials`, `formatDate`).
+
+### 4.15. `MilestonesInvestorsTab` (`MilestonesInvestorsTabjs.txt`)
+
+*   **Purpose:** Displays and manages investor milestone payments (M1, M2, M3). Used within `InvestorsTab`.
+*   **Structure:**
+    *   Main container `div` with padding and border.
+    *   Header: Title ("Milestone Payments"), Edit/Save button.
+    *   Milestone Cards (`space-y-4`):
+        *   Separate cards for M1, M2, M3.
+        *   Each card has a header (Milestone ID, Percentage) and body.
+        *   Body displays Payment Date and Amount (as inputs in edit mode, text in view mode).
+        *   Also displays Projected amount.
+    *   Payment Summary card (`bg-gray-50`):
+        *   Displays Total Payments.
+        *   Displays Project Cost.
+        *   Includes a progress bar.
+        *   Shows summary cards for Total Paid, Remaining, Progress %.
+*   **State Management:**
+    *   `isEditingPayments`: Boolean to toggle edit mode.
+    *   `isSaving`: Boolean for save operation loading state.
+    *   `milestoneData`: Object storing state for M1, M2, M3 payment amounts and dates.
+    *   Uses `useToast` hook.
+*   **Key Functionality:**
+    *   **Display:**
+        *   Shows M1 (50%), M2 (40%), M3 (10%) payment details.
+        *   Displays Payment Date (formatted using `formatDate`) and Payment Amount (formatted using `formatCurrency`).
+        *   Shows Projected payment calculated based on `project.projectCost` and percentage.
+        *   Calculates and displays Total Payments, Project Cost, and Remaining Amount.
+        *   Visualizes progress with a simple progress bar.
+    *   **Editing:**
+        *   Toggles edit mode via Edit/Save button. Edit mode is disabled if `isPPAEnabled` prop is false.
+        *   Renders Payment Date as HTML date input and Amount as number input.
+        *   Uses `formatDateForInput` to convert MM/DD/YYYY to YYYY-MM-DD for the date input.
+        *   `handleMilestoneChange` updates the `milestoneData` state.
+    *   **Saving:**
+        *   "Save Changes" button triggers `handleMilestoneSave`.
+        *   Calls `updateRecord` on `PM_Kanban_Projects` with `Investor_M1_Payment`, `Investor_M1_Date`, etc.
+        *   Uses `showToast` for notifications.
+        *   Calls `fetchModalData` prop to refresh.
+        *   Exits edit mode.
+*   **Dependencies:** `react`, utility functions (`updateRecord`), Contexts (`useToast`), helper functions (`formatCurrency`, `formatDate`, `formatDateForInput`, `calculateProjectedPayment`).
+
+## 5. Helper Modals & Components
+
+### 5.1. `IssueModal` (`IssueModaljs.txt`)
+
+*   **Purpose:** Provides a modal form for raising new project issues.
+*   **Key Functionality:**
+    *   Collects issue description (`issueInput`).
+    *   Includes a "Notify Sales" checkbox (`notifySales`).
+    *   Provides a user tagging dropdown (`selectedUsers`, `showUserDropdown`), similar to `NotesSection`.
+    *   Submits the new issue data (`onSubmit` which calls `handleAddIssue` in `ProjectDetailsModal`) using `createRecord`.
+*   **Dependencies:** `react`, utility functions (`getCurrentUser`).
+
+### 5.2. `TagModal` (`TagModaljs.txt`)
+
+*   **Purpose:** Provides a modal form for adding existing tags to a project.
+*   **Key Functionality:**
+    *   Displays a dropdown (`selectedTag`) of available tags (filtered based on `availableTags` prop).
+    *   Submits the selected tag (`onSubmit` which calls `handleAddTag` in `ProjectDetailsModal`).
+    *   Shows a loading state (`isLoading`).
+*   **Dependencies:** `react`.
+
+### 5.3. `SystemApprovalModal` (`SystemApprovalModaljs.txt`)
+
+*   **Purpose:** Provides a modal interface for editing key system metrics (kW, Output, Usage), viewing the component list (read-only quantity editing), and approving the system design.
+*   **Structure:**
+    *   Fixed position modal overlay.
+    *   Main container `div` with padding, border, max-width, shadow, rounded corners.
+    *   Header: Title ("System Approval").
+    *   System Fields Grid (`grid grid-cols-3`): Inputs for System Size (kW), Annual Output (kWh), Annual Usage (kWh).
+    *   Components List:
+        *   Header ("Components").
+        *   Maps over `formData.materials`.
+        *   Each material shown in a card (`grid grid-cols-2`) displaying Model name and an input for Quantity.
+    *   Approval Checkbox section.
+    *   Action Buttons: Cancel, Save Changes.
+*   **State Management:**
+    *   `isSaving`: Boolean flag for save operation loading state.
+    *   `formData`: Object holding the state for editable fields:
+        *   `kW_STC`, `annualOutput`, `annualUsage`, `isApproved`.
+        *   `materials`: Array derived from the `materials` prop, including `originalQuantity` for comparison.
+    *   `modifications`: Object tracking which parts of the form have been changed (`system`: boolean, `materials`: Set of modified material IDs).
+    *   Uses `useEffect` to update `formData` when the `system` prop changes.
+*   **Key Functionality:**
+    *   **Editing System Metrics:** Allows users to modify `kW_STC`, `annualOutput`, and `annualUsage` via number inputs. Changes update `formData` and set `modifications.system` to true.
+    *   **Editing Material Quantities:** Allows users to modify the `Quantity` for each listed material. `handleMaterialChange` updates `formData.materials` and adds/removes the material ID from `modifications.materials` Set based on whether the quantity differs from `originalQuantity`.
+    *   **Approval:** Provides an "Approve System" checkbox bound to `formData.isApproved`.
+    *   **Saving:** `handleSubmit` function:
+        *   Sets `isSaving` to true.
+        *   Updates the Project record (`PM_Kanban_Projects`) via `updateRecord` with the values from `formData` (kW_STC, Annual_Output_kWh, Is_Approved, Annual_Usage).
+        *   If `modifications.materials` Set is not empty, iterates through modified materials and calls `updateRecord` for each on the `PM_Kanban_Materials` form to update the `Quantity`.
+        *   Calls the `onUpdate` prop (likely `fetchModalData`) after all updates succeed.
+        *   Sets `isSaving` back to false.
+    *   **Closing:** Cancel button or clicking outside the modal calls `onClose` prop.
+*   **Dependencies:** `react`, utility functions (`updateRecord`, `createRecord` - `createRecord` seems imported but unused).
+
+### 5.4. `AddMaterialForm` (`AddMaterialFormjs.txt`)
+
+*   **Purpose:** Provides a modal form for adding new items to the Bill of Materials. Used in `SystemsTab`.
+*   **Key Functionality:**
+    *   Dropdown for Category (filtered based on `existingMaterials`).
+    *   Cascading dropdowns for Manufacturer and Model (populated based on `equipmentData` and previous selections).
+    *   Input for Quantity.
+    *   Read-only display of Unit Price (fetched from `equipmentData`) and calculated Total Price.
+    *   Submits the new material data (`handleSubmit`) using `createRecord`.
+    *   Calls `onMaterialAdded` after successful submission.
+*   **Dependencies:** `react`, utility functions (`createRecord`).
+
+### 5.5. `EditSalesRepModal` (`EditSalesRepModaljs.txt`)
+
+*   **Purpose:** Provides a modal form for editing Sales Rep details, including name, contact info, and commission rates.
+*   **Structure:**
+    *   Fixed position modal overlay.
+    *   Main container `div` with padding, border, max-width, shadow, rounded corners.
+    *   Header: Title ("Edit Sales Representative"), Close button.
+    *   Form Grid (`grid grid-cols-2 gap-6`):
+        *   Inputs for First Name, Last Name, Email, Phone.
+        *   Inputs for Regular, Commercial, and Shared Commission Rates.
+    *   Footer: Cancel and Save Changes buttons.
+*   **State Management:**
+    *   `editedSalesRep`: Object holding the state for the form fields, initialized/updated via `useEffect` when the `salesRep` prop changes.
+    *   Uses `useToast` hook.
+*   **Key Functionality:**
+    *   **Initialization:** Populates form fields from the `salesRep` prop using `useEffect`. Handles splitting the `salesRep.name` into first/last names.
+    *   **Editing:** Allows editing Name (First, Last), Email, Phone, and the three commission rate fields.
+    *   **Saving:**
+        *   `handleSave` function is triggered by the "Save Changes" button.
+        *   Constructs payload (`formattedData`) including nested `Name` object.
+        *   Calls `updateRecord('PM_Kanban_Sales_Reps', salesRep.id, { data: formattedData })`.
+        *   Uses `showToast` for loading/success/error messages.
+        *   Calls `fetchModalData` and `onSave` props on success.
+        *   Closes the modal (`onClose`).
+    *   **Closing:** Cancel button or clicking outside the modal calls `onClose`.
+*   **Dependencies:** `react`, utility functions (`updateRecord`), Contexts (`useToast`).
+
+### 5.6. `MultipleFileUploadForm` (`MultipleFileUploadFormjs.txt`)
+
+*   **Purpose:** Handles the UI and logic for uploading multiple files simultaneously, allowing users to set metadata for each file before initiating the batch upload. Used by `DocumentsTab`.
+*   **Structure:**
+    *   Fixed position modal overlay.
+    *   Main container `div` with max-width and rounded corners.
+    *   Fixed Header section:
+        *   Title showing the number of files.
+        *   Close button.
+        *   Bulk action controls: Dropdown to set all types, buttons to mark/clear all as revision.
+        *   Drag-and-drop area to add more files.
+    *   Scrollable content area (`overflow-y-auto`) displaying the list of files.
+        *   Each file is rendered as a card with icon, name, type dropdown, revision checkbox, and remove button.
+        *   Includes a progress bar section (`getProgressBar`) for each file.
+    *   Fixed Footer section:
+        *   Cancel button.
+        *   "Upload All" button.
+*   **State Management:**
+    *   `fileConfigs`: Array of objects, each containing the `File` object, processed file info (`processedFile`), selected `documentType`, and `isRevision` flag.
+    *   `dragActive`: Boolean for drag-and-drop UI state.
+*   **Key Functionality:**
+    *   Initializes `fileConfigs` based on the `files` prop.
+    *   **File Management:**
+        *   Allows adding more files via drag-and-drop (`handleDrop`) or file input (`fileInputRef`).
+        *   Allows removing individual files (`handleRemoveFile`).
+    *   **Metadata Editing:**
+        *   Provides a dropdown for each file to select the `documentType` (using `documentTypes` prop).
+        *   Provides a checkbox for each file to set `isRevision`.
+    *   **Bulk Actions:**
+        *   "Set All Types" dropdown applies the selected type to all files (`setBulkType`).
+        *   "Mark All as Revision" / "Clear All Revisions" buttons update the `isRevision` flag for all files (`setBulkRevision`).
+    *   **Upload Initiation:**
+        *   "Upload All" button calls the `onUpload` prop (passed from `DocumentsTab`) with the current `fileConfigs` array.
+        *   Button is disabled during upload (`isUploading` prop) or if no files are present.
+    *   **Progress Display:** Renders progress bars and status messages (Uploading, Success, Error) for each file based on the `uploadProgress` prop.
+*   **Dependencies:** `react`, `processFile` (from `fileUtils.js`).
+
+### 5.7. `PDFPreview` (`PDFPreviewjs.txt`)
+
+*   **Purpose:** Displays a PDF document within a modal-like overlay.
+*   **Key Functionality:**
+    *   Embeds the PDF using an `<iframe>`.
+    *   Displays the filename in the header.
+    *   Provides Close and Download buttons.
+*   **Dependencies:** `react`.
+
+### 5.8. `Toast` (`Toastjs.txt`)
+
+*   **Purpose:** Displays short-lived notification messages.
+*   **Key Functionality:**
+    *   Shows messages with different types (info, error, success, warning, loading), each with distinct styling and icons.
+    *   Automatically dismisses toasts after 5 seconds (except for 'loading').
+    *   Provides a close button.
+    *   Uses `useEffect` for the auto-dismiss timer.
+*   **Dependencies:** `react`.
+
+### 5.9. `EmailTemplatesSection` (`EmailTemplatesSectionjs.txt`)
+
+*   **Purpose:** Displays a list of predefined email templates and allows selecting and sending them.
+*   **Structure:**
+    *   Main container `div` with padding and border.
+    *   Header: Title ("Email Templates"), Send Selected button.
+    *   Templates Grid (`grid grid-cols-2 gap-4`).
+        *   Maps over `EMAIL_TEMPLATES` constant.
+        *   Each template is a clickable card (`p-3 border rounded-lg cursor-pointer`).
+        *   Displays template name, description, last sent time (if available), and selection status (icon and text).
+*   **State Management:**
+    *   `selectedTemplates`: Set storing the IDs of the currently selected templates.
+    *   `isSending`: Boolean flag for the send operation.
+    *   Uses `useToast` hook.
+*   **Key Functionality:**
+    *   **Display:** Renders a grid of available email templates defined in the `EMAIL_TEMPLATES` constant.
+        *   For each template, it attempts to find the last sent time by searching `project.communication` for matching emails (`getLastSentTime`).
+        *   Shows template name, description, and formatted last sent time (if found).
+        *   Indicates selection status visually (styling, icon, text).
+    *   **Selection:** Clicking a template card toggles its ID in the `selectedTemplates` Set (`toggleTemplate`).
+    *   **Sending:**
+        *   "Send Selected" button triggers `handleSendTemplates`.
+        *   Validates that templates are selected and `currentUser.id` exists.
+        *   Iterates through `selectedTemplates` Set:
+            *   Finds the corresponding template object from `EMAIL_TEMPLATES`.
+            *   Constructs payload for `Add_Communication` form with `Communication_Type: "Email"`, `Email_Type: "Template"`, `Email_Subject` (using `template.template`), `Email_To`, `Project`, `Contact`, `User`, and `TRIG_Send_Template: true`.
+            *   Calls `createRecord` for each selected template.
+        *   Clears selection, calls `onEmailSent` prop (likely `refreshCommunications`), and shows toasts.
+*   **Dependencies:** `react`, `lucide-react` icons (`Mail`, `Check`, `AlertCircle`), utility functions (`createRecord`), Contexts (`useToast`).
+
+### 5.10. `CommItem` (`CommItemjs.txt`)
+
+*   **Purpose:** Renders a single communication item (currently only implemented for Calls) based on its type.
+*   **Structure:**
+    *   Main `CommItem` component acts as a switcher based on `comm.Communication_Type`.
+    *   `CallView` sub-component:
+        *   Main container `div` with border and hover effect.
+        *   Header: Call Type indicator (Icon + Text based on `Call_Type`), Timestamp.
+        *   Subject display.
+        *   Details row: Duration, User, Contact.
+        *   "View Details" / "Hide Details" button.
+        *   Conditional expandable details section (`isExpanded` state):
+            *   Parses `comm.Description` (expecting key: value pairs on new lines).
+            *   Displays key-value pairs in a grid.
+*   **State Management (`CallView`):**
+    *   `isExpanded`: Boolean to control visibility of the description details.
+*   **Key Functionality (`CallView`):**
+    *   Determines call status (Incoming, Outgoing, Missed, Unknown) and associated color/icon using `getCallStatusInfo` based on `comm.Call_Type`.
+    *   Displays formatted timestamp (`formatDate`) and duration (`formatDuration`).
+    *   Displays Subject, User, and Contact.
+    *   Parses multi-line description string into key-value pairs (`parseDescription`) and displays them in the expandable section.
+    *   Toggles the expandable section visibility.
+*   **Note:** Email and SMS views are not implemented (return `null`). `CommItem` itself doesn't seem to be used by `CommunicationTab`, which implements its own rendering logic.
+*   **Dependencies:** `react`.
+
+## 6. Utility Files
+
+### 6.1. `fileUpload.js` (`fileUploadjs.txt`)
+
+*   **Purpose:** Contains the `uploadDocumentWithFile` function.
+*   **Key Functionality:**
+    *   Handles uploading a single document and its associated file to Zoho Creator.
+    *   Step 1: Creates an `Add_Document` record with metadata.
+    *   Step 2: Uses `ZOHO.CREATOR.FILE.uploadFile` to upload the actual file against the created record ID and `File_Upload` field.
+    *   Step 3: Updates the document record to set `File_Uploaded` to true.
+*   **Dependencies:** `logError` (from `errorHandling.js`).
+
+### 6.2. `attachmentUpload.js` (`attachmentUploadjs.txt`)
+
+*   **Purpose:** Contains functions for handling note attachments.
+*   **Key Functionality:**
+    *   `uploadNoteAttachments`: Uploads multiple files as attachments to a specific note.
+        *   For each file:
+            *   Creates an `Add_Note_Attachment` record linking to the note and project.
+            *   Uploads the file using `ZOHO.CREATOR.FILE.uploadFile` against the `File_field`.
+            *   Updates the attachment record, setting `Transfer_Trigger` to true (likely for backend processing).
+    *   `createNoteWithAttachments`: Creates a note and then uploads attachments using `uploadNoteAttachments`.
+    *   `validateAttachments`: Checks file size against a limit (default 25MB).
+*   **Dependencies:** `logError`, `getCurrentUser`.
+
+### 6.3. `customAPI.js` (`customAPIjs.txt`)
+
+*   **Purpose:** Contains functions for invoking Zoho Creator Custom APIs.
+*   **Key Functionality:**
+    *   `createWorkDriveFolders`: Calls the `Create_WorkDrive_Folder` custom API to create project folders in WorkDrive. Takes `projectId` and `userEmail`.
+    *   `uploadWorkDriveFile`: Calls the `Upload_to_WorkDrive` custom API. Takes `projectId`, `userEmail`, and `documentId`. Includes a 30-second timeout.
+    *   `sendEmailNotifications`: Calls the `Send_Email_to_Client` custom API. Takes `template` name, project `id`, and `currentUserId`.
+*   **Dependencies:** None explicitly listed, relies on `ZOHO.CREATOR.DATA.invokeCustomApi`.
+
+## 7. Application Context (`appjs.txt`)
+
+*   **Purpose:** The main application component that sets up the Kanban board and renders the `ProjectDetailsModal`.
+*   **Key Functionality (relevant to Modal):**
+    *   Manages the overall application state (`projects`, `stages`, `users`, `currentUser`, etc.).
+    *   Handles opening the modal (`handleProjectClick`):
+        *   Sets `showProjectModal` and `selectedProjectId`.
+        *   Fetches full details using `fetchProjectDetails`.
+        *   Updates the `selectedProject` state for the modal.
+        *   Calls `updateActiveDetailWindow`.
+        *   Includes logic to trigger folder creation (`TRIG_Create_Project_Folders`) if `project_folder` is missing and polls for completion.
+    *   Handles closing the modal (`handleCloseModal`):
+        *   Resets modal state.
+        *   Clears `activeDetailWindow`.
+        *   Refreshes Kanban data.
+    *   Provides `fetchModalData`

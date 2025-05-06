@@ -1,0 +1,171 @@
+# Project Detail Modal - Component Usage Guide
+
+This guide outlines how the Base UI Components should be used within the Project Detail Modal and its various tabs. It aims to promote consistency and leverage the capabilities of the base components effectively.
+
+Refer to the [Base Component Usage Guide](mdc:docs/guides/base_component_usage_guide.txt) for detailed API documentation of each base component.
+
+---
+
+## 1. Overall Modal Structure (`BaseModal`)
+
+*   **File:** `app/components/modal/ProjectDetailModal.js`
+*   **Usage:** The entire Project Detail view is wrapped in a `<base-modal>`.
+*   **Configuration:**
+    *   `:show`: Bound to `isVisible` from `modalStore`.
+    *   `@close`: Emits to `closeModal` action in `modalStore`.
+    *   `size`: Currently set to `'6xl'`. This seems appropriate for the amount of content.
+    *   `scrollBehavior`: Set to `'outside'`. This means the entire modal panel scrolls, including the header and tabs. This is generally suitable.
+    *   `hideScrollbar`: Set to `true`. Visually cleaner, but ensure content doesn't become inaccessible if it unexpectedly overflows vertically without a visible scrollbar.
+    *   `no-header-padding`: Set to `true` because the `ModalHeader` component provides its own padding.
+    *   `#header` slot: Used to inject the custom `ModalHeader` component.
+    *   `#default` slot: Contains the main content, including the `<base-tabs>` and the dynamic tab content area.
+    *   `#footer` slot: **Currently empty**. This correctly removes the default footer provided by `BaseModal`.
+*   **Recommendations:**
+    *   Maintain the current `6xl` size unless content consistently overflows significantly.
+    *   The `outside` scroll behavior works well with the sticky `ModalHeader`. If complex scrolling is needed *within* a tab *while* keeping the header/tabs visible, consider switching to `inside` and managing scrolling within the tab component's root element.
+    *   Continue using the `#header` slot for the custom header and the empty `#footer` slot.
+
+---
+
+## 2. Modal Header (`ModalHeader.js`)
+
+*   **File:** `app/components/modal/ModalHeader.js`
+*   **Purpose:** Displays primary project identification (Contact Name, Address), key metadata (Stage, Tranche, Dates, Size, etc.), action buttons (Email, Call, Folders, Refresh, Close), and Tags.
+*   **Base Components Used:**
+    *   `BaseSelectMenu`: Used for Stage and Tranche selection.
+        *   *Configuration:* Bound to `currentStageId`/`currentTrancheId`, options loaded from `lookupsStore`, `@update:modelValue` triggers store actions. Uses custom styling classes for appearance within the header.
+        *   *Recommendation:* Ensure the custom styling (`bg-white/10`, etc.) is intentional and perhaps consolidate into a reusable style or consider if a `BaseSelectMenu` variant could achieve this.
+    *   `BaseBadge`: Used for displaying project tags.
+        *   *Configuration:* Iterates over `processedTags`. `:color` is dynamically bound based on tag category mapping (`TAG_CATEGORY_COLORS`). Uses `size="sm"`. Includes a nested remove button.
+        *   *Recommendation:* This is a good use of `BaseBadge`. Ensure `TAG_CATEGORY_COLORS` covers all expected categories. The nested button is acceptable, but consider accessibility implications.
+    *   `BaseButton`: (Implicitly used, as it's globally registered) Used for Email, Call, Refresh, Close, Add Tag, etc.
+        *   *Configuration:* Various `variant`s (`icon-ghost`-like custom styling with hover), `size`s (`xs`, `sm`), and icons (`far fa-envelope`, `fas fa-sync-alt`, etc.). Click handlers trigger methods or emit events.
+        *   *Recommendation:* Standardize button usage. The custom styled buttons (Email, Call, icons) should ideally use `BaseButton` variants like `'icon-ghost'` or `'secondary'` with appropriate icons passed via props (`leadingIcon`). This improves consistency and reduces custom CSS. Review focus states (`focus:ring-white`) for accessibility contrast on the gradient background.
+    *   *(Other Base Components?)* `Counters.js` uses `BaseBadge`.
+*   **Recommendations:**
+    *   **Refactor Buttons:** Convert custom `<button>` elements to use `<base-button>` with appropriate variants (`icon-ghost`, `secondary`) and icon props. Ensure consistent focus styling.
+    *   **Select Menu Style:** Evaluate if the custom styling for `BaseSelectMenu` can be achieved via props/variants or if a specific header-select style is needed.
+    *   **Tag Management:** The Add Tag functionality uses a custom dropdown. Consider if `BaseDropdown` or potentially `BaseCombobox` could replace this for consistency, although the current implementation is functional.
+    *   **Data Display:** Key metrics (Size, Payment, Dates) are displayed as simple `<span>` elements with custom styling. Consider using `BaseDescriptionList` (variant `compact` or similar) or custom stat components for better semantic structure and consistency if this pattern repeats.
+    *   **Address:** Address is a clickable button. Ensure the `title` attribute provides sufficient context.
+
+---
+
+## 3. Tab Navigation (`BaseTabs`)
+
+*   **File:** `app/components/modal/ProjectDetailModal.js` (where `<base-tabs>` is used)
+*   **Usage:** Renders the main navigation tabs below the header.
+*   **Configuration:**
+    *   `:tabs`: Bound to the `tabs` computed property in `ProjectDetailModal`.
+    *   `:modelValue`: Bound to `activeTab` from `modalStore`.
+    *   `@update:modelValue`: Emits to `setActiveTab` action in `modalStore`.
+    *   `class`: Uses `px-6 border-b border-gray-200` for padding and separation.
+    *   `variant`: Implicitly uses the default `'underline'` variant.
+*   **Recommendations:**
+    *   The default `'underline'` variant is suitable and commonly used. Keep this unless a different visual style (like `'pills'`) is strongly desired.
+    *   Ensure tab `id`s are consistent and match the keys used in the `activeTabComponent` computed property.
+    *   The padding and border classes applied directly are acceptable for this specific location.
+
+---
+
+## 4. Content Display within Tabs
+
+Tabs contain various ways of displaying information. Here are common patterns and component usage:
+
+### 4.1. Cards (`BaseCard`)
+
+*   **Examples:** `OverviewTab`, `SystemsTab`, `PermittingTab`, `SurveyTab`.
+*   **Usage:** Used extensively to group related information within tabs (e.g., "Events", "Issues", "System Overview", "Permitting Details").
+*   **Configuration:**
+    *   Typically uses the `#header` slot for a title (sometimes with action buttons) and the `#default` slot for content.
+    *   Standard `bg-white`, `shadow-sm`, `border`, `rounded-lg` styling is common.
+*   **Recommendations:**
+    *   **Standardize Headers:** Use `<base-section-heading>` or `<base-card-heading>` within the `#header` slot for consistent title/action layout, rather than custom flex divs (as seen in OverviewTab Issues/Events).
+    *   **Padding:** Use standard card padding unless specific content requires `noBodyPadding`.
+    *   **Nesting:** Avoid nesting cards directly unless visually distinct and necessary. Use dividers or spacing instead.
+
+### 4.2. Lists (`BaseFeed`, `BaseStackedList`, `BaseGridList`)
+
+*   **Examples:**
+    *   `BaseFeed`: Used in `OverviewTab` for Notes (via `NoteItem`). Could be used for Activity/Communications.
+    *   `BaseStackedList`: Used in `DocumentsTab` (via `DocumentTypeGroup`/`DocumentItem`). Could be used for simple lists in other tabs.
+    *   `BaseGridList`: Used in `ContactsTab` to display `ContactCard` components.
+*   **Usage:** Displaying sequences of items like notes, activities, documents, contacts.
+*   **Configuration:**
+    *   Requires providing item data via `:items` or the default slot.
+    *   Relies heavily on the `#item` slot for rendering individual list items (`NoteItem`, `DocumentItem`, `ContactCard`, etc.).
+    *   Variants (`simple`, `card`, `compact`) are chosen based on context.
+*   **Recommendations:**
+    *   **Choose Appropriately:**
+        *   `BaseFeed` is ideal for chronological items with icons/timestamps (Notes, Activity, Communications). Use the `#item` slot for custom rendering.
+        *   `BaseStackedList` is good for lists within cards or sections where items need separation/borders (Documents). Use the `#item` slot.
+        *   `BaseGridList` is best for card-based layouts (Contacts).
+    *   **Item Components:** Encapsulate the rendering of individual list items into dedicated components (like `NoteItem`, `ContactCard`, `DocumentItem`) and use them within the `#item` slot of the list component. This promotes modularity.
+
+### 4.3. Forms & Inputs (`BaseTextInput`, `BaseSelectMenu`, `BaseTextArea`, `BaseCheckboxGroup`, `BaseRadioGroup`)
+
+*   **Examples:** `OverviewTab` (Add Note), `ContactsTab` (ContactForm), `SystemsTab` (MaterialForm, Edit System), `PermittingTab`, `SurveyTab`.
+*   **Usage:** Used for adding or editing data within tabs.
+*   **Configuration:**
+    *   Bound using `v-model`.
+    *   Labels provided via `label` prop.
+    *   Placeholders used where appropriate.
+    *   Error states bound to `:error` prop.
+    *   Often grouped within `<base-card>` or custom form layouts.
+*   **Recommendations:**
+    *   **Layout:** Use `<base-form-layouts>` component to structure forms with multiple fields/sections consistently, especially for edit forms (like `ContactForm`, `MaterialForm`).
+    *   **Labels & Required:** Always provide clear labels using the `label` prop. Use `required` prop and visual indicators (`<span class="text-red-500">*</span>`) for required fields.
+    *   **Error Handling:** Bind error messages to the `:error` prop for consistent display.
+    *   **Select Menus:** Prefer `BaseSelectMenu` for simple dropdowns. Use `BaseCombobox` (via `BaseCommandPalette` if needed) only for typeahead/searchable dropdowns.
+    *   **Text Areas:** `BaseTextArea` is well-suited for notes/comments. Utilize the `#actions` slot for buttons like "Add Note".
+    *   **Checkbox/Radio:** Use `BaseRadioGroup` and `BaseCheckboxGroup` for selecting single or multiple options from a predefined list (e.g., Tags in Permitting edit form).
+
+### 4.4. Data Display (`BaseDescriptionList`, `BaseBadge`, `BaseAvatar`)
+
+*   **Examples:**
+    *   `BaseBadge`: Used in `ModalHeader` (Tags), `OverviewTab` (Note/Issue status/tags), `ContactsTab` (Contact Type), `PermittingTab` (Status), `SurveyTab` (Status).
+    *   `BaseAvatar`: Used in `OverviewTab` (`NoteItem`).
+    *   `BaseDescriptionList`: *Potential Use:* Could be used in tabs like `Overview`, `PropertyInfo`, `Survey`, `Permitting` to display key-value data pairs more consistently than custom `dl` or grid layouts.
+*   **Usage:** Displaying status indicators, user initials, or structured key-value data.
+*   **Configuration:**
+    *   `BaseBadge`: `:color` prop is crucial for semantic meaning. Use consistent colors for similar statuses across tabs. `size="sm"` or `xs` is common in the modal.
+    *   `BaseAvatar`: `:initials` prop required. `size` adjusted based on context.
+    *   `BaseDescriptionList`: Requires `items` prop or slotted `dt`/`dd` pairs. Choose appropriate `variant`.
+*   **Recommendations:**
+    *   **Badge Colors:** Define and use a consistent color mapping for statuses (e.g., 'Approved' is always green, 'Problem' is always red) across all tabs using `BaseBadge`. Refer to `TAG_CATEGORY_COLORS` for tag consistency.
+    *   **Description Lists:** Refactor sections displaying key-value pairs (like parts of Survey, Permitting, System Overview) to use `<base-description-list>` with appropriate variants (`striped`, `compact`, `two-column`) for better structure and less custom styling.
+    *   **Avatars:** Use consistently for user representations (e.g., Note authors, Activity authors).
+
+### 4.5. Buttons (`BaseButton`)
+
+*   **Examples:** Used throughout (ModalHeader, OverviewTab, ContactsTab, DocumentsTab, etc.).
+*   **Usage:** Triggering actions (Save, Cancel, Edit, Add, Refresh, Close, View Report, etc.).
+*   **Configuration:** Wide variety of `variant`, `size`, `color`, `leadingIcon`/`trailingIcon` props used.
+*   **Recommendations:**
+    *   **Consistency:** Use standard variants (`primary`, `secondary`, `danger`, `link`, `icon-ghost`) consistently for similar actions.
+        *   **Primary Action:** Use `variant="primary"` (Blue) for the main confirmation/save action in a section/form.
+        *   **Cancel/Secondary:** Use `variant="secondary"` (White/Gray border) for cancellation or less prominent actions.
+        *   **Destructive:** Use `variant="danger"` (Red) for delete/destructive actions, preferably with confirmation (`BaseDialog`).
+        *   **Links:** Use `variant="link"` (Blue text) for navigation-like actions that look like links but might trigger JS.
+        *   **Icon-Only:** Use `variant="icon-ghost"` (or `secondary` with only an icon slot) for icon buttons with minimal visual weight (like Edit/Delete icons on cards/rows).
+    *   **Sizing:** Use `size="sm"` or `xs` for buttons within dense areas like card headers or list items. Use `size="md"` for primary form actions.
+    *   **Icons:** Use `leadingIcon` or `trailingIcon` props instead of putting `<i>` tags directly in the slot where possible.
+    *   **Loading/Disabled States:** Utilize the `:loading` and `:disabled` props to provide clear user feedback during asynchronous operations or when actions are unavailable.
+
+---
+
+## 5. General Recommendations & Improvements
+
+1.  **Component Adoption:** Fully replace custom-styled buttons, lists, cards, and form elements with their corresponding Base Components (`BaseButton`, `BaseStackedList`/`BaseFeed`, `BaseCard`, `BaseTextInput`, etc.) to ensure consistency and reduce custom CSS/JS.
+2.  **Layout Consistency:** Use `<base-grid-list>` for grid layouts (like ContactsTab) and consider `<base-form-layouts>` for structuring forms within tabs (like `ContactForm`, `MaterialForm`, edit modes in `PermittingTab`/`SurveyTab`).
+3.  **Data Display:** Employ `<base-description-list>` for displaying key-value pairs in tabs like Survey, Permitting, System Overview, and Property Info for better semantic structure and consistency.
+4.  **Color Palette:** Strictly adhere to the primary accent color rule (Blue - `blue-500`/`600`) for primary buttons and active states (e.g., active tabs, selected items). Refactor existing `indigo` usage. Use semantic colors (green for success, red for danger/errors, yellow for warnings) consistently via component props (e.g., `BaseBadge color`, `BaseAlert color`, `BaseButton variant="danger"`).
+5.  **Error Handling:** Use `<base-alert>` for displaying significant errors (e.g., failed data loading). Use the `error` prop on input components (`BaseTextInput`, `BaseSelectMenu`, etc.) for field-level validation feedback. Use `BaseNotification` (via `uiStore`) for feedback on actions (Save Success/Failure, Delete Confirmation, etc.).
+6.  **Loading States:** Implement loading indicators more consistently.
+    *   Use the `ProjectDetailModalSkeleton` component when the main modal data is loading.
+    *   Use the `:loading` prop on `<base-button>` components during form submissions or data refreshes initiated by that button.
+    *   Consider adding skeleton loaders within specific cards or sections if only parts of a tab load asynchronously.
+7.  **Empty States:** Utilize `<base-empty-states>` within tabs where lists or sections might be empty (e.g., No Documents, No Contacts, No Notes, No Issues). Provide informative messages and potentially relevant action buttons within the `actions` slot.
+8.  **Modularity:** Continue breaking down tab content into smaller, reusable components (like `ContactCard`, `NoteItem`, `MaterialForm`) where appropriate. Pass data down via props.
+
+By applying these guidelines, the Project Detail Modal UI will become more consistent, maintainable, and easier to extend with new features and tabs. 

@@ -1,59 +1,249 @@
-app/
-├── App.js
-├── components/
-│   ├── common/
-│   │   ├── BaseAlert.js
-│   │   ├── BaseAvatar.js
-│   │   ├── BaseBadge.js
-│   │   ├── BaseButton.js
-│   │   ├── BaseButtonGroup.js
-│   │   ├── BaseCard.js
-│   │   ├── BaseCombobox.js
-│   │   ├── BaseContainer.js
-│   │   ├── BaseDescriptionList.js
-│   │   ├── BaseDropdown.js
-│   │   ├── BaseFeed.js
-│   │   ├── BaseGridList.js
-│   │   ├── BaseListContainer.js
-│   │   ├── BaseModal.js
-│   │   ├── BaseNotification.js
-│   │   ├── BaseSelectMenu.js
-│   │   ├── BaseStackedList.js
-│   │   ├── BaseTable.js
-│   │   ├── BaseTabs.js
-│   │   ├── BaseTextArea.js
-│   │   ├── BaseTextInput.js
-│   │   ├── BaseToggle.js
-│   │   └── DevToolbar.js
-│   └── kanban/
-│       ├── KanbanBoard.js
-│       ├── KanbanBoardSkeleton.js
-│       ├── KanbanCard.js
-│       ├── KanbanColumn.js
-│       ├── KanbanToolbar.js
-│       └── DevToolbar.js
-├── config/
-│   ├── constants.js
-│   └── options.js
-├── services/
-│   ├── zohoCreatorAPI.js
-│   ├── initService.js
-│   └── activityLogService.js
-├── store/
-│   ├── lookupsStore.js
-│   ├── modalStore.js
-│   ├── projectsStore.js
-│   ├── uiStore.js
-│   └── userStore.js
-├── translations/
-│   └── en.json
-├── utils/
-│   ├── helpers.js
-│   ├── localStorage.js
-│   └── processors.js
-├── views/
-│   └── WidgetView.js
-└── widget.html
+├── .gitignore
+├── ZET-debug.log
+├── cert.pem
+├── key.pem
+├── package.json
+├── plugin-manifest.json
+├── app
+│   ├── App.js
+│   ├── widget.html
+│   ├── components
+│   │   ├── common
+│   │   │   ├── BaseActionPanel.js
+│   │   │   ├── BaseAlert.js
+│   │   │   ├── BaseAvatar.js
+│   │   │   ├── BaseBadge.js
+│   │   │   ├── BaseBreadcrumbs.js
+│   │   │   ├── BaseButton.js
+│   │   │   ├── BaseButtonGroup.js
+│   │   │   ├── BaseCalendar.js
+│   │   │   ├── BaseCard.js
+│   │   │   ├── BaseCardHeading.js
+│   │   │   ├── BaseCheckboxGroup.js
+│   │   │   ├── BaseCombobox.js
+│   │   │   ├── BaseCommandPalette.js
+│   │   │   ├── BaseContainer.js
+│   │   │   ├── BaseDescriptionList.js
+│   │   │   ├── BaseDialog.js
+│   │   │   ├── BaseDivider.js
+│   │   │   ├── BaseDrawer.js
+│   │   │   ├── BaseDropdown.js
+│   │   │   ├── BaseEmptyStates.js
+│   │   │   ├── BaseFeed.js
+│   │   │   ├── BaseFormLayouts.js
+│   │   │   ├── BaseGridList.js
+│   │   │   ├── BaseInputGroup.js
+│   │   │   ├── BaseKanbanBoard.js
+│   │   │   ├── BaseLayout.js
+│   │   │   ├── BaseListContainer.js
+│   │   │   ├── BaseMediaObject.js
+│   │   │   ├── BaseModal.js
+│   │   │   ├── BaseNavbar.js
+│   │   │   ├── BaseNotification.js
+│   │   │   ├── BasePageHeading.js
+│   │   │   ├── BasePagination.js
+│   │   │   ├── BaseRadioGroup.js
+│   │   │   ├── BaseSectionHeading.js
+│   │   │   ├── BaseSelectMenu.js
+│   │   │   ├── BaseSidebarNavigation.js
+│   │   │   ├── BaseStackedList.js
+│   │   │   ├── BaseStats.js
+│   │   │   ├── BaseStepNavigation.js
+│   │   │   ├── BaseTable.js
+│   │   │   ├── BaseTabs.js
+│   │   │   ├── BaseTextArea.js
+│   │   │   ├── BaseTextInput.js
+│   │   │   └── BaseToggle.js
+│   │   ├── kanban
+│   │   │   ├── DevToolbar.js
+│   │   │   ├── KanbanBoard.js
+│   │   │   ├── KanbanBoardSkeleton.js
+│   │   │   ├── KanbanCard.js
+│   │   │   ├── KanbanColumn.js
+│   │   │   └── KanbanToolbar.js
+│   │   └── modal
+│   │       ├── Counters.js
+│   │       ├── FileComparison.js
+│   │       ├── FilePreview.js
+│   │       ├── ModalHeader.js
+│   │       ├── ProjectDetailModal.js
+│   │       ├── ProjectDetailModalSkeleton.js
+│   │       └── tabs
+│   │           ├── activity
+│   │           │   └── ActivityTab.js
+│   │           ├── commissions
+│   │           │   └── CommissionsTab.js
+│   │           ├── communications
+│   │           │   ├── CommItem.js
+│   │           │   ├── CommunicationsTab.js
+│   │           │   └── EmailTemplatesSection.js
+│   │           ├── contacts
+│   │           │   ├── ContactCard.js
+│   │           │   ├── ContactForm.js
+│   │           │   └── ContactsTab.js
+│   │           ├── documents
+│   │           │   ├── DocumentChecklist.js
+│   │           │   ├── DocumentItem.js
+│   │           │   ├── DocumentTypeGroup.js
+│   │           │   ├── DocumentsTab.js
+│   │           │   └── MultipleFileUploadForm.js
+│   │           ├── investors
+│   │           │   └── InvestorsTab.js
+│   │           ├── overview
+│   │           │   ├── EventItem.js
+│   │           │   ├── IssueItem.js
+│   │           │   ├── LatestActivityPreview.js
+│   │           │   ├── NoteAttachmentPreview.js
+│   │           │   ├── NoteItem.js
+│   │           │   ├── OverviewTab.js
+│   │           │   └── SalesRepInfoCard.js
+│   │           ├── permitting
+│   │           │   └── PermittingTab.js
+│   │           ├── propertyInfo
+│   │           │   └── PropertyInfoTab.js
+│   │           ├── survey
+│   │           │   └── SurveyTab.js
+│   │           ├── systems
+│   │           │   ├── MaterialForm.js
+│   │           │   ├── MaterialItem.js
+│   │           │   └── SystemsTab.js
+│   │           └── tasks
+│   │               └── TasksTab.js
+│   ├── config
+│   │   ├── constants.js
+│   │   └── options.js
+│   ├── services
+│   │   ├── activityLogService.js
+│   │   ├── initService.js
+│   │   └── zohoCreatorAPI.js
+│   ├── store
+│   │   ├── communicationsStore.js
+│   │   ├── contactsStore.js
+│   │   ├── documentsStore.js
+│   │   ├── lookupsStore.js
+│   │   ├── materialStore.js
+│   │   ├── modalStore.js
+│   │   ├── permittingStore.js
+│   │   ├── projectsStore.js
+│   │   ├── uiStore.js
+│   │   └── userStore.js
+│   ├── translations
+│   │   └── en.json
+│   ├── utils
+│   │   ├── helpers.js
+│   │   ├── localStorage.js
+│   │   └── processors.js
+│   └── views
+│       └── WidgetView.js
+├── docs
+│   ├── active_docs
+│   │   ├── general_rules.mdc
+│   │   ├── general_rules.txt
+│   │   ├── lookup_backend_structure.txt
+│   │   ├── other_backend_structure.txt
+│   │   ├── project_backend_structure.txt
+│   │   ├── project_directory.txt
+│   │   └── zoho_Api.txt
+│   ├── audit_reports
+│   │   └── kanban_audit_review_points.txt
+│   ├── current_docs
+│   │   ├── ZohoCreatorDoc.txt
+│   │   ├── communications_tab_build_plan.txt
+│   │   ├── current_detail_modal_build_plan.txt
+│   │   ├── current_kanban_build_plan.txt
+│   │   ├── modal_build_plan.txt
+│   │   ├── old_modal_audit.txt
+│   │   ├── vue_modal_rebuild_plan.txt
+│   │   ├── vuex_to_pinia_migration.txt
+│   │   └── zoho_backend_schema.txt
+│   ├── guides
+│   │   ├── base_component_usage_guide.txt
+│   │   ├── modal_component_usage_guide.txt
+│   │   └── zoho_file_preview_guide.txt
+│   ├── notes
+│   │   └── base_components.txt
+│   ├── old_code
+│   │   ├── ActivitiesTabjs.txt
+│   │   ├── AddMaterialFormjs.txt
+│   │   ├── CommItemjs.txt
+│   │   ├── CommSectionjs.txt
+│   │   ├── CommissionNotesjs.txt
+│   │   ├── CommunicationTabjs.txt
+│   │   ├── ContactItemjs.txt
+│   │   ├── ContactTabjs.txt
+│   │   ├── Countersjs.txt
+│   │   ├── DocumentChecklistjs.txt
+│   │   ├── DocumentContentjs.txt
+│   │   ├── DocumentTypeDrawerjs.txt
+│   │   ├── DocumentsSectionjs.txt
+│   │   ├── DocumentsTabjs.txt
+│   │   ├── EditSalesRepModaljs.txt
+│   │   ├── EmailTemplatesSectionjs.txt
+│   │   ├── EventsSectionjs.txt
+│   │   ├── InvestorsTabjs.txt
+│   │   ├── IssueModaljs.txt
+│   │   ├── IssuesSectionjs.txt
+│   │   ├── KanbanBoardSkeletonjs.txt
+│   │   ├── KanbanBoardjs.tx
+│   │   ├── KanbanCardjs.txt
+│   │   ├── KanbanColumnjs.txt
+│   │   ├── MilestonesInvestorsTabjs.txt
+│   │   ├── ModalHeaderjs.txt
+│   │   ├── MultipleFileUploadFormjs.txt
+│   │   ├── NoteAttachmentjs.txt
+│   │   ├── NoteItemjs.txt
+│   │   ├── NotesSectionjs.txt
+│   │   ├── OverviewTabjs.txt
+│   │   ├── PDFPreviewjs.txt
+│   │   ├── PermittingTabjs.txt
+│   │   ├── ProjectDetailsModaljs.txt
+│   │   ├── SalesRepInfojs.txt
+│   │   ├── SalesRepTabjs.txt
+│   │   ├── SurveyTabjs.txt
+│   │   ├── SystemApprovalModaljs.txt
+│   │   ├── SystemsTabjs.txt
+│   │   ├── TagModaljs.txt
+│   │   ├── ToastContextjs.txt
+│   │   ├── Toastjs.txt
+│   │   ├── Toolbarjs.txt
+│   │   ├── TranchesKanbanBoardjs.txt
+│   │   ├── WorkRequirementBarsjs.txt
+│   │   ├── appjs.txt
+│   │   ├── attachmentUploadjs.txt
+│   │   ├── customAPIjs.txt
+│   │   ├── dataFetchingjs.txt
+│   │   ├── deleteRecordjs.txt
+│   │   ├── fileUploadjs.txt
+│   │   ├── navigationjs.txt
+│   │   ├── recordCreationjs.txt
+│   │   ├── recordUpdatesjs.txt
+│   │   ├── stagecardUpdatejs.txt
+│   │   ├── stylescss.txt
+│   │   ├── userInfojs.txt
+│   │   ├── widgethtml.txt
+│   │   └── zohoApijs.txt
+│   ├── old_docs
+│   │   ├── buildPlan.txt
+│   │   ├── dataSchema.txt
+│   │   ├── devPlan.txt
+│   │   ├── vue-multiselect-css.txt
+│   │   ├── vue-multiselect.txt
+│   │   └── zohoApiDocs.txt
+│   └── prev_code
+│       ├── prev_appjs.txt
+│       ├── prev_kanbancard.txt
+│       ├── prev_kanbanboardjs.txt
+│       ├── prev_kanbancolumnjs.txt
+│       ├── prev_kanbantoolbar.txt
+│       ├── prev_widgethtml.txt
+│       └── prev_widgetviewjs.txt
+└── server
+    └── index.js (DO NOT TOUCH, NO ALTERATIONS WHATSOEVER FOR ANY REASON)
 
-# Note: Specific component files under components/common/ and components/kanban/ 
-# are omitted for brevity but follow the structure shown in App.js registration.
+# Note: Structure reflects created/modified files and assumed locations for others.
+
+### Documentation & Configuration
+- `docs/active_docs/data_flow.txt`: Documents the flow of data from API calls to UI components.
+- `docs/active_docs/project_directory.txt`: This file, listing the project structure.
+- `docs/active_docs/zoho_Api.txt`: Details on Zoho Creator API usage and function definitions.
+- `docs/active_docs/common_patterns.txt`: Guidelines for consistent patterns across widgets.

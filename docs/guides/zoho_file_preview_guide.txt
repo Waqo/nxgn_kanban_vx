@@ -1,0 +1,140 @@
+# Guide: Previewing Zoho Creator File Uploads in Widgets via Google Docs Viewer
+
+## Goal
+
+To display a preview of files (like PDFs, images, documents) stored in a Zoho Creator 'File Upload' field within an `<iframe>` in a custom widget, instead of triggering a direct download.
+
+This guide details the workaround using Google Docs Viewer, as Zoho Creator does not provide a direct, embeddable preview URL for files solely uploaded via the standard 'File Upload' field (unlike WorkDrive or Embed links).
+
+## Prerequisites in Zoho Creator
+
+1.  **Published Report:** The report containing the records and the 'File Upload' field you want to preview **must be published**. 
+    *   Go to your Application -> Edit -> Share (or Settings -> Share/Publish).
+    *   Find the relevant report (e.g., `PM_Kanban_Documents`).
+    *   Publish the report. Configure permissions appropriately (e.g., access via private link).
+2.  **Private Key:** Obtain the **Private Key** associated with the *published report*. 
+    *   When you publish the report or access its published link settings, Zoho Creator provides a Private Link and a corresponding Private Key (a long alphanumeric string).
+    *   Copy this Private Key securely. **This key grants access to the published report data, treat it like a password.**
+3.  **Required Names:** You need the following link names:
+    *   Your Zoho Account Owner Name (e.g., `nexgenroofingandsolar`)
+    *   Your Application Link Name (e.g., `nexgen-portal`)
+    *   The Link Name of the Published Report (e.g., `PM_Kanban_Documents`)
+    *   The Link Name of the File Upload field within that report (e.g., `File_Upload`)
+
+## Widget Implementation Steps
+
+1.  **Fetch Document Data:** In your widget's JavaScript, fetch the specific document record you want to preview. Ensure you retrieve:
+    *   The record's `ID`.
+    *   The value of the `File_Upload` field (this contains the internal Zoho download path string).
+
+2.  **Extract Internal Filepath:** The `File_Upload` field value contains a URL path like `/api/v2.1/.../download?filepath=[INTERNAL_FILEPATH]`. You need to extract the `[INTERNAL_FILEPATH]` part.
+    ```javascript
+    function getInternalFilePath(fileUploadString) {
+      if (!fileUploadPath) return null;
+      try {
+        // Construct a full dummy URL to use URLSearchParams
+        const fullUrl = new URL(fileUploadString, 'https://creator.zoho.com'); 
+        return fullUrl.searchParams.get('filepath');
+      } catch (e) {
+        console.error('Could not parse filepath from File_Upload string:', fileUploadPath, e);
+        return null;
+      }
+    }
+    ```
+
+3.  **Construct Zoho Public Download URL:** Create the specific URL that points to the file via the published report endpoint. **Note:** Accessing this URL directly in a browser *will still likely trigger a download*, but Google Docs Viewer can often process it.
+    ```javascript
+    function constructZohoPublicUrl(docId, internalFilePath, privateKey) {
+      if (!docId || !internalFilePath || !privateKey) return null;
+      
+      // Replace placeholders with your actual values
+      const ownerName = 'nexgenroofingandsolar'; 
+      const appName = 'nexgen-portal';
+      const reportName = 'PM_Kanban_Documents'; // Use the published report's link name
+      const fieldName = 'File_Upload'; // The file upload field's link name
+      
+      // Construct the URL
+      const url = `https://creatorapp.zohopublic.com/${ownerName}/${appName}/report/${reportName}/${docId}/${fieldName}/download-file/${privateKey}?filepath=/${internalFilePath}`;
+      
+      console.log("Constructed Zoho Public URL:", url);
+      return url;
+    }
+    ```
+
+4.  **Construct Google Docs Viewer URL:** Wrap the Zoho public download URL (from Step 3) inside the Google Docs Viewer URL. **Crucially, the Zoho URL must be URL-encoded.**
+    ```javascript
+    function getGoogleViewerUrl(zohoPublicUrl) {
+        if (!zohoPublicUrl) return null;
+        const encodedZohoUrl = encodeURIComponent(zohoPublicUrl);
+        const viewerUrl = `https://docs.google.com/viewer?url=${encodedZohoUrl}&embedded=true`;
+        console.log("Constructed Google Viewer URL:", viewerUrl);
+        return viewerUrl;
+    }
+    ```
+
+5.  **Set Iframe Source:** In your widget's HTML template (e.g., within a modal component), use an `<iframe>` and dynamically bind its `src` attribute to the final Google Docs Viewer URL generated in Step 4.
+
+## Example Usage (Simplified Vue Component Logic)
+
+```javascript
+// Inside your Vue component's setup function
+
+const modalStore = useModalStore(); // Assuming you have access
+const doc = computed(() => props.document); // Assuming 'document' prop has ID and File_Upload
+const docId = computed(() => doc.value?.ID);
+const fileUploadPath = computed(() => doc.value?.File_Upload?.trim());
+const docName = computed(() => doc.value?.Document_Name || 'Document');
+
+// !! STORE THIS SECURELY OR PASS VIA WIDGET PARAMS !!
+const ZOHO_PRIVATE_KEY = 'E1FjUgJFzbAU5Y02f10ADJ6WUCCHwuSOXRsQOSJOkKrrjqAPWQWn2eF65mE4RFnyxO9JMJJ2r8ByQnpvXOaGdTmZTwAHWvxXRxvq'; 
+
+const handleRequestPreview = () => {
+    const internalPath = getInternalFilePath(fileUploadPath.value);
+    if (internalPath) {
+        const zohoUrl = constructZohoPublicUrl(docId.value, internalPath, ZOHO_PRIVATE_KEY);
+        const googleUrl = getGoogleViewerUrl(zohoUrl);
+        if (googleUrl) {
+            modalStore.openPreview(googleUrl, docName.value);
+        } else {
+            // Handle error: Couldn't construct Google URL
+            console.error("Failed to construct Google Viewer URL.");
+        }
+    } else {
+         // Handle error: Couldn't extract internal path
+         console.error("Failed to extract internal filepath.");
+    }
+};
+
+// Helper functions as defined above
+function getInternalFilePath(fileUploadPath) { /* ... see step 2 ... */ }
+function constructZohoPublicUrl(docId, internalFilePath, privateKey) { /* ... see step 3 ... */ }
+function getGoogleViewerUrl(zohoPublicUrl) { /* ... see step 4 ... */ }
+
+```
+
+## HTML Template Example
+
+```html
+<!-- Within your preview modal component (e.g., FilePreview.js) -->
+<template #default>
+     <div v-if="url" class="bg-gray-800" style="height: 80vh;">
+         <iframe 
+             :src="url" <!-- url is bound to the Google Viewer URL from modalStore -->
+             class="w-full h-full border-0"
+             frameborder="0"
+             allowfullscreen
+         ></iframe>
+     </div>
+     <!-- ... -->
+</template>
+```
+
+## Important Considerations
+
+*   **Security:** Publishing a report and using a private key makes the data in that published view accessible via that key. Configure publish permissions carefully.
+*   **Reliability:** As noted in Zoho support threads, the Google Docs Viewer method might not be 100% reliable. It can sometimes fail to render the document on the first try and may require a refresh. It's a workaround, not a native feature.
+*   **Dependency:** This method relies on Google's public Docs Viewer service being available and supporting the Zoho URL format.
+*   **Preferred Method:** If available, always prioritize using the `Embed_Link` or `WorkDrive_Link` fields provided by Zoho, as these are designed for embedding and are generally more reliable than this workaround.
+*   **Error Handling:** Implement robust error handling around URL parsing and construction.
+
+This method provides a viable way to achieve previews for standard File Upload fields when other options aren't available, but be mindful of its limitations. 

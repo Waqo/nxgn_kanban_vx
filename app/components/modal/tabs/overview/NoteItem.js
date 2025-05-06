@@ -52,7 +52,7 @@ export default {
     const userStore = useUserStore();
 
     // Log initial replies length
-    console.log(`[NoteItem ${note.value.id}] Initial replies count: ${replies.value?.length || 0}`);
+  // console.log(`[NoteItem ${note.value.id}] Initial replies count: ${replies.value?.length || 0}`);
 
     const authorName = computed(() => note.value.author || 'Unknown User');
     
@@ -106,7 +106,7 @@ export default {
         const all = replies.value || [];
         const limited = all.slice(0, REPLY_LIMIT);
         const result = showAllReplies.value ? all : limited;
-        console.log(`[NoteItem ${note.value.id}] displayedReplies calculated. showAllReplies: ${showAllReplies.value}, Result length: ${result.length}`); // Log computed
+      // console.log(`[NoteItem ${note.value.id}] displayedReplies calculated. showAllReplies: ${showAllReplies.value}, Result length: ${result.length}`); // Log computed
         return result;
     });
     const hasMoreReplies = computed(() => (replies.value?.length || 0) > REPLY_LIMIT);
@@ -136,7 +136,7 @@ export default {
     const toggleShowAllReplies = () => {
         const oldState = showAllReplies.value;
         showAllReplies.value = !showAllReplies.value;
-        console.log(`[NoteItem ${note.value.id}] toggleShowAllReplies called. State changed from ${oldState} to ${showAllReplies.value}`); // Log toggle
+      // console.log(`[NoteItem ${note.value.id}] toggleShowAllReplies called. State changed from ${oldState} to ${showAllReplies.value}`); // Log toggle
     };
 
     // --- Toggle function for attachments ---
@@ -211,11 +211,11 @@ export default {
 
         if (isImage) {
             finalPreviewUrl = directUrl;
-            console.log(`NoteItem: Using direct image URL for preview: ${finalPreviewUrl}`);
+          // console.log(`NoteItem: Using direct image URL for preview: ${finalPreviewUrl}`);
         } else {
             // Attempt to use Google Viewer for non-images
             let internalFilePath = null;
-            console.log(`[NoteItem] Direct URL for non-image: ${directUrl}`); // Log the URL being parsed
+          // console.log(`[NoteItem] Direct URL for non-image: ${directUrl}`); // Log the URL being parsed
             try {
                 // Extract filepath from the direct URL (assuming /api/.../download?filepath=... format)
                 const urlObject = new URL(directUrl);
@@ -231,7 +231,7 @@ export default {
                 const { REPORT_PUBLISHED_NOTE_ATTACHMENTS, FIELD_NOTE_ATTACHMENT_FIELD } = await import('../../../../config/constants.js');
                 const zohoPublicDownloadUrl = `https://creatorapp.zohopublic.com/nexgenroofingandsolar/nexgen-portal/report/${REPORT_PUBLISHED_NOTE_ATTACHMENTS}/${attachment.id}/${FIELD_NOTE_ATTACHMENT_FIELD}/download-file/${privateKey}?filepath=${internalFilePath}`;
                 finalPreviewUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(zohoPublicDownloadUrl)}&embedded=true`;
-                console.log(`NoteItem: Constructed Google Viewer URL: ${finalPreviewUrl}`);
+              // console.log(`NoteItem: Constructed Google Viewer URL: ${finalPreviewUrl}`);
             } else {
                 console.warn(`NoteItem: Could not construct Google Viewer URL for non-image. Falling back to direct URL (might not render). Filepath: ${internalFilePath}, ID: ${attachment.id}`);
                 finalPreviewUrl = directUrl; // Fallback to direct URL if viewer construction fails
@@ -239,7 +239,7 @@ export default {
         }
 
         if (finalPreviewUrl) {
-            console.log(`NoteItem: Calling modalStore.openPreview for ${previewTitle}`);
+          // console.log(`NoteItem: Calling modalStore.openPreview for ${previewTitle}`);
             // Call modalStore action to open the central preview modal
             modalStore.openPreview(finalPreviewUrl, previewTitle, isImage, downloadUrl, 'noteAttachment');
         } else {

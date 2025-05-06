@@ -1,0 +1,2177 @@
+# Base Component Usage Guide
+
+This guide provides documentation and usage examples for the base UI components used in the project, particularly within the context of the Project Detail Modal.
+
+---
+
+## 1. BaseActionPanel
+
+**File:** `app/components/common/BaseActionPanel.js`
+
+**Purpose:** A flexible panel component designed to display information (title, description) with an associated action area (e.g., a button, input group). Its layout adapts based on the chosen `variant`.
+
+**Key Props:**
+
+*   `title` (String, default: ''): Main title text.
+*   `description` (String, default: ''): Text displayed below the title.
+*   `variant` (String, default: 'default'): Determines layout. Options:
+    *   `'default'`: Action below text.
+    *   `'action-right'`: Action inline to the right of text (on wider screens).
+    *   `'action-top-right'`: Action at the top right, opposite the title.
+    *   `'input-group'`: Layout suited for an input field and button.
+    *   `'well'`: Uses a `bg-gray-50` background.
+*   `bgColor` (String, default: null): Overrides the default background color (`bg-white` or `bg-gray-50` for 'well').
+*   `rounded` (String, default: 'sm:rounded-lg'): Tailwind rounding class.
+*   `shadow` (String, default: 'shadow-sm'): Tailwind shadow class.
+*   `padding` (String, default: 'px-4 py-5 sm:p-6'): Tailwind padding class.
+*   `className` (String, default: ''): Additional custom classes for the root element.
+
+**Slots:**
+
+*   `title`: Override the default title rendering.
+*   `description`: Override the default description rendering.
+*   `content`: Add arbitrary content within the text area.
+*   `action`: Place interactive elements (buttons, inputs) in the designated action area.
+
+**Basic Usage Example:**
+
+```html
+<BaseActionPanel 
+  title="Update Profile" 
+  description="Keep your personal information up to date."
+  variant="action-right"
+>
+  <template #action>
+    <BaseButton color="blue">Save Changes</BaseButton>
+  </template>
+</BaseActionPanel>
+```
+
+---
+
+## 2. BaseAlert
+
+**File:** `app/components/common/BaseAlert.js`
+
+**Purpose:** Displays contextual feedback messages (e.g., success, error, warning, info) with consistent styling.
+
+**Key Props:**
+
+*   `color` (String, default: 'yellow'): Sets the alert's theme. Options: `'red'`, `'green'`, `'blue'`, `'yellow'`.
+*   `title` (String, default: ''): Optional bold title text for the alert.
+*   `dismissible` (Boolean, default: false): If true, shows a close button.
+*   `variant` (String, default: 'default'): Visual style. Options:
+    *   `'default'`: Standard background color fill.
+    *   `'accent-border'`: Colored left border with a lighter background.
+
+**Slots:**
+
+*   `default`: Main content/message of the alert.
+*   `actions`: Place action buttons (e.g., "Retry", "Undo") within the alert.
+*   `trailing`: Place content (like links) aligned to the right side of the alert content.
+
+**Events:**
+
+*   `dismiss`: Emitted when the dismiss button (if `dismissible` is true) is clicked.
+
+**Basic Usage Example:**
+
+```html
+<BaseAlert 
+  color="green" 
+  title="Success!" 
+  :dismissible="true" 
+  @dismiss="showAlert = false"
+  v-if="showAlert"
+>
+  Your project has been successfully updated.
+  <template #actions>
+     <BaseButton size="sm" color="green" variant="text">View Project</BaseButton>
+     <BaseButton size="sm" color="green" variant="text">Dismiss</BaseButton>
+  </template>
+   <template #trailing>
+       <a href="#" class="font-medium text-green-700 hover:text-green-600">Details <span aria-hidden="true">&rarr;</span></a>
+   </template>
+</BaseAlert>
+```
+
+---
+
+## 3. BaseAvatar
+
+**File:** `app/components/common/BaseAvatar.js`
+
+**Purpose:** Displays a circular avatar, typically showing user initials as a fallback if an image isn't provided (though this implementation focuses on initials).
+
+**Key Props:**
+
+*   `initials` (String, default: ''): The initials or name to derive initials from. Displays '??' if empty.
+*   `size` (String, default: 'md'): Size of the avatar. Options: `'xs'`, `'sm'`, `'md'`, `'lg'`, `'xl'`.
+*   `bgColorClass` (String, default: 'bg-gray-500'): Tailwind background color class for the circle.
+
+**Slots:** None.
+
+**Basic Usage Example:**
+
+```html
+<BaseAvatar initials="John Doe" size="lg" bgColorClass="bg-blue-500" /> 
+```
+
+---
+
+## 4. BaseBadge
+
+**File:** `app/components/common/BaseBadge.js`
+
+**Purpose:** Displays small status descriptors or labels with various color options.
+
+**Key Props:**
+
+*   `color` (String, default: 'gray'): Sets the badge's color scheme. Options: `'gray'`, `'red'`, `'yellow'`, `'green'`, `'blue'`, `'indigo'`, `'purple'`, `'pink'`.
+*   `align` (String, default: 'left'): Text alignment within the badge. Options: `'left'`, `'center'`.
+
+**Slots:**
+
+*   `default`: The text content of the badge.
+
+**Basic Usage Example:**
+
+```html
+<BaseBadge color="green">Active</BaseBadge>
+<BaseBadge color="red" align="center">Urgent</BaseBadge>
+```
+
+---
+
+## 5. BaseBreadcrumbs
+
+**File:** `app/components/common/BaseBreadcrumbs.js`
+
+**Purpose:** Displays hierarchical navigation links (breadcrumbs) to show the user's location within the application or site structure.
+
+**Key Props:**
+
+*   `pages` (Array, required, default: `[]`): An array of page objects. Each object must have `name` (String) and `href` (String) properties. An optional `current` (Boolean) property can be set for the last item.
+*   `variant` (String, default: 'chevrons'): Visual style of the breadcrumbs. Options:
+    *   `'chevrons'`: Default style with '>' separators.
+    *   `'slashes'`: Uses '/' separators.
+    *   `'contained'`: Rounded background container with angled separators.
+    *   `'full-width'`: Full-width bar with angled separators.
+*   `showHomeIcon` (Boolean, default: true): Whether to display the initial 'Home' icon link.
+*   `homeIconClass` (String, default: 'fas fa-home'): Font Awesome class for the home icon.
+*   `maxWidth` (String, default: '7xl'): Tailwind max-width utility (e.g., 'max-w-7xl') applied only when `variant` is `'full-width'`.
+*   `className` (String, default: ''): Additional custom classes for the root `<nav>` element.
+
+**Slots:**
+
+*   `home-icon`: Customize the rendering of the home icon link.
+*   `separator`: Customize the separator between breadcrumb items. Receives `variant` and `index` props.
+*   `page-link`: Customize the rendering of each page link. Receives `page` object prop.
+
+**Basic Usage Example:**
+
+```html
+<BaseBreadcrumbs 
+  :pages="[
+    { name: 'Projects', href: '/projects' },
+    { name: 'Project Alpha', href: '/projects/alpha', current: true }
+  ]"
+  variant="contained"
+/>
+```
+
+---
+
+## 6. BaseButton
+
+**File:** `app/components/common/BaseButton.js`
+
+**Purpose:** A versatile button component supporting various styles, sizes, icons, loading states, and the ability to render as a link (`<a>`).
+
+**Key Props:**
+
+*   `tag` (String, default: 'button'): Renders the component as a `<button>` or `<a>` tag.
+*   `variant` (String, default: 'primary'): Button style. Options: `primary`, `secondary`, `danger`, `success`, `warning`, `info`, `light`, `dark`, `link`, `icon-ghost`.
+*   `size` (String, default: 'md'): Button size. Options: `xs`, `sm`, `md`, `lg`, `xl`.
+*   `label` (String, default: ''): Text content for the button (used if default slot is not provided).
+*   `leadingIcon` (String, default: ''): Font Awesome class for an icon placed before the text (e.g., 'fas fa-plus').
+*   `trailingIcon` (String, default: ''): Font Awesome class for an icon placed after the text.
+*   `disabled` (Boolean, default: false): Disables the button.
+*   `loading` (Boolean, default: false): Shows a loading spinner and disables the button.
+*   `href` (String, default: '#'): URL for link buttons (`tag: 'a'`).
+*   `showFocusRing` (Boolean, default: true): Controls the visibility of the focus outline ring.
+*   `focusRingColorClass` (String, default: 'focus:ring-blue-500'): Tailwind class for the focus ring color.
+*   `attrs` (Object, default: `{}`): Pass additional HTML attributes (e.g., `type`, `name`).
+
+**Slots:**
+
+*   `default`: Main content of the button (overrides the `label` prop).
+
+**Events:**
+
+*   `click`: Emitted when the button is clicked (and not disabled/loading).
+
+**Basic Usage Example:**
+
+```html
+<BaseButton 
+  variant="success" 
+  size="lg" 
+  leadingIcon="fas fa-check" 
+  :loading="isSaving"
+  @click="saveData"
+>
+  Save
+</BaseButton>
+
+<BaseButton 
+  tag="a" 
+  variant="link" 
+  href="/help"
+  trailingIcon="fas fa-external-link-alt"
+>
+  Learn More
+</BaseButton>
+```
+
+---
+
+## 7. BaseButtonGroup
+
+**File:** `app/components/common/BaseButtonGroup.js`
+
+**Purpose:** Creates a group of connected buttons, often used for toggling states, selecting options, or presenting related actions. Supports single or multiple selections and an optional dropdown on the last button.
+
+**Key Props:**
+
+*   `options` (Array, default: `[]`): Array of button options. Can be simple values (strings/numbers) or objects `{ value, label, icon?, iconPosition?, stat?, disabled? }`.
+*   `modelValue` ([String, Number, Array, null], default: null): The currently selected value(s). Use an array for `multiple: true`.
+*   `multiple` (Boolean, default: false): Allows multiple options to be selected simultaneously.
+*   `optionValueKey`, `optionLabelKey`, etc. (String): Customize keys if using objects in `options`.
+*   `buttonSize` (String, default: 'md'): Size for buttons in the group (`xs` to `xl`).
+*   `baseVariant` (String, default: 'secondary'): Button variant for non-selected state.
+*   `activeVariant` (String, default: 'primary'): Button variant for selected state.
+*   `iconOnly` (Boolean, default: false): Styles the group for icon-only buttons.
+*   `tag` (String, default: 'span'): Container element tag.
+*   `rounded` (String, default: 'md'): Container rounding (`none`, `sm`, `md`, `lg`, `full`).
+*   `shadow` (String, default: 'xs'): Container shadow (`none`, `xs`, `sm`, `md`, `lg`, `xl`).
+*   `isolated` (Boolean, default: true): Uses `isolate` utility for better z-index stacking.
+*   `withDropdown` (Boolean, default: false): Adds a dropdown chevron button to the end.
+*   `dropdownItems` (Array, default: `[]`): Items for the dropdown menu `{ text, href?, onClick? }`.
+*   `dropdownPlacement` (String, default: 'right'): Position of the dropdown menu relative to the button.
+
+**Slots:**
+
+*   `default`: Allows for custom implementation within the group container (e.g., adding other elements).
+
+**Events:**
+
+*   `update:modelValue`: Emitted when the selection changes. Payload is the new value or array of values.
+*   `dropdown-select`: Emitted when a dropdown item is clicked. Payload is `(item, index)`.
+
+**Basic Usage Example:**
+
+```html
+<BaseButtonGroup
+  :options="[
+    { value: 'view', label: 'View', icon: 'fas fa-eye' },
+    { value: 'edit', label: 'Edit', icon: 'fas fa-pencil-alt' },
+    { value: 'delete', label: 'Delete', icon: 'fas fa-trash', disabled: true }
+  ]"
+  v-model="selectedAction"
+  buttonSize="sm"
+/>
+
+<BaseButtonGroup
+  :options="['Bold', 'Italic', 'Underline']"
+  v-model="textFormat"
+  multiple
+  activeVariant="info"
+  iconOnly
+  :withDropdown="true"
+  :dropdownItems="[{ text: 'More Options' }]"
+  @dropdown-select="handleMoreOptions"
+/>
+```
+
+---
+
+## 8. BaseCalendar
+
+**File:** `app/components/common/BaseCalendar.js`
+
+**Purpose:** A flexible calendar component for displaying dates and events in various views (day, week, month, year, mini) and layouts.
+
+**Key Props:**
+
+*   `date` ([Date, String], default: `new Date()`): The initial date the calendar should display or navigate around.
+*   `events` (Array, default: `[]`): Array of event objects. Expected shape: `{ id?, date | datetime, name, time?, imageUrl?, ... }`.
+*   `view` (String, default: 'month'): The current calendar view (`day`, `week`, `month`, `year`, `mini`).
+*   `variant` (String, default: 'default'): Visual presentation style (`default`, `card`, `borderless`, `mini`, `double`, `stacked`, `side-by-side`, `dark`).
+*   `showHeader` (Boolean, default: true): Show the header with title and navigation.
+*   `showNavigation` (Boolean, default: true): Show previous/today/next buttons.
+*   `showViewSelector` (Boolean, default: false): Show dropdown to change views.
+*   `showEvents` (Boolean, default: true): Display events within the calendar cells/list.
+*   `showWeekends` (Boolean, default: true): (Currently affects day headers, could be expanded).
+*   `firstDayMonday` (Boolean, default: true): Start the week on Monday.
+*   `rounded` (Boolean, default: true): Apply rounded corners to the main grid.
+*   `withShadow` (Boolean, default: false): Apply shadow to the main grid.
+*   `bgColor` (String, default: 'white'): Background color class base (e.g., 'white', 'gray-100').
+*   `maxEventsToShow` (Number, default: 2): Max events shown per day in month view before showing '+ N more'.
+*   `className` (String, default: ''): Additional custom classes for the root element.
+
+**Slots:**
+
+*   `event-actions`: Place actions (like buttons) next to events in the stacked/side-by-side list. Receives `event` object prop.
+
+**Events:**
+
+*   `date-change`: Emitted when the displayed date range changes (navigation, clicking non-current month day). Payload is the new `Date` object.
+*   `view-change`: Emitted when the view is changed via the selector. Payload is the new view `String`.
+*   `day-click`: Emitted when a day cell is clicked. Payload is `(clickedDate: Date, dayObject: Object)`.
+*   `event-click`: Emitted when an event within the calendar is clicked. Payload is the `event` object.
+*   `add-event`: Emitted when the 'Add event' button in the header is clicked. Payload is the currently `selectedDate` or `currentDate` (`Date` object).
+*   `today-click`: Emitted when the 'Today' button is clicked.
+
+**Basic Usage Example:**
+
+```html
+<BaseCalendar
+  :date="currentProjectDate"
+  :events="projectEvents"
+  view="month"
+  variant="card"
+  :showHeader="true"
+  :showNavigation="true"
+  @day-click="handleDaySelect"
+  @event-click="openEventDetails"
+/>
+```
+
+---
+
+## 9. BaseCard
+
+**File:** `app/components/common/BaseCard.js`
+
+**Purpose:** A container component for displaying content in a card format, typically with optional header and footer sections.
+
+**Key Props:**
+
+*   `noBodyPadding` (Boolean, default: false): Removes the default padding from the body section.
+*   `cardBg` (String, default: 'bg-white'): Base background color for the card.
+*   `headerBg` (String, default: null): Specific background for the header section.
+*   `bodyBg` (String, default: null): Specific background for the body section.
+*   `footerBg` (String, default: null): Specific background for the footer section (defaults to `bg-gray-50` if `cardBg` is white, otherwise inherits `cardBg`).
+*   `noShadow` (Boolean, default: false): Removes the default `shadow-sm`.
+*   `noRounding` (Boolean, default: false): Removes the default `rounded-lg` (or `sm:rounded-lg` if `fullWidthMobile`).
+*   `fullWidthMobile` (Boolean, default: false): Applies rounding only on `sm` breakpoint and larger.
+
+**Slots:**
+
+*   `header`: Content for the card's header section.
+*   `body` (or `default`): Content for the card's main body section.
+*   `footer`: Content for the card's footer section.
+
+**Basic Usage Example:**
+
+```html
+<BaseCard cardBg="bg-gray-50">
+  <template #header>
+    <BaseCardHeading title="User Settings" />
+  </template>
+
+  <p>This is the main content of the card.</p> 
+
+  <template #footer>
+    <BaseButton variant="primary">Save</BaseButton>
+  </template>
+</BaseCard>
+
+<BaseCard :noBodyPadding="true">
+  <img src="/path/to/image.jpg" alt="Card Image" class="w-full" />
+</BaseCard>
+```
+
+---
+
+## 10. BaseCardHeading
+
+**File:** `app/components/common/BaseCardHeading.js`
+
+**Purpose:** Provides a standardized heading structure often used within `BaseCard` headers, supporting titles, descriptions, avatars, icons, and action slots.
+
+**Key Props:**
+
+*   `title` (String, required): The main heading text.
+*   `description` (String, default: ''): Optional text below the title.
+*   `variant` (String, default: 'default'): Style variant. Options: `default`, `with-avatar`, `with-icon`, `subtle`.
+*   `avatar` (Object, default: `{}`): Avatar details for `with-avatar` variant. Shape: `{ src?, alt?, initials? }`.
+*   `icon` (String, default: ''): Font Awesome class for `with-icon` variant (e.g., 'fas fa-info-circle').
+*   `iconColor` (String, default: 'gray'): Color theme for the icon background/text. Options: `gray`, `blue`, `green`, `red`, `yellow`, `indigo`, `purple`.
+*   `withBorder` (Boolean, default: true): Shows a bottom border.
+*   `withActions` (Boolean, default: false): Enables the `actions` slot on the right.
+*   `size` (String, default: 'medium'): Size of the heading text and associated elements (`small`, `medium`, `large`).
+*   `className` (String, default: ''): Additional custom classes for the root element.
+
+**Slots:**
+
+*   `media`: Replace the default avatar/icon rendering.
+*   `title`: Replace the default title rendering.
+*   `description`: Replace the default description rendering.
+*   `actions`: Content for the right-aligned action area (only rendered if `withActions` is true).
+
+**Basic Usage Example:**
+
+```html
+<BaseCard>
+  <template #header>
+    <BaseCardHeading 
+      title="Project Details" 
+      description="Overview of the project status"
+      :withActions="true"
+    >
+      <template #actions>
+        <BaseButton variant="secondary" size="sm">Edit</BaseButton>
+      </template>
+    </BaseCardHeading>
+  </template>
+  ...
+</BaseCard>
+
+<BaseCardHeading 
+  title="Notifications" 
+  variant="with-icon" 
+  icon="fas fa-bell"
+  iconColor="blue"
+  size="large"
+  :withBorder="false"
+/>
+```
+
+---
+
+## 11. BaseCheckboxGroup
+
+**File:** `app/components/common/BaseCheckboxGroup.js`
+
+**Purpose:** Renders a group of checkboxes, typically within a `<fieldset>`, allowing for multiple selections from a list of options.
+
+**Key Props:**
+
+*   `modelValue` (Array, default: `[]`): An array containing the values of the currently selected checkboxes.
+*   `options` (Array, default: `[]`): Array of checkbox options. Can be simple values or objects `{ id, name, description?, disabled?, indeterminate? }`.
+*   `optionValueKey`, `optionLabelKey`, etc. (String): Customize keys if using objects in `options`.
+*   `name` (String, default: 'checkbox-group'): Base name attribute for the input elements.
+*   `legend` (String, default: ''): Text for the `<legend>` element.
+*   `legendClass` (String): Custom CSS classes for the legend.
+*   `legendSrOnly` (Boolean, default: false): Hides the legend visually but keeps it for screen readers.
+*   `description` (String, default: ''): Description text displayed below the legend.
+*   `required` (Boolean, default: false): Indicates if the fieldset is required (adds asterisk to legend).
+*   `disabled` (Boolean, default: false): Disables all checkboxes in the group.
+*   `variant` (String, default: 'default'): Layout style. Options:
+    *   `'default'`: Standard vertical list with spacing.
+    *   `'dividers'`: Adds dividers between options.
+    *   `'right'`: Places the checkbox input to the right of the label.
+    *   `'bordered'`: Adds top/bottom borders and dividers.
+*   `descriptionDisplay` (String, default: 'block'): How option descriptions are displayed (`block`, `inline`).
+*   `error` (String, default: ''): Displays an error message below the group.
+*   `ariaLabel` (String, default: ''): Sets an `aria-label` on the fieldset.
+
+**Slots:** None.
+
+**Events:**
+
+*   `update:modelValue`: Emitted when the selection changes. Payload is the new array of selected values.
+*   `change`: Emitted on individual checkbox change. Payload is `{ value: newValueArray, option: clickedOption, checked: boolean }`.
+
+**Notes:**
+
+*   Supports `indeterminate` state if the option object has `indeterminate: true`.
+
+**Basic Usage Example:**
+
+```html
+<BaseCheckboxGroup
+  v-model="selectedNotifications"
+  legend="Notification Preferences"
+  :options="[
+    { id: 'email', name: 'Email', description: 'Receive email updates.' },
+    { id: 'sms', name: 'SMS', description: 'Receive text messages.', disabled: true },
+    { id: 'push', name: 'Push Notifications', description: 'Browser/App notifications.' }
+  ]"
+  variant="dividers"
+/>
+```
+
+---
+
+## 12. BaseCombobox
+
+**File:** `app/components/common/BaseCombobox.js`
+
+**Purpose:** A complex input component that combines a text input with a dropdown list, allowing users to either type to filter options or select from the list.
+
+**Key Props:**
+
+*   `modelValue` ([Object, String, Number, null], default: null): The currently selected option object or value.
+*   `options` (Array, default: `[]`): The list of available options.
+*   `label` (String, default: ''): Label text displayed above the combobox.
+*   `placeholder` (String, default: 'Select an option...'): Placeholder text for the input field.
+*   `optionValueKey` (String, default: 'id'): Key for the unique value within option objects.
+*   `optionLabelKey` (String, default: 'name'): Key for the display text within option objects.
+*   `displayWithImage` (Boolean): If true, expects `imageUrlKey` in options for displaying images.
+*   `displayWithStatus` (Boolean): If true, expects `statusKey` in options for displaying status dots.
+*   `displayWithSecondaryText` (Boolean): If true, expects `secondaryTextKey` in options for displaying secondary text.
+*   `secondaryTextKey`, `statusKey`, `imageUrlKey` (String): Customize keys for display variations.
+*   `checkPosition` (String, default: 'right'): Position of the checkmark for the selected item (`left`, `right`).
+*   `disabled` (Boolean): Disables the combobox.
+*   `attrs` (Object, default: `{}`): Pass additional HTML attributes to the input element.
+
+**Slots:** (Used internally by `BaseCommandPalette`, potentially usable for custom display)
+
+*   `option`: Customize the rendering of each option in the dropdown. Receives `{ option, active, selected }`.
+*   `empty-state`: Customize the content shown when filtering yields no results. Receives `{ query }`.
+*   `initial-state`: Customize the content shown in the dropdown area before typing.
+
+**Events:**
+
+*   `update:modelValue`: Emitted when an option is selected. Payload is the selected option object or value.
+
+**Notes:**
+
+*   This component is quite complex and primarily used as the core of `BaseCommandPalette`.
+*   Direct usage might require careful handling of option rendering via slots.
+
+**Basic Usage Example (Conceptual):**
+
+```html
+<BaseCombobox
+  v-model="selectedUser"
+  label="Assign User"
+  :options="userList"
+  optionLabelKey="fullName"
+  optionValueKey="userId"
+  placeholder="Search users..."
+  displayWithImage
+  imageUrlKey="avatarUrl"
+/>
+```
+
+---
+
+## 13. BaseCommandPalette
+
+**File:** `app/components/common/BaseCommandPalette.js`
+
+**Purpose:** Provides a modal-based command palette interface (like VS Code, Slack) allowing quick searching and execution of commands or selection of items.
+
+**Key Props:**
+
+*   `show` (Boolean, default: false, requires `v-model:show`): Controls the visibility of the palette modal.
+*   `options` (Array, default: `[]`): Array of command/item objects to search. Shape depends on the `#option` slot usage (e.g., `{ id, name, category?, icon?, url?, ... }`).
+*   `placeholder` (String, default: 'Search...'): Placeholder for the search input.
+*   `optionLabelKey` (String, default: 'name'): Key used for display text in the default option rendering.
+*   `optionValueKey` (String, default: 'id'): Key used for the unique value of the selected item.
+*   `emptyResultMessage` (String, default: 'No results found.'): Message when search yields no results.
+*   `initialPrompt` (String, default: 'Start typing to search...'): Prompt shown before typing.
+*   `modalSize` (String, default: 'xl'): Size variant for the underlying `BaseModal`.
+*   `persistent` (Boolean, default: false): Makes the underlying `BaseModal` persistent.
+
+**Slots:**
+
+*   `option`: Customize the rendering of each search result item. Receives `{ option, active, selected }`.
+*   `empty-state`: Customize the view shown when no results are found. Receives `{ query }`.
+*   `initial-state`: Customize the view shown before a search is performed.
+*   `footer`: Add content to the modal footer.
+
+**Events:**
+
+*   `update:show`: Emitted when the modal requests to be closed.
+*   `select`: Emitted when an item is selected from the palette. Payload is the selected option object.
+
+**Basic Usage Example:**
+
+```html
+<BaseCommandPalette
+  v-model:show="isPaletteOpen"
+  :options="availableCommands"
+  @select="executeCommand"
+>
+  <template #option="{ option, active, selected }">
+    <div class="flex items-center p-2" :class="{ 'bg-indigo-100': active }">
+      <i :class="[option.icon, 'mr-2']"></i>
+      <span>{{ option.name }}</span>
+      <span v-if="option.category" class="ml-auto text-xs text-gray-500">{{ option.category }}</span>
+    </div>
+  </template>
+</BaseCommandPalette>
+```
+
+---
+
+## 14. BaseContainer
+
+**File:** `app/components/common/BaseContainer.js`
+
+**Purpose:** Provides different strategies for constraining content width and applying padding based on screen size, using Tailwind CSS utility classes.
+
+**Key Props:**
+
+*   `variant` (String, default: 'default'): Defines the container behavior. Options:
+    *   `'default'`: Full width on mobile, constrained by `maxWidth` on larger screens, padding on `sm`+. Use `paddedMobile` for mobile padding.
+    *   `'constrained'`: Constrained by `maxWidth` on all screens, with padding.
+    *   `'breakpoint'`: Uses Tailwind's `container` class (full width until breakpoints), no mobile padding.
+    *   `'constrained-breakpoint'`: Uses Tailwind's `container`, but adds padding on all screens.
+    *   `'narrow'`: Outer container constrained by `maxWidth`, inner content constrained by `innerMaxWidth`.
+*   `maxWidth` (String, default: '7xl'): Tailwind `max-w-*` class for the outer constraint (e.g., `5xl`, `6xl`, `7xl`).
+*   `innerMaxWidth` (String, default: '3xl'): Tailwind `max-w-*` class for the inner constraint (used only by `narrow` variant).
+*   `paddedMobile` (Boolean, default: false): Adds horizontal padding on mobile for the `default` variant.
+*   `paddingX` (String, default: '4'): Base horizontal padding utility number (e.g., `4` -> `px-4`).
+*   `paddingSm` (String, default: '6'): Horizontal padding utility number for `sm` breakpoint (`sm:px-6`).
+*   `paddingLg` (String, default: '8'): Horizontal padding utility number for `lg` breakpoint (`lg:px-8`).
+*   `className` (String, default: ''): Additional custom classes for the container element.
+
+**Slots:**
+
+*   `default`: The content to be placed inside the container.
+
+**Basic Usage Example:**
+
+```html
+<!-- Standard centered content, padded on sm+ -->
+<BaseContainer maxWidth="5xl">
+  <h1>Page Title</h1>
+  <p>Page content...</p>
+</BaseContainer>
+
+<!-- Constrained width on all screens, with padding -->
+<BaseContainer variant="constrained" maxWidth="6xl">
+  <YourComponent />
+</BaseContainer>
+
+<!-- Narrow content area within a wider max width -->
+<BaseContainer variant="narrow" maxWidth="7xl" innerMaxWidth="3xl">
+   <ArticleBody />
+</BaseContainer>
+```
+
+---
+
+## 15. BaseDescriptionList
+
+**File:** `app/components/common/BaseDescriptionList.js`
+
+**Purpose:** Displays data in a definition list (`<dl>`) format, suitable for showing key-value pairs or item details. Offers various layout styles.
+
+**Key Props:**
+
+*   `items` (Array, default: `[]`): Array of data objects, typically `{ term: String, description: String | Number }`.
+*   `title` (String, default: ''): Optional title displayed above the list.
+*   `subtitle` (String, default: ''): Optional subtitle/description below the title.
+*   `variant` (String, default: 'default'): Layout style. Options: `default` (2-col grid on sm+), `compact` (inline flex), `bordered`, `stacked`, `striped`, `card`, `two-column` (multi-col grid).
+*   `columns` ([Number, String], default: 1): Number of columns for `two-column` variant.
+*   `termClass` (String): Custom classes for the term (`<dt>`) element.
+*   `descriptionClass` (String): Custom classes for the description (`<dd>`) element.
+*   `bgColor` (String, default: 'white'): Background color class (e.g., `white`, `gray-50`).
+*   `dividers` (Boolean, default: true): Show dividing lines between items (behavior varies by variant).
+*   `spacing` (String, default: 'md'): Vertical spacing between items (`sm`, `md`, `lg`).
+*   `paddingX` (String, default: '0'): Horizontal padding for items (`0`, `3`, `4`, `6`).
+*   `withActions` (Boolean, default: false): Enables the `actions` slot within each description.
+*   `hideLabels` (Boolean, default: false): Hides term labels visually (useful for narrow views).
+
+**Slots:**
+
+*   `default`: Used if `items` prop is not provided. Allows defining list items (`<div><dt>...</dt><dd>...</dd></div>`) directly.
+*   `subtitle`: Add custom content below the main title/subtitle.
+*   `actions`: Add interactive elements (e.g., buttons) inline with the description. Receives `{ item, index }`.
+*   `footer`: Add content below the list.
+
+**Basic Usage Example:**
+
+```html
+<BaseDescriptionList
+  title="Applicant Information"
+  :items="[
+    { term: 'Full name', description: 'Margot Foster' },
+    { term: 'Application for', description: 'Backend Developer' },
+    { term: 'Email address', description: 'margotfoster@example.com' },
+    { term: 'Salary expectation', description: '$120,000' }
+  ]"
+  variant="striped"
+  paddingX="6"
+  :withActions="true"
+>
+  <template #actions="{ item }">
+    <BaseButton variant="link" size="sm">Edit {{ item.term }}</BaseButton>
+  </template>
+</BaseDescriptionList>
+```
+
+---
+
+## 16. BaseDialog
+
+**File:** `app/components/common/BaseDialog.js`
+
+**Purpose:** Displays a modal dialog box, typically used for short confirmations, alerts, or prompts requiring user interaction.
+
+**Key Props:**
+
+*   `show` (Boolean, default: false, requires `v-model:show`): Controls the visibility of the dialog.
+*   `title` (String, default: 'Dialog Title'): The main title text.
+*   `iconType` (String, default: 'info'): Determines the icon displayed. Options: `success`, `error`, `warning`, `info`, `question`.
+*   `confirmButtonText` (String, default: 'Confirm'): Text for the primary confirmation button.
+*   `cancelButtonText` (String, default: 'Cancel'): Text for the secondary cancellation button.
+*   `hideCancelButton` (Boolean, default: false): Hides the cancel button.
+*   `persistent` (Boolean, default: false): Prevents closing the dialog by clicking the overlay.
+*   `closeOnEsc` (Boolean, default: true): Allows closing the dialog by pressing the Escape key.
+*   `variant` (String, default: 'default'): Layout style. Options:
+    *   `'default'`: Icon on the left, text on the right (on `sm+` screens).
+    *   `'centered'`: Icon on top, text centered below.
+*   `textAlignment` (String, default: null): Overrides default text alignment (`left`, `center`).
+*   `buttonLayout` (String, default: 'default'): Arrangement of footer buttons. Options:
+    *   `'default'`: Buttons aligned right (Confirm on right).
+    *   `'wide-split'`: Uses grid to place cancel left, confirm right.
+    *   `'full-width'`: Meant for a single full-width button (use slots).
+    *   `'left-aligned'`: Buttons aligned left (Confirm on left).
+*   `showDismissButton` (Boolean, default: false): Shows an 'X' button in the top-right corner.
+*   `footerVariant` (String, default: 'default'): Style for the footer background (`default`, `gray`).
+*   `size` (String, default: 'lg'): Max width of the dialog panel (`sm`, `md`, `lg`, `xl`).
+*   `zIndex` (Number, default: 50): CSS z-index for the dialog container.
+
+**Slots:**
+
+*   `default`: Main content/description of the dialog.
+*   `icon`: Customize the icon element.
+*   `title`: Customize the title element.
+*   `buttons`: Customize the entire button area in the footer.
+
+**Events:**
+
+*   `confirm`: Emitted when the confirm button is clicked.
+*   `cancel`: Emitted when the cancel button is clicked.
+*   `close`: Emitted when the dialog requests to be closed (by button click, overlay click, or Esc key).
+
+**Basic Usage Example:**
+
+```html
+<BaseDialog
+  v-model:show="showDeleteConfirm"
+  title="Delete Project?"
+  iconType="warning"
+  confirmButtonText="Delete"
+  confirmButtonVariant="danger"
+  @confirm="deleteProject"
+>
+  Are you sure you want to delete this project? This action cannot be undone.
+</BaseDialog>
+```
+
+---
+
+## 17. BaseDivider
+
+**File:** `app/components/common/BaseDivider.js`
+
+**Purpose:** Creates a horizontal dividing line, optionally with text or an icon centered or left-aligned on the line.
+
+**Key Props:**
+
+*   `label` (String, default: ''): Text to display on the divider. Ignored if `icon` or default slot is used.
+*   `icon` (String, default: ''): Font Awesome icon class to display. Takes precedence over `label`. Ignored if default slot is used.
+*   `contentPosition` (String, default: 'center'): Position of the label/icon/slot (`center`, `left`).
+*   `labelType` (String, default: 'label'): Style for the `label` text (`label` for small text, `title` for larger semi-bold text).
+*   `lineColor` (String, default: 'border-gray-300'): Tailwind border color class.
+*   `lineStyle` (String, default: 'border-solid'): Tailwind border style class (`border-solid`, `border-dashed`, etc.).
+*   `bgColor` (String, default: 'bg-white'): Background color for the content span (should match the container background).
+*   `className` (String, default: ''): Additional classes for the root `<div>`.
+
+**Slots:**
+
+*   `default`: Content to place on the divider line (e.g., a button, badge). Takes precedence over `label` and `icon` props.
+
+**Basic Usage Example:**
+
+```html
+<BaseDivider label="Or continue with" />
+
+<BaseDivider icon="fas fa-star" contentPosition="left" lineColor="border-yellow-400" />
+
+<BaseDivider labelType="title" label="Section End" />
+
+<BaseDivider>
+  <BaseButton size="sm" variant="secondary">Load More</BaseButton>
+</BaseDivider>
+```
+
+---
+
+## 18. BaseDrawer
+
+**File:** `app/components/common/BaseDrawer.js`
+
+**Purpose:** A slide-out panel component (also known as a sidebar or off-canvas panel) typically used for navigation, forms, or displaying supplementary details.
+
+**Key Props:**
+
+*   `show` (Boolean, default: false, requires `v-model:show`): Controls the visibility of the drawer.
+*   `title` (String, default: 'Drawer Title'): Title displayed in the header. Ignored if `#header` or `#title` slot is used.
+*   `position` (String, default: 'right'): Side from which the drawer slides out (`left`, `right`).
+*   `width` (String, default: 'md'): Tailwind `max-w-*` class for the drawer panel (`sm` to `7xl`).
+*   `withOverlay` (Boolean, default: true): Show the background overlay.
+*   `closeOnOverlayClick` (Boolean, default: true): Allow closing by clicking the overlay.
+*   `closeOnEsc` (Boolean, default: true): Allow closing with the Escape key.
+*   `hideCloseButton` (Boolean, default: false): Hide the default 'X' close button.
+*   `closeButtonOutside` (Boolean, default: false): Positions the close button outside the panel (useful for edge-to-edge content).
+*   `headerVariant` (String, default: 'default'): Header style (`default`, `branded` for colored background, `none` for no header styling).
+*   `stickyFooter` (Boolean, default: false): Makes the footer stick to the bottom.
+*   `zIndex` (Number, default: 40): CSS z-index for the drawer.
+*   `transitionDuration` (String, default: 'duration-500 sm:duration-700'): Transition speed classes.
+
+**Slots:**
+
+*   `default`: Main content area of the drawer.
+*   `header`: Completely replace the header section.
+*   `title`: Replace the title area within the default header.
+*   `headerDescription`: Add description text within the default header.
+*   `close-button`: Customize the close button. Receives `closeFn` prop.
+*   `footer`: Content for the drawer footer.
+
+**Events:**
+
+*   `update:show`: Emitted when the drawer requests to be closed.
+*   `close`: Emitted immediately when a close action is triggered.
+*   `closed`: Emitted after the closing transition finishes.
+*   `opened`: Emitted after the opening transition finishes.
+
+**Basic Usage Example:**
+
+```html
+<BaseDrawer v-model:show="isSettingsOpen" title="Application Settings" position="left" width="lg">
+  <p>Settings form goes here...</p>
+  
+  <template #footer>
+    <BaseButton variant="secondary" @click="isSettingsOpen = false">Cancel</BaseButton>
+    <BaseButton variant="primary" @click="saveSettings">Save</BaseButton>
+  </template>
+</BaseDrawer>
+```
+
+---
+
+## 19. BaseDropdown
+
+**File:** `app/components/common/BaseDropdown.js`
+
+**Purpose:** Displays a dropdown menu triggered by a button.
+
+**Key Props:**
+
+*   `buttonText` (String, default: 'Options'): Text for the default trigger button.
+*   `buttonIcon` (String, default: 'fa-chevron-down'): Font Awesome icon class for the default trigger button.
+*   `buttonVariant` (String, default: 'default'): Style of the trigger button (`default`, `minimal`, `custom`). If `custom`, use the `#button` slot.
+*   `placement` (String, default: 'right'): Position of the dropdown menu relative to the button (`left`, `right`).
+*   `width` (String, default: '56'): Tailwind `w-*` class for the menu width (e.g., `48`, `56`, `64`).
+*   `itemGroups` (Array, default: `[]`): Define menu items directly via props. Array of groups, where each group is `{ items: [{ text, icon?, href?, onClick?, disabled?, type?('button'|'form') }] }`.
+*   `dividers` (Boolean, default: true): Show dividers between `itemGroups` or named slots.
+*   `disabled` (Boolean, default: false): Disables the trigger button.
+
+**Slots:**
+
+*   `button`: Customize the trigger button element.
+*   `header`: Add content to the top of the dropdown menu.
+*   `group1`, `group2`, `group3`, `group4`: Define menu items within named group slots. Use standard `<a>` or `<button>` elements with `role="menuitem"`.
+*   `default`: Used if no `itemGroups` or named group slots are provided. Define simple menu items here.
+*   `footer`: Add content to the bottom of the dropdown menu.
+
+**Events:**
+
+*   `select`: Emitted when a menu item is clicked. Payload is `(itemObject, index)` if using `itemGroups`, otherwise event depends on slotted content.
+
+**Basic Usage Example (Props):**
+
+```html
+<BaseDropdown
+  buttonText="Actions"
+  :itemGroups="[
+    { items: [
+      { text: 'Edit', icon: 'fas fa-pencil-alt', onClick: handleEdit },
+      { text: 'Duplicate', icon: 'far fa-copy', onClick: handleDuplicate }
+    ] },
+    { items: [
+      { text: 'Archive', icon: 'fas fa-archive' },
+      { text: 'Delete', icon: 'fas fa-trash', disabled: true, type: 'button' }
+    ] }
+  ]"
+  @select="logSelection"
+/>
+```
+
+**Basic Usage Example (Slots):**
+
+```html
+<BaseDropdown buttonVariant="minimal">
+  <template #group1>
+    <a href="#" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem">Account settings</a>
+    <a href="#" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem">Support</a>
+  </template>
+  <template #group2>
+     <button type="button" @click="logout" class="text-gray-700 block w-full text-left px-4 py-2 text-sm hover:bg-gray-100" role="menuitem">Sign out</button>
+  </template>
+</BaseDropdown>
+```
+
+---
+
+## 20. BaseEmptyStates
+
+**File:** `app/components/common/BaseEmptyStates.js`
+
+**Purpose:** Provides styled components to indicate when a list or area has no content to display, often including an icon, title, description, and call-to-action.
+
+**Key Props:**
+
+*   `icon` (String, default: ''): Primary icon class (e.g., 'fas fa-folder-open'). Ignored if `#icon` slot used.
+*   `iconClass` (String, default: 'mx-auto size-12 text-gray-400'): Classes for the default icon.
+*   `title` (String, default: ''): Main heading text. Ignored if `#title` slot used.
+*   `titleTag` (String, default: 'h3'): HTML tag for the title (`h2`, `h3`).
+*   `titleClass` (String, default: 'mt-2 text-sm font-semibold text-gray-900'): Classes for the default title.
+*   `description` (String, default: ''): Supporting text. Ignored if `#description` slot used.
+*   `descriptionClass` (String, default: 'mt-1 text-sm text-gray-500'): Classes for the default description.
+*   `variant` (String, default: 'simple'): Layout style. Options:
+    *   `'simple'`: Centered icon, text, and actions.
+    *   `'bordered-button'`: Content inside a clickable dashed border button.
+    *   `'content-focused'`: Top-aligned text, slots for actions below.
+*   `borderStyle` (String, default: 'border-dashed'): Border style for `bordered-button` variant.
+*   `borderColor` (String, default: 'border-gray-300'): Border color for `bordered-button`.
+*   `borderHoverColor` (String, default: 'hover:border-gray-400'): Hover border color for `bordered-button`.
+*   `containerClass` (String, default: ''): Additional classes for the root container.
+
+**Slots:**
+
+*   `icon`: Customize the icon area.
+*   `title`: Customize the title area.
+*   `description`: Customize the description area.
+*   `actions`: Place call-to-action buttons or links.
+*   `secondaryContent`: Add supplementary content below actions (for `content-focused` variant).
+
+**Events:**
+
+*   `button-click`: Emitted only when the `bordered-button` variant is clicked.
+
+**Basic Usage Example:**
+
+```html
+<BaseEmptyStates
+  icon="fas fa-users"
+  title="No Team Members"
+  description="Get started by adding your first team member."
+  variant="simple"
+>
+  <template #actions>
+    <BaseButton variant="primary" @click="showAddMemberForm">Add Member</BaseButton>
+  </template>
+</BaseEmptyStates>
+
+<BaseEmptyStates
+  title="Create your first project"
+  variant="bordered-button"
+  @button-click="openNewProjectModal"
+/>
+```
+
+---
+
+## 21. BaseFeed
+
+**File:** `app/components/common/BaseFeed.js`
+
+**Purpose:** Displays a list of items chronologically, often used for activity feeds, timelines, or comment threads. Supports connecting lines between items.
+
+**Key Props:**
+
+*   `items` (Array, required, default: `[]`): Array of feed items. The structure is defined by the parent using the `#item` slot.
+*   `itemKey` (String, default: 'id'): Unique key property for each item in the `items` array.
+*   `variant` (String, default: 'simple'): Layout style. Options:
+    *   `'simple'`: Standard vertical feed with icons offset left.
+    *   `'compact'`: More compact style, often for comments.
+*   `showLine` (Boolean, default: true): Display the vertical connecting line.
+*   `lineColor` (String, default: 'bg-gray-200'): Tailwind background color for the line.
+*   `lineWidth` (String, default: 'w-0.5'): Tailwind width class for the line.
+*   `lineOffset` (String, default: null): Tailwind positioning classes for the line top/left point (e.g., 'top-4 left-4 -ml-px'). Defaults based on `variant`.
+*   `listClass` (String, default: ''): Custom classes for the root `<ul>` element.
+*   `itemClass` (String, default: ''): Custom classes for each `<li>` element.
+*   `emptyMessage` (String, default: 'No feed items to display.'): Message shown when `items` is empty.
+
+**Slots:**
+
+*   `item`: Required slot to define the rendering of each feed item. Receives `{ item, index, isLast }`.
+*   `empty`: Customize the empty state message/content.
+*   `footer`: Add content below the feed list (e.g., a comment input form).
+
+**Basic Usage Example:**
+
+```html
+<BaseFeed :items="activityLog" itemKey="logId" variant="simple">
+  <template #item="{ item }">
+    <div class="relative flex space-x-3">
+      <div>
+        <span :class="[
+          'flex size-8 items-center justify-center rounded-full ring-8 ring-white',
+          item.type === 'comment' ? 'bg-gray-400' : 'bg-blue-500'
+        ]">
+          <i :class="[
+            'size-5 text-white',
+            item.type === 'comment' ? 'far fa-comment-dots' : 'fas fa-check'
+            ]" aria-hidden="true"></i>
+        </span>
+      </div>
+      <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+        <div>
+          <p class="text-sm text-gray-500">
+            {{ item.content }} 
+            <a v-if="item.target" :href="item.target.href" class="font-medium text-gray-900">{{ item.target.name }}</a>
+          </p>
+        </div>
+        <div class="text-right text-sm whitespace-nowrap text-gray-500">
+          <time :datetime="item.datetime">{{ item.date }}</time>
+        </div>
+      </div>
+    </div>
+  </template>
+  <template #footer>
+    <BaseTextArea placeholder="Add a comment..." />
+  </template>
+</BaseFeed>
+```
+
+---
+
+## 22. BaseFormLayouts
+
+**File:** `app/components/common/BaseFormLayouts.js`
+
+**Purpose:** A structural component to organize form sections and fields consistently. It provides layout containers (like grids) based on the chosen `variant`, but requires the parent component to structure the actual form fields and labels within its default slot.
+
+**Key Props:**
+
+*   `variant` (String, default: 'stacked'): Main layout style. Options:
+    *   `'stacked'`: Sections stacked vertically, typically with titles/descriptions above field grids.
+    *   `'two-column'`: Section titles/descriptions in the left column, fields in the right column.
+    *   `'two-column-cards'`: Like `two-column`, but field areas are wrapped in cards.
+    *   `'labels-on-left'`: Sections stacked vertically, but within each section, field labels are on the left of inputs.
+*   `tag` (String, default: 'div'): The root HTML element tag. Use `<form>` outside this component if needed.
+*   `withDividers` (Boolean, default: true): Adds dividing lines between sections (behavior varies slightly by variant).
+*   `cardBg`, `cardShadow`, `cardRing`, `cardRounded` (String): Styling props for the card wrappers in the `two-column-cards` variant.
+*   `className` (String, default: ''): Custom classes for the root element.
+
+**Slots:**
+
+*   `default`: **Required slot** where the form sections and fields must be structured according to the chosen `variant`. Receives slot props:
+    *   `sectionContentBaseClass` (String): Base class for the content area within a section.
+    *   `defaultFieldGridClass` (String): Grid class for fields in `stacked` or `two-column` variants.
+    *   `cardBg`, `cardShadow`, `cardRing`, `cardRounded` (String): Props passed through for styling cards in `two-column-cards`.
+*   `actions`: A common footer area for form actions (Save, Cancel buttons) for non-card variants.
+*   `cardActions`: Used within the default slot for the `two-column-cards` variant to place actions inside the card footer.
+
+**Notes on Slot Structure:**
+
+*   **Stacked:** Use divs for sections, apply dividers if needed. Inside section content, use `defaultFieldGridClass` for field layout.
+*   **Two-Column:** Use grid layout for each section (title left, fields right). Use `defaultFieldGridClass` for the field grid on the right.
+*   **Two-Column-Cards:** Like `two-column`, but wrap the right-side field grid in a `div` styled using the passed card props. Use `#cardActions` slot for footer buttons inside the card.
+*   **Labels-on-Left:** Use divs for sections. Inside each section, create a grid row (`sm:grid sm:grid-cols-3 ...`) for each field, placing the label on the left and input on the right.
+
+**Basic Usage Example (Illustrating Stacked Variant Structure):**
+
+```html
+<BaseFormLayouts variant="stacked">
+  <template #default="{ sectionContentBaseClass, defaultFieldGridClass }">
+    <div class="border-b border-gray-900/10 pb-12">
+      <h2 class="text-base font-semibold text-gray-900">Personal Information</h2>
+      <p class="mt-1 text-sm text-gray-600">Use a permanent address where you can receive mail.</p>
+      <div :class="[sectionContentBaseClass, defaultFieldGridClass]">
+        <div class="sm:col-span-3">
+          <BaseTextInput label="First name" v-model="formData.firstName" />
+        </div>
+        <div class="sm:col-span-3">
+          <BaseTextInput label="Last name" v-model="formData.lastName" />
+        </div>
+        </div>
+    </div>
+    <!-- ... other sections ... -->
+  </template>
+
+  <template #actions>
+    <BaseButton variant="secondary">Cancel</BaseButton>
+    <BaseButton type="submit">Save</BaseButton>
+  </template>
+</BaseFormLayouts>
+```
+
+---
+
+## 23. BaseGridList
+
+**File:** `app/components/common/BaseGridList.js`
+
+**Purpose:** A simple container component that applies responsive Tailwind CSS `grid` and `gap` classes based on props, making it easy to create grid layouts.
+
+**Key Props:**
+
+*   `tag` (String, default: 'ul'): HTML tag for the grid container (`ul`, `div`).
+*   `cols`, `smCols`, `mdCols`, `lgCols`, `xlCols`, `xxlCols` ([String, Number]): Number of columns at different breakpoints (e.g., `cols="2"`, `lgCols="4"`).
+*   `gap`, `smGap`, ..., `xxlGap` ([String, Number]): Uniform gap size at different breakpoints.
+*   `gapX`, `smGapX`, ..., `xxlGapX` ([String, Number]): Horizontal gap size (overrides uniform `gap`).
+*   `gapY`, `smGapY`, ..., `xxlGapY` ([String, Number]): Vertical gap size (overrides uniform `gap`).
+
+**Slots:**
+
+*   `default`: The content (grid items) to be placed inside the grid container. Typically `<li>` elements if `tag` is `ul`.
+
+**Basic Usage Example:**
+
+```html
+<BaseGridList tag="ul" cols="1" smCols="2" lgCols="3" gap="6">
+  <li v-for="item in items" :key="item.id">
+    <BaseCard>{{ item.name }}</BaseCard>
+  </li>
+</BaseGridList>
+```
+
+---
+
+## 24. BaseLayout
+
+**File:** `app/components/common/BaseLayout.js`
+
+**Purpose:** Provides a high-level structure for application pages, typically defining areas for a navigation bar (navbar), a sidebar, and the main content area. It includes options for different visual styles and responsive behavior for the sidebar.
+
+**Key Props:**
+
+*   `showNavbar` (Boolean, default: true): Whether to render the navbar area.
+*   `showSidebar` (Boolean, default: true): Whether to render the sidebar area.
+*   `navbarVariant` (String, default: 'light'): Styling for the navbar (`light`, `light-gray`, `dark`, `branded`, `transparent`).
+*   `sidebarVariant` (String, default: 'light'): Styling for the sidebar (`light`, `dark`, `narrow`, `branded`).
+*   `pageTitle` (String, default: 'Dashboard'): Default title displayed in the navbar/header.
+*   `sidebarWidth` (String, default: '72'): Tailwind `w-*` class for the standard sidebar width.
+*   `narrowSidebarWidth` (String, default: '20'): Tailwind `w-*` class for the `narrow` sidebar variant.
+*   `headerPadding` (String, default: '6'): Tailwind `py-*` class number for navbar vertical padding.
+*   `withOverlap` (Boolean, default: false): Creates a layout where the main content overlaps a colored header section.
+*   `compactHeader` (Boolean, default: false): Reduces the padding and potentially font size in the header.
+*   `containerMaxWidth` (String, default: '7xl'): Tailwind `max-w-*` class for constraining content width.
+*   `bgColor` (String, default: 'white'): Base background color for the entire layout area.
+*   `contentBgColor` (String, default: 'white'): Background color specifically for the main content area.
+
+**Slots:**
+
+*   `sidebar`: Content for the sidebar (navigation, etc.).
+*   `navbarLogo`: Customize the logo/branding area in the navbar.
+*   `navbarTitle`: Customize the page title display in the navbar.
+*   `navbarActions`: Place action buttons/icons (e.g., profile menu, notifications) in the navbar.
+*   `navbarContent`: Add extra content below the main navbar items (e.g., breadcrumbs, tabs).
+*   `overlapHeader`: Define the content of the header section used in the `withOverlap` layout.
+*   `default`: The main page content.
+
+**Notes:**
+
+*   This component manages the responsive behavior of the sidebar (mobile overlay vs. static desktop).
+*   It acts as a structural shell; the content of each area is provided via slots.
+
+**Basic Usage Example:**
+
+```html
+<BaseLayout pageTitle="My Projects" sidebarVariant="dark" navbarVariant="light-gray">
+  <template #sidebar>
+    <AppSidebarNavigation />
+  </template>
+  
+  <template #navbarActions>
+    <UserProfileDropdown />
+  </template>
+
+  <!-- Main Content -->
+  <ProjectListTable /> 
+
+</BaseLayout>
+```
+
+---
+
+## 25. BaseListContainer
+
+**File:** `app/components/common/BaseListContainer.js`
+
+**Purpose:** Renders a list of items (`<ul>`) with various container and item styling options, suitable for simple lists, lists within cards, or lists with separators.
+
+**Key Props:**
+
+*   `items` (Array, default: `[]`): Array of list items. Can be used instead of the default slot.
+*   `itemKey` (String, default: 'id'): Unique key property for items when using the `items` prop.
+*   `variant` (String, default: 'simple'): Styling variant. Options:
+    *   `'simple'`: Basic list, padding on items.
+    *   `'card'`: Wraps the list in a styled card container.
+    *   `'card-mobile'`: Card style, but full width on mobile.
+    *   `'separate'`: Each item is rendered as a separate card.
+    *   `'separate-mobile'`: Separate cards, full width on mobile.
+    *   `'flat'`: List wrapped in a container with border, no shadow.
+    *   `'simple-mobile'`: Simple list, less padding on mobile.
+*   `dividers` (Boolean, default: true): Show dividing lines between list items.
+*   `cardSpacing` (String, default: '3'): Tailwind `space-y-*` class number for `separate` variants.
+*   `paddingX`, `paddingY`, `mobilePaddingX` (String): Control padding values for items/containers based on variant.
+*   `className` (String, default: ''): Custom classes for the main container element (if applicable based on variant).
+*   `emptyMessage` (String, default: 'No items to display'): Message shown when no items or default slot content is present.
+
+**Slots:**
+
+*   `item`: Define the rendering for each item when using the `items` prop. Receives `{ item }`.
+*   `default`: Define list items (`<li>`) directly within the slot, overriding the `items` prop.
+*   `empty`: Customize the empty state message/content.
+
+**Basic Usage Example:**
+
+```html
+<BaseListContainer variant="card" :items="users" itemKey="userId">
+  <template #item="{ item }">
+    <div class="flex justify-between items-center">
+      <span>{{ item.name }}</span>
+      <BaseBadge :color="item.isActive ? 'green' : 'gray'">
+        {{ item.isActive ? 'Active' : 'Inactive' }}
+      </BaseBadge>
+    </div>
+  </template>
+</BaseListContainer>
+
+<BaseListContainer variant="simple-mobile" :dividers="false">
+   <li>Item 1</li>
+   <li>Item 2</li>
+</BaseListContainer>
+```
+
+---
+
+## 26. BaseTextInput
+
+**File:** `app/components/common/BaseTextInput.js`
+
+**Purpose:** Renders a standard HTML text input field with enhancements like labels, placeholders, error display, required/disabled states, and an optional clear button.
+
+**Key Props:**
+
+*   `modelValue` ([String, Number], default: ''): The value of the input field.
+*   `label` (String, default: ''): Text label displayed above the input.
+*   `placeholder` (String, default: ''): Placeholder text inside the input.
+*   `type` (String, default: 'text'): Input type (e.g., `text`, `email`, `password`, `number`, `tel`, `url`).
+*   `required` (Boolean, default: false): Marks the input as required (adds asterisk to label, affects browser validation).
+*   `disabled` (Boolean, default: false): Disables the input field.
+*   `trailingIconClass` (String, default: null): Font Awesome class for an icon displayed inside the input on the right (e.g., 'fas fa-search'). Not shown if `clearable` is active.
+*   `error` (String, default: null): Error message to display below the input. Also applies error styling.
+*   `clearable` (Boolean, default: false): Adds a clear button (X) inside the input when it has content.
+*   `clearIconClass` (String, default: 'fas fa-times-circle'): Font Awesome class for the clear button icon.
+
+**Slots:** None.
+
+**Events:**
+
+*   `update:modelValue`: Emitted on every input change. Payload is the new input value.
+*   `clear`: Emitted when the clear button is clicked.
+
+**Attributes:**
+
+*   Standard input attributes (`id`, `name`, `maxlength`, `pattern`, etc.) are passed directly to the underlying `<input>` element via `v-bind="$attrs"`.
+
+**Basic Usage Example:**
+
+```html
+<BaseTextInput 
+  label="Email Address" 
+  type="email" 
+  v-model="userEmail" 
+  placeholder="you@example.com"
+  :error="emailError"
+  required
+/>
+
+<BaseTextInput 
+  label="Search"
+  v-model="searchTerm"
+  placeholder="Enter search term..."
+  trailingIconClass="fas fa-search"
+  clearable
+/>
+```
+
+---
+
+## 27. BaseMediaObject
+
+**File:** `app/components/common/BaseMediaObject.js`
+
+**Purpose:** A layout component that arranges a media element (like an image, icon, or avatar) alongside a content block. Supports different alignments, positions, and responsive stacking.
+
+**Key Props:**
+
+*   `mediaPosition` (String, default: 'left'): Position of the media relative to content (`left`, `right`).
+*   `mediaAlignment` (String, default: 'top'): Vertical alignment of media (`top`, `center`, `bottom`, `stretch`).
+*   `responsive` (String, default: 'none'): Stacking behavior on small screens (`none`, `basic`, `wide`).
+*   `mediaWidth` (String, default: 'w-16'): Tailwind width class for the media container (ignored if `responsive='wide'`).
+*   `spacingClass` (String, default: null): Specific Tailwind margin class for space between media and content (e.g., 'mr-4'). Overrides default.
+*   `defaultSpacing` ([String, Number], default: 4): Default spacing value (Tailwind unit) if `spacingClass` isn't provided.
+*   `containerClass` (String, default: ''): Custom classes for the root `<div>`.
+*   `mediaContainerClass` (String, default: ''): Custom classes for the media `<div>`.
+*   `contentContainerClass` (String, default: ''): Custom classes for the content `<div>`.
+
+**Slots:**
+
+*   `media`: The content for the media element (e.g., `<img>`, `<BaseAvatar>`, `<i>`).
+*   `default`: The main content block.
+
+**Basic Usage Example:**
+
+```html
+<BaseMediaObject mediaPosition="left" mediaAlignment="center" mediaWidth="w-12" responsive="basic">
+  <template #media>
+    <BaseAvatar initials="JD" size="lg" />
+  </template>
+  <div>
+    <h4 class="text-lg font-bold">John Doe</h4>
+    <p class="text-sm text-gray-500">Software Engineer</p>
+  </div>
+</BaseMediaObject>
+```
+
+---
+
+## 28. BaseModal
+
+**File:** `app/components/common/BaseModal.js`
+
+**Purpose:** Provides a general-purpose modal dialog window that appears over the main content. Includes options for size, positioning, scrolling behavior, and header/footer customization.
+
+**Key Props:**
+
+*   `show` (Boolean, default: false, requires `v-model:show`): Controls the visibility of the modal.
+*   `title` (String, default: 'Modal Title'): Default title text in the header.
+*   `size` (String, default: 'md'): Max width of the modal panel (`sm`, `md`, `lg`, `xl`, `2xl`, ..., `7xl`, `full`).
+*   `persistent` (Boolean, default: false): Prevents closing the modal by clicking the overlay.
+*   `scrollBehavior` (String, default: 'inside'): Determines scrolling area (`inside` body or `outside` panel).
+*   `maxHeight` (String, default: '96%'): Max height of the modal content container.
+*   `zIndex` (Number, default: 50): CSS z-index for the modal container.
+*   `hideCloseButton` (Boolean, default: false): Hides the default 'X' close button.
+*   `closeOnEsc` (Boolean, default: true): Allows closing with the Escape key.
+*   `centered` (Boolean, default: false): Vertically centers the modal on the screen.
+*   `hideScrollbar` (Boolean, default: false): Hides scrollbars while allowing scrolling.
+*   `noHeaderPadding` (Boolean, default: false): Removes default padding from the header area.
+
+**Slots:**
+
+*   `header`: Customize the entire header section.
+*   `default`: The main content/body of the modal.
+*   `footer`: Content for the modal footer area (typically for action buttons).
+
+**Events:**
+
+*   `close`: Emitted immediately when a close action is triggered.
+*   `closed`: Emitted after the closing transition finishes.
+*   `opened`: Emitted after the opening transition finishes.
+
+**Basic Usage Example:**
+
+```html
+<BaseModal v-model:show="isFormOpen" title="Create New Item" size="xl" scrollBehavior="inside">
+  <!-- Form content goes here -->
+  <MyItemForm />
+
+  <template #footer>
+    <BaseButton variant="secondary" @click="isFormOpen = false">Cancel</BaseButton>
+    <BaseButton variant="primary" @click="submitForm">Create</BaseButton>
+  </template>
+</BaseModal>
+```
+
+---
+
+## 29. BaseNavbar
+
+**File:** `app/components/common/BaseNavbar.js`
+
+**Purpose:** Renders a navigation bar, typically placed at the top of the page. Includes slots for logo, navigation links, actions, and supports a mobile menu toggle.
+
+**Key Props:**
+
+*   `variant` (String, default: 'light'): Color theme (`light`, `dark`).
+*   `maxWidth` (String, default: '7xl'): Tailwind `max-w-*` class for content constraint.
+*   `containerPadding` (String, default: 'px-4 sm:px-6 lg:px-8'): Horizontal padding.
+*   `height` (String, default: 'h-16'): Navbar height class.
+*   `className` (String, default: ''): Custom classes for the root `<nav>`.
+*   `enableMobileMenu` (Boolean, default: true): Enables the hamburger menu button and panel for mobile.
+
+**Slots:**
+
+*   `logo`: Area for the brand logo/image.
+*   `navigation-desktop`: Desktop navigation links. Receives color helper props (e.g., `defaultTextColor`, `currentTextColor`).
+*   `actions-desktop`: Desktop action items (buttons, profile menu). Receives color helper props.
+*   `mobile-menu-button`: Customize the mobile menu toggle button. Receives `{ toggle, isOpen, ...colorHelpers }`.
+*   `mobile-panel`: Content of the mobile menu panel shown when toggled. Receives `{ closeMenu }`.
+
+**Notes:**
+
+*   The component provides default color variables via slot props based on the `variant` (e.g., `defaultTextColor`) to help style slotted content consistently.
+
+**Basic Usage Example:**
+
+```html
+<BaseNavbar variant="dark">
+  <template #logo>
+    <img src="/logo-white.png" alt="Logo" class="h-8 w-auto">
+  </template>
+  <template #navigation-desktop="{ defaultTextColor, currentTextColor, defaultHoverTextColor }">
+    <a href="/dashboard" :class="['inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium border-white', currentTextColor]">Dashboard</a>
+    <a href="/reports" :class="['inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium', defaultTextColor, defaultHoverTextColor]">Reports</a>
+  </template>
+  <template #actions-desktop>
+    <UserProfileDropdown />
+  </template>
+  <template #mobile-panel="{ closeMenu }">
+    <div class="space-y-1 px-2 pt-2 pb-3">
+      <a href="/dashboard" @click="closeMenu" class="block rounded-md bg-gray-900 px-3 py-2 text-base font-medium text-white">Dashboard</a>
+      <a href="/reports" @click="closeMenu" class="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white">Reports</a>
+    </div>
+  </template>
+</BaseNavbar>
+```
+
+---
+
+## 30. BaseNotification
+
+**File:** `app/components/common/BaseNotification.js`
+
+**Purpose:** Displays temporary, dismissible messages (often called toasts) typically used for feedback after user actions (e.g., save success, error message).
+
+**Key Props:**
+
+*   `id` ([String, Number], required): A unique identifier for the notification, used by the parent/manager component to track and remove it.
+*   `type` (String, default: 'info'): Notification type, determines the default icon and color hints (`success`, `error`, `warning`, `info`).
+*   `title` (String, default: ''): Optional bold title text.
+*   `duration` (Number, default: 5000): Auto-dismiss delay in milliseconds. Set to `0` for persistent notifications.
+*   `dismissible` (Boolean, default: true): Whether to show the close button.
+
+**Slots:**
+
+*   `leading`: Customize the leading element (icon, avatar). Receives `{ iconName, iconColorClass }`.
+*   `content`: Customize the main content area. Receives `{ title, titleColorClass, contentColorClass }`. The default slot content goes inside this area by default.
+*   `default`: The main message content of the notification.
+*   `actions`: Add action buttons/links below the main content.
+*   `trailing-actions`: Add elements to the right side (e.g., alternative close button).
+*   `close`: Customize the close button. Receives `{ dismissFn }`.
+
+**Events:**
+
+*   `dismiss`: Emitted when the notification requests to be dismissed (either by timer or user click). Payload is the notification `id`.
+
+**Notes:**
+
+*   This component renders a single notification panel. A separate manager component (e.g., `NotificationManager`) is typically needed to handle the list/queue of notifications and their positioning on the screen.
+
+**Basic Usage Example (within a Manager):**
+
+```html
+<!-- Inside a Notification Manager component -->
+<div class="fixed inset-0 flex items-end px-4 py-6 pointer-events-none sm:p-6 sm:items-start">
+  <div class="w-full flex flex-col items-center space-y-4 sm:items-end">
+    <transition-group name="list" tag="div">
+      <BaseNotification
+        v-for="notification in notifications" 
+        :key="notification.id"
+        :id="notification.id"
+        :type="notification.type"
+        :title="notification.title"
+        :duration="notification.duration"
+        @dismiss="removeNotification"
+      >
+        {{ notification.message }}
+      </BaseNotification>
+    </transition-group>
+  </div>
+</div>
+```
+
+---
+
+## 31. BasePageHeading
+
+**File:** `app/components/common/BasePageHeading.js`
+
+**Purpose:** Renders a prominent heading section for a page, often including the page title, metadata, breadcrumbs, avatar, and action buttons.
+
+**Key Props:**
+
+*   `title` (String, required): The main page title.
+*   `variant` (String, default: 'default'): Layout and style variant. Options:
+    *   `'default'`: Simple title, optional description and actions.
+    *   `'with-meta'`: Includes a metadata section below the title.
+    *   `'with-avatar'`: Displays an avatar next to the title.
+    *   `'with-breadcrumbs'`: Displays breadcrumbs above the title.
+    *   `'with-meta-action'`: Like `with-meta`, ensures actions are always present.
+    *   `'dark'`: Dark background variant.
+*   `description` (String, default: ''): Text displayed below the title.
+*   `meta` ([String, Array], default: ''): Metadata items displayed below the title (in `with-meta` variants).
+*   `breadcrumbs` (Array, default: `[]`): Array of breadcrumb objects `{ name, href, current? }` for `with-breadcrumbs` variant.
+*   `avatar` (Object, default: `{}`): Avatar data `{ src?, alt?, initials?, size?('small'|'medium'|'large') }` for `with-avatar` variant.
+*   `withBorder` (Boolean, default: true): Show a bottom border (except for `dark` variant).
+*   `className` (String, default: ''): Custom classes for the root container.
+*   `withActions` (Boolean, default: false): Enables the `actions` slot on the right.
+
+**Slots:**
+
+*   `actions`: Content for the right-aligned action area (e.g., buttons).
+
+**Basic Usage Example:**
+
+```html
+<BasePageHeading 
+  title="Project Dashboard" 
+  :withActions="true"
+>
+  <template #actions>
+    <BaseButton variant="primary">New Project</BaseButton>
+  </template>
+</BasePageHeading>
+
+<BasePageHeading
+  title="User Profile"
+  variant="with-meta"
+  :meta="[
+    'Applied for Backend Developer on August 24, 2023',
+    'Status: Interview Scheduled'
+  ]"
+/>
+
+<BasePageHeading
+  title="Settings"
+  variant="with-breadcrumbs"
+  :breadcrumbs="[
+    { name: 'Home', href: '/' },
+    { name: 'Account', href: '/account' },
+    { name: 'Settings', href: '/account/settings', current: true }
+  ]"
+/>
+```
+
+---
+
+## 32. BasePagination
+
+**File:** `app/components/common/BasePagination.js`
+
+**Purpose:** Displays pagination controls (page numbers, previous/next buttons) to navigate through lists or tables spanning multiple pages.
+
+**Key Props:**
+
+*   `currentPage` (Number, required): The currently active page (1-indexed).
+*   `totalPages` (Number, required): The total number of available pages.
+*   `totalItems` (Number, default: null): Total number of items (for displaying results text).
+*   `itemsPerPage` (Number, default: 10): Items per page (for displaying results text).
+*   `maxVisiblePages` (Number, default: 5): Maximum number of page number buttons to show (includes ellipsis).
+*   `variant` (String, default: 'default'): Layout style. Options:
+    *   `'default'`: Button group style with results text left.
+    *   `'centered'`: Centered page links with prev/next text buttons.
+    *   `'simple'`: Simple prev/next buttons with results text left.
+*   `prevText` (String, default: 'Previous'): Text for the previous button.
+*   `nextText` (String, default: 'Next'): Text for the next button.
+*   `containerClass` (String): Custom classes for the main container (applied to `default` and `simple` variants).
+
+**Slots:**
+
+*   `results-text`: Customize the results text display. Receives `{ startItem, endItem, totalItems }`.
+*   `prev-button`: Customize the previous button content. Receives `{ disabled }`.
+*   `next-button`: Customize the next button content. Receives `{ disabled }`.
+*   `ellipsis`: Customize the ellipsis (...) element.
+*   `page-button`: Customize the page number button content. Receives `{ page, isCurrent }`.
+
+**Events:**
+
+*   `update:currentPage`: Emitted when a page change is requested. Payload is the new page number.
+
+**Basic Usage Example:**
+
+```html
+<BasePagination
+  :currentPage="pageNumber"
+  :totalPages="totalPageCount"
+  :totalItems="totalItemsCount"
+  @update:currentPage="goToNewPage"
+  variant="centered"
+/>
+```
+
+---
+
+## 33. BaseRadioGroup
+
+**File:** `app/components/common/BaseRadioGroup.js`
+
+**Purpose:** Renders a group of radio buttons, typically within a `<fieldset>`, allowing the user to select a single option from a list. Offers various visual styles like simple lists, cards, panels, and color pickers.
+
+**Key Props:**
+
+*   `modelValue` ([String, Number, Object, Boolean, null], default: null): The value of the currently selected radio button.
+*   `options` (Array, default: `[]`): Array of radio button options. Can be simple values or objects `{ id, name, description?, disabled?, color?, ... }`. Structure varies by variant (e.g., cards might expect more fields).
+*   `optionValueKey`, `optionLabelKey`, etc. (String): Customize keys if using objects in `options`.
+*   `name` (String, default: 'radio-group'): Common `name` attribute for the radio inputs, essential for grouping.
+*   `legend` (String, default: ''): Text for the `<legend>` element.
+*   `description` (String, default: ''): Description text displayed below the legend.
+*   `required` (Boolean, default: false): Marks the fieldset as required.
+*   `disabled` (Boolean, default: false): Disables all radio buttons in the group.
+*   `variant` (String, default: 'simple'): Visual layout style. Options: `simple`, `panel`, `cards`, `small-cards`, `stacked-cards`, `table`, `dividers`, `color-picker`.
+*   `layout` (String, default: 'vertical'): Arrangement for `simple` variant (`vertical`, `horizontal`).
+*   `labelPosition` (String, default: 'right'): Position of the label relative to the radio input (`right`, `left`).
+*   `descriptionDisplay` (String, default: 'block'): How option descriptions are displayed (`block`, `inline`).
+*   `error` (String, default: ''): Displays an error message below the group.
+*   `colorKey` (String, default: 'color'): Key for the color value in options (for `color-picker` variant).
+*   `ariaLabel` (String, default: ''): Sets an `aria-label` on the fieldset.
+
+**Slots:**
+
+*   `tableColumns`: Customize additional columns for the `table` variant. Receives `{ option, checked }`.
+*   `cardFooter`: Add content to the footer area of `cards` variant. Receives `{ option }`.
+*   `stackedCardDescription`: Customize the description area in `stacked-cards` variant. Receives `{ option }`.
+*   `stackedCardPrice`: Customize the price area in `stacked-cards` variant. Receives `{ option }`.
+
+**Events:**
+
+*   `update:modelValue`: Emitted when the selection changes. Payload is the selected option value (or object if `optionValueKey` isn't found/used consistently).
+
+**Basic Usage Example:**
+
+```html
+<BaseRadioGroup
+  v-model="selectedPlan"
+  legend="Choose a Plan"
+  variant="cards"
+  :options="[
+    { id: 'hobby', name: 'Hobby', description: '10 users', usage: '10GB' },
+    { id: 'pro', name: 'Pro', description: '50 users', usage: '100GB' },
+    { id: 'enterprise', name: 'Enterprise', description: 'Unlimited users', usage: 'Unlimited' }
+  ]"
+/>
+
+<BaseRadioGroup
+  v-model="deliveryMethod"
+  legend="Delivery Method"
+  variant="simple"
+  layout="horizontal"
+  :options="['Standard', 'Express']"
+/>
+```
+
+---
+
+## 34. BaseSectionHeading
+
+**File:** `app/components/common/BaseSectionHeading.js`
+
+**Purpose:** Creates a heading for a section of content, often used within forms or settings pages. Supports titles, descriptions, badges, actions, dropdowns, and tabs.
+
+**Key Props:**
+
+*   `title` (String, required): The main heading text.
+*   `description` (String, default: ''): Optional text below the title.
+*   `variant` (String, default: 'default'): Layout and style variant. Options: `default`, `with-tabs`, `with-badge`, `with-action`, `with-dropdown`, `subtle`.
+*   `useH2` (Boolean, default: false): Renders the title as `<h2>` instead of `<h3>`.
+*   `withBorder` (Boolean, default: true): Shows a bottom border (except for `with-tabs`).
+*   `badge` (String, default: ''): Text for the badge (in `with-badge` variant).
+*   `badgeColor` (String, default: 'gray'): Color theme for the badge (`gray`, `blue`, `green`, etc.).
+*   `tabs` (Array, default: `[]`): Array of tab objects `{ id, name, current?, href?, count? }` for `with-tabs` variant.
+*   `activeTab` (String, default: ''): The `id` of the currently active tab (required for `with-tabs`).
+*   `className` (String, default: ''): Custom classes for the root container.
+
+**Slots:**
+
+*   `actions`: Content for the right-aligned action area (used by `with-action`, `with-dropdown` variants). Typically holds buttons or a dropdown.
+
+**Events:**
+
+*   `tab-click`: Emitted when a tab is clicked (in `with-tabs` variant). Payload is `{ tab: clickedTabObject, event: clickEvent }`.
+
+**Basic Usage Example:**
+
+```html
+<BaseSectionHeading 
+  title="Profile Settings" 
+  description="Manage your personal information."
+/>
+
+<BaseSectionHeading
+  title="Billing History"
+  variant="with-action"
+  :withBorder="false"
+>
+  <template #actions>
+    <BaseButton variant="secondary" size="sm">Download All</BaseButton>
+  </template>
+</BaseSectionHeading>
+
+<BaseSectionHeading
+  title="Notifications"
+  variant="with-tabs"
+  :tabs="notificationTabs"
+  :activeTab="currentTabId"
+  @tab-click="handleTabChange"
+/>
+```
+
+---
+
+## 35. BaseSelectMenu
+
+**File:** `app/components/common/BaseSelectMenu.js`
+
+**Purpose:** Renders a standard HTML `<select>` dropdown menu, styled with Tailwind CSS.
+
+**Key Props:**
+
+*   `modelValue` ([String, Number, Object, null], default: null): The currently selected value.
+*   `options` (Array, default: `[]`): Array of options. Can be primitive values (strings, numbers) or objects `{ value, label, disabled? }`.
+*   `label` (String, default: ''): Text label displayed above the select menu.
+*   `placeholder` (String, default: 'Select an option'): Placeholder text shown as the default disabled option.
+*   `optionValueKey` (String, default: 'value'): Key for the option's value when using objects.
+*   `optionLabelKey` (String, default: 'label'): Key for the option's display text when using objects.
+*   `disabled` (Boolean, default: false): Disables the select menu.
+*   `required` (Boolean, default: false): Marks the select menu as required.
+*   `attrs` (Object, default: `{}`): Pass additional HTML attributes (like `id`, `name`) to the `<select>` element.
+*   `showClearButton` (Boolean, default: false): Adds a small clear (X) button inside the select element when a value is selected.
+
+**Slots:** None.
+
+**Events:**
+
+*   `update:modelValue`: Emitted when the selection changes. Payload is the selected *value* (not the full object).
+
+**Basic Usage Example:**
+
+```html
+<BaseSelectMenu
+  label="Assignee"
+  v-model="selectedAssigneeId"
+  :options="userOptions" 
+  optionValueKey="id"
+  optionLabelKey="name"
+  placeholder="Select a user..."
+  showClearButton
+/>
+
+<BaseSelectMenu
+  label="Status"
+  v-model="currentStatus"
+  :options="['Pending', 'Active', 'Completed', 'Cancelled']"
+/>
+```
+
+---
+
+## 36. BaseStackedList
+
+**File:** `app/components/common/BaseStackedList.js`
+
+**Purpose:** Displays a list of items vertically, often used for lists of people, projects, or discussions within cards or sections. Offers several common layout variants.
+
+**Key Props:**
+
+*   `items` (Array, default: `[]`): Array of items to display. Structure depends on the template used in the `#item` slot.
+*   `itemKey` (String, default: 'id'): Unique key property for items.
+*   `variant` (String, default: 'simple'): Layout style. Options include `simple`, `dark`, `with-links`, `with-badges`, `card`, `narrow`, `two-column`, `full-width`, `with-avatars`, `with-actions`, etc.
+*   `dividers` (Boolean, default: true): Show dividing lines between items.
+*   `clickable` (Boolean, default: false): (Potentially used by some variants/slots) Indicates items are clickable.
+*   `hoverEffect` (Boolean, default: false): Adds a hover background effect (mainly for `with-links` variant).
+*   `emptyMessage` (String, default: 'No items to display'): Message shown when `items` is empty.
+*   `bgColor` (String, default: 'white'): Background color (mainly for `card` variant).
+*   (Other props like `columns`, `avatarSize` might be specific to certain internal template fallbacks but are less relevant when using slots).
+
+**Slots:**
+
+*   `item`: **Required slot** to define the rendering for each list item. Receives `{ item, index }`.
+*   `empty`: Customize the empty state message/content.
+*   `footer`: Add content below the list.
+
+**Notes:**
+
+*   The component provides several built-in fallback templates within the `#item` slot based on detecting common properties (like `name`, `email`, `imageUrl` for people; `title`, `author` for discussions; `name`, `status` for projects). However, **it is strongly recommended to always provide a custom `#item` slot** for reliable and specific rendering.
+
+**Basic Usage Example:**
+
+```html
+<BaseStackedList :items="teamMembers" itemKey="memberId" variant="with-avatars">
+  <template #item="{ item }">
+    <div class="flex items-center gap-x-4">
+      <BaseAvatar :initials="item.initials" :imageUrl="item.avatarUrl" size="10" />
+      <div class="min-w-0">
+        <p class="text-sm font-semibold leading-6 text-gray-900">{{ item.name }}</p>
+        <p class="mt-1 truncate text-xs leading-5 text-gray-500">{{ item.role }}</p>
+      </div>
+    </div>
+    <div class="flex shrink-0 items-center gap-x-4">
+       <BaseButton variant="secondary" size="sm">View</BaseButton>
+    </div>
+  </template>
+</BaseStackedList>
+```
+
+---
+
+## 37. BaseStats
+
+**File:** `app/components/common/BaseStats.js`
+
+**Purpose:** Displays a set of key statistics or metrics, often in a grid layout. Supports various visual styles, including simple text, cards, and trend indicators.
+
+**Key Props:**
+
+*   `stats` (Array, required, default: `[]`): Array of stat objects. Expected shape: `{ id?, name, stat | value, previousStat?, unit?, change?, changeType?('increase'|'decrease'|'positive'|'negative'), icon? }`.
+*   `title` (String, default: ''): Optional title for the entire stats section.
+*   `variant` (String, default: 'simple'): Layout and style variant. Options: `simple`, `dark`, `cards`, `brand-icon`, `shared-borders`, `trending`.
+*   `columns`, `smColumns`, `lgColumns` ([Number, String]): Number of grid columns at different breakpoints.
+*   `rounded` (Boolean, default: true): Apply rounding (used by `cards`, `shared-borders`, `brand-icon`).
+*   `withShadow` (Boolean, default: true): Apply shadow (used by `cards`, `shared-borders`, `brand-icon`).
+*   `bgColor` (String, default: 'white'): Background color (used by `cards`, `brand-icon`, `trending`).
+*   `showSecondary` (Boolean, default: true): Show secondary info like `previousStat` or `unit`.
+*   `showTrend` (Boolean, default: true): Show trend indicators (`change`, `changeType`).
+*   `withDividers` (Boolean, default: false): Adds dividers (used by `shared-borders`).
+
+**Slots:** None (customization is done via the `stats` data structure).
+
+**Basic Usage Example:**
+
+```html
+<BaseStats
+  title="Last 30 Days"
+  variant="cards"
+  :stats="[
+    { name: 'Total Subscribers', stat: '71,897', previousStat: '70,946', change: '12%', changeType: 'increase' },
+    { name: 'Avg. Open Rate', stat: '58.16%', previousStat: '56.14%', change: '2.02%', changeType: 'increase' },
+    { name: 'Avg. Click Rate', stat: '24.57%', previousStat: '28.62%', change: '4.05%', changeType: 'decrease' }
+  ]"
+/>
+
+<BaseStats
+  variant="brand-icon"
+  :stats="[
+    { name: 'Total Revenue', stat: '$405,091.00', icon: 'far fa-gem', change: '10.9%', changeType: 'increase' },
+    { name: 'New Customers', stat: '1,234', icon: 'fas fa-users', change: '5.4%', changeType: 'decrease' }
+  ]"
+/>
+```
+
+---
+
+## 38. BaseStepNavigation
+
+**File:** `app/components/common/BaseStepNavigation.js`
+
+**Purpose:** Displays a series of steps, typically for a multi-stage process or workflow, indicating the current, completed, and upcoming steps. Offers various visual styles.
+
+**Key Props:**
+
+*   `steps` (Array, required, default: `[]`): Array of step objects. Required shape: `{ id, name, status: 'complete'|'current'|'upcoming' }`. Optional: `{ href?, description?, icon? }`.
+*   `variant` (String, default: 'simple'): Visual style. Options: `simple`, `panels`, `panels-bordered`, `bullets`, `bullets-text`, `circles`, `circles-text`.
+*   `clickable` (Boolean, default: true): Makes steps with an `href` clickable `<a>` tags.
+*   `className` (String, default: ''): Custom classes for the root `<nav>` element.
+
+**Slots:** None (customization is primarily through the `steps` data structure and variants).
+
+**Events:**
+
+*   `step-click`: Emitted when a clickable step is clicked. Payload is the `step` object.
+
+**Notes on Variant Structures:**
+
+*   Most variants display `name` and an indicator (line, circle, bullet, panel styling) based on `status`.
+*   `simple`: Shows `id` and `name`.
+*   `panels`, `panels-bordered`: Show `id`, `name`, `description` within panels.
+*   `circles-text`: Shows `name` and `description` next to circle indicators.
+*   `bullets`, `circles`: Primarily visual indicators, rely on tooltips or surrounding context for step names if not using `bullets-text`/`circles-text`.
+
+**Basic Usage Example:**
+
+```html
+<BaseStepNavigation
+  variant="circles"
+  :clickable="true"
+  :steps="[
+    { id: '01', name: 'Job Details', href: '#', status: 'complete' },
+    { id: '02', name: 'Application Form', href: '#', status: 'current' },
+    { id: '03', name: 'Preview', href: '#', status: 'upcoming' }
+  ]"
+  @step-click="handleStepChange"
+/>
+
+<BaseStepNavigation
+  variant="panels-bordered"
+  :steps="[
+    { id: 'Step 1', name: 'Cart', description: 'Review your items.', href: '#', status: 'complete' },
+    { id: 'Step 2', name: 'Billing', description: 'Enter payment details.', href: '#', status: 'current' },
+    { id: 'Step 3', name: 'Confirmation', description: 'Confirm your order.', href: '#', status: 'upcoming' }
+  ]"
+/>
+```
+
+---
+
+## 39. BaseTable
+
+**File:** `app/components/common/BaseTable.js`
+
+**Purpose:** Renders data in a tabular format (`<table>`). Supports sorting, various styling options, loading/empty states, and slots for customization.
+
+**Key Props:**
+
+*   `headers` (Array, required): Defines table columns. Shape: `{ key: string, label: string, sortable?: boolean, alignRight?: boolean, hiddenOn?: string, visibleFrom?: string }`.
+*   `items` (Array, required): Array of data objects to display in rows.
+*   `title` (String, default: ''): Optional title displayed above the table.
+*   `description` (String, default: ''): Optional description below the title.
+*   `showAddButton` (Boolean, default: false): Show an 'Add' button in the header area.
+*   `addButtonLabel` (String, default: 'Add item'): Text for the add button.
+*   `sortBy` (String, default: ''): Key of the header to sort by initially.
+*   `sortDirection` (String, default: 'asc'): Initial sort direction (`asc`, `desc`).
+*   `applySort` (Boolean, default: true): Apply the sorting logic to the `items` prop internally.
+*   `itemKey` (String, default: 'id'): Unique key property for items (used in `:key`).
+*   `loading` (Boolean, default: false): Displays a loading indicator row.
+*   `emptyMessage` (String, default: 'No items to display'): Message shown when `items` is empty.
+*   `variant` (String, default: 'default'): Table styling. Options: `default`, `card`, `striped`, `bordered`, `condensed`, `full-width`, `full-constrained`.
+*   `headerStyle` (String, default: 'default'): Header row styling (`default`, `uppercase`, `light-gray`).
+*   `verticalLines` (Boolean, default: false): Adds vertical borders between columns.
+*   `stickyHeader` (Boolean, default: false): Makes the table header stick to the top on scroll.
+
+**Slots:**
+
+*   `cell(key)`: Customize rendering for a specific cell based on the header key. Receives `{ item, value }`. Example: `<template #cell(status)="{ value }"> ... </template>`.
+*   `actionsHeader`: Customize the header for the actions column.
+*   `actions`: Customize the content of the actions column for each row. Receives `{ item }`.
+*   `empty`: Customize the content shown when the table is empty.
+
+**Events:**
+
+*   `addItem`: Emitted when the 'Add' button is clicked.
+*   `editItem`: Emitted when the default 'Edit' link in the actions column is clicked (if listener exists).
+*   `update:sortBy`: Emitted when a sortable header is clicked to change the sort key.
+*   `update:sortDirection`: Emitted when a sortable header is clicked to change the sort direction.
+*   `rowClick`: Emitted when a table row (`<tr>`) is clicked (excluding clicks on internal buttons/links). Receives the `item` object.
+
+**Basic Usage Example:**
+
+```html
+<BaseTable
+  :headers="[
+    { key: 'name', label: 'Name', sortable: true },
+    { key: 'title', label: 'Title' },
+    { key: 'email', label: 'Email', hiddenOn: 'sm' },
+    { key: 'role', label: 'Role' }
+  ]"
+  :items="users"
+  v-model:sortBy="currentSortBy"
+  v-model:sortDirection="currentSortDir"
+  itemKey="userId"
+  title="Users"
+  description="List of all users in the system."
+  variant="card"
+  showAddButton
+  @addItem="openAddUserModal"
+  @rowClick="viewUserDetails"
+>
+  <template #cell(role)="{ value }">
+    <BaseBadge color="blue">{{ value }}</BaseBadge>
+  </template>
+  <template #actions="{ item }">
+    <BaseButton variant="link" size="sm" @click.stop="editUser(item)">Edit</BaseButton>
+  </template>
+</BaseTable>
+```
+
+---
+
+## 40. BaseTabs
+
+**File:** `app/components/common/BaseTabs.js`
+
+**Purpose:** Displays a set of tabs for navigating between different views or sections of content.
+
+**Key Props:**
+
+*   `tabs` (Array, required): Array of tab objects. Shape: `{ id: string, name: string, href?: string, icon?: string, count?: string|number, current?: boolean }`. `current` is typically controlled by `modelValue`.
+*   `modelValue` ([String, Number], required): The `id` of the currently active tab. Use with `v-model:modelValue`.
+*   `variant` (String, default: 'underline'): Visual style. Options: `underline`, `pills`, `bar`, `full-width-underline`.
+*   `pillsColor` (String, default: 'gray'): Color theme for the active state in `pills` variant (`gray`, `brand`).
+*   `className` (String, default: ''): Custom classes for the container element.
+
+**Slots:**
+
+*   `tab-label-(id)`: Allows customization of the label area for a specific tab (identified by its `id`). Receives `{ tab }`.
+*   `default`: Slot intended for the content associated with the currently active tab (parent component should handle conditional rendering based on `modelValue`).
+
+**Events:**
+
+*   `update:modelValue`: Emitted when a tab is clicked, providing the `id` of the newly selected tab.
+*   `tab-click`: Emitted when a tab is clicked. Payload is the clicked `tab` object.
+
+**Basic Usage Example:**
+
+```html
+<div>
+  <BaseTabs
+    :tabs="projectTabs"
+    v-model:modelValue="activeProjectTabId"
+    variant="pills"
+    pillsColor="brand"
+  />
+
+  <div class="mt-4">
+    <!-- Conditionally render content based on activeProjectTabId -->
+    <div v-if="activeProjectTabId === 'overview'"><ProjectOverview /></div>
+    <div v-if="activeProjectTabId === 'tasks'"><ProjectTasks /></div>
+    <div v-if="activeProjectTabId === 'files'"><ProjectFiles /></div>
+  </div>
+</div>
+```
+
+---
+
+## 41. BaseTextArea
+
+**File:** `app/components/common/BaseTextArea.js`
+
+**Purpose:** Renders a multi-line text input area (`<textarea>`), often used for comments, descriptions, or longer text entries. Includes layout options for integrating with avatars and action buttons.
+
+**Key Props:**
+
+*   `modelValue` (String, default: ''): The content of the text area.
+*   `label` (String, default: ''): Text label displayed above the text area.
+*   `placeholder` (String, default: ''): Placeholder text inside the text area.
+*   `rows` (Number, default: 4): Default number of visible text lines.
+*   `id` (String): Explicit ID for the textarea element.
+*   `name` (String, default: 'textarea'): Name attribute for the textarea.
+*   `disabled` (Boolean, default: false): Disables the text area.
+*   `variant` (String, default: 'default'): Styling variant (`default` with outline, `underline`).
+*   `attrs` (Object, default: `{}`): Pass additional HTML attributes to the `<textarea>` element.
+
+**Slots:**
+
+*   `leading`: Place content (e.g., `<BaseAvatar>`) to the left of the text area.
+*   `label`: Customize the label rendering.
+*   `description`: Add descriptive text inside the top border of the text area (for `default` variant).
+*   `actions`: Place content (e.g., action buttons, character count) in a toolbar area below the text area input.
+
+**Events:**
+
+*   `update:modelValue`: Emitted on every input change. Payload is the new text area value.
+
+**Basic Usage Example:**
+
+```html
+<BaseTextArea
+  label="Add your comment"
+  v-model="newComment"
+  placeholder="What are your thoughts?"
+  :rows="3"
+>
+  <template #leading>
+    <BaseAvatar :initials="currentUser.initials" />
+  </template>
+  <template #actions>
+    <div class="flex-grow"></div> <!-- Spacer -->
+    <BaseButton type="submit">Comment</BaseButton>
+  </template>
+</BaseTextArea>
+```
+
+---
+
+## 42. BaseToggle
+
+**File:** `app/components/common/BaseToggle.js`
+
+**Purpose:** Renders a switch-like toggle button for boolean states.
+
+**Key Props:**
+
+*   `modelValue` (Boolean, default: false): The state of the toggle (use with `v-model`).
+*   `variant` (String, default: 'default'): Visual style (`default` with icons, `short` compact version).
+*   `label` (String, default: 'Use setting'): Text used for `aria-label` and screen readers.
+*   `disabled` (Boolean, default: false): Disables the toggle.
+*   `onColor` (String, default: 'bg-blue-600'): Tailwind background color class when on.
+*   `offColor` (String, default: 'bg-gray-200'): Tailwind background color class when off.
+*   `ariaLabel` (String, default: null): Explicit `aria-label` override.
+
+**Slots:**
+
+*   `icon-on`: Content for the icon shown inside the knob when the toggle is ON (only for `default` variant).
+*   `icon-off`: Content for the icon shown inside the knob when the toggle is OFF (only for `default` variant).
+
+**Events:**
+
+*   `update:modelValue`: Emitted when the toggle state changes. Payload is the new boolean value.
+
+**Basic Usage Example:**
+
+```html
+<div class="flex items-center">
+  <BaseToggle v-model="isEnabled" ariaLabel="Enable feature" />
+  <span class="ml-3 text-sm font-medium text-gray-900">Enable Feature</span>
+</div>
+
+<BaseToggle v-model="useCompactMode" variant="short" ariaLabel="Compact mode" />
+```
+
+---
+
+## 43. BaseVerticalNavigation
+
+**File:** `app/components/common/BaseVerticalNavigation.js`
+
+**Purpose:** Displays a vertical navigation menu, typically used within a sidebar. Supports nested items (one level deep) and different color variants.
+
+**Key Props:**
+
+*   `navigationItems` (Array, required): Array of top-level navigation items. Shape: `{ id, name, href?, current, icon?, count?, children?: Array<NavItem> }`. Child shape: `{ id, name, href, current, initial? }`.
+*   `secondaryNavigationItems` (Array, default: `[]`): Separate array for a secondary navigation section (e.g., teams, projects). Shape: `{ id, name, href?, current, initial? }`.
+*   `secondaryTitle` (String, default: ''): Title for the secondary navigation section.
+*   `variant` (String, default: 'light'): Color theme (`light`, `dark`, `brand`).
+*   `logoSrc`, `logoAlt` (String): Props for displaying a logo at the top (ignored if `#logo` slot used).
+*   `expandable` (Boolean, default: false): Enables collapsible parent items (Note: Requires `children` in `navigationItems` and handles clicks differently).
+*   `containerClass`, `navClass`, `logoContainerClass` (String): Custom classes for layout elements.
+*   `ariaLabel` (String, default: 'Sidebar'): ARIA label for the `<nav>` element.
+
+**Slots:**
+
+*   `logo`: Customize the logo area at the top.
+*   `item`: Customize the rendering of a navigation item (both primary and secondary). Receives `{ item, depth: 0 | 1 }`.
+*   `primary-item-content`: Customize the content *inside* the primary item's link/button. Receives `{ item }`.
+*   `secondary-title`: Customize the title for the secondary section.
+*   `secondary-item-content`: Customize the content *inside* the secondary item's link. Receives `{ item }`.
+*   `secondary-item-prefix`: Customize the element before the secondary item's name (e.g., initial box). Receives `{ item }`.
+*   `badge`: Customize the count badge display. Receives `{ count }`.
+*   `footer`: Add content fixed to the bottom of the navigation area.
+
+**Events:**
+
+*   `item-click`: Emitted when any navigation item (primary or secondary) is clicked. Payload is the `item` object.
+
+**Basic Usage Example:**
+
+```html
+<BaseVerticalNavigation
+  :navigationItems="mainNav"
+  :secondaryNavigationItems="projectNav"
+  secondaryTitle="Projects"
+  variant="light"
+>
+  <template #logo>
+    <MyLogoComponent />
+  </template>
+  <template #footer>
+    <UserProfileLink />
+  </template>
+</BaseVerticalNavigation>
+```
+
+---

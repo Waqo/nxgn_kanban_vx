@@ -1,0 +1,260 @@
+notes_implementation_plan.txt
+-----------------------------
+
+**Goal:** Implement full CRUD functionality for notes, including adding notes, replying, attaching files, tagging users, and previewing attachments within the OverviewTab.
+
+**Phase 1: Setup notesStore and Basic Add Note Functionality**
+
+1.  **Create `app/store/notesStore.js`:**
+    *   **File:** `app/store/notesStore.js` (New File)
+    *   **Tasks:**
+        *   Define the store using `Pinia.defineStore('notes', ...)`.
+        *   Add basic state (e.g., `isLoading`, `error`).
+        *   Create an `addNewNote` action.
+        *   **`addNewNote` Action Logic:**
+            *   Accept parameters: `projectId`, `noteContent`, `userId`, `userName` (for Author text field), `teamOnly`. (Attachments and tagged users will be added later).
+            *   Perform basic validation.
+            *   Import necessary constants (`FORM_NOTES`, field names like `FIELD_NOTE_CONTENT`, `FIELD_NOTE_PROJECT_LOOKUP`, `FIELD_NOTE_USER_LOOKUP`, `FIELD_NOTE_AUTHOR_TEXT`, `FIELD_NOTE_TEAM_ONLY`, `FIELD_NOTE_CONTEXT`, `FIELD_NOTE_DEPARTMENT`). Refer to `docs/active_docs/other_backend_structure.txt` for `Add_Note` schema.
+            *   Import `ZohoAPIService`, `useUiStore`, `useModalStore`, `logActivity`.
+            *   Set loading state (`isLoading = true`), add loading notification (`uiStore.addNotification`).
+            *   Construct the payload object for `ZohoAPIService.addRecord` using the correct API field names (e.g., `Note`, `Project`, `User_Lookup`, `Author`, `Team_Only`, `Context: 'General'`, `Department: 'Project Management'`).
+            *   Call `ZohoAPIService.addRecord(FORM_NOTES, payload)`.
+            *   Handle success: Remove loading notification, show success notification, call `modalStore.refreshModalData()`, call `logActivity`.
+            *   Handle error: Remove loading notification, show error notification.
+            *   Set loading state (`isLoading = false`).
+            *   Return success status (boolean).
+
+2.  **Update `OverviewTab.js` to Call `notesStore.addNewNote`:**
+    *   **File:** `app/components/modal/tabs/overview/OverviewTab.js`
+    *   **Tasks:**
+        *   Import `useNotesStore`.
+        *   Instantiate the store in `setup()`.
+        *   Modify the existing `addNote` method:
+            *   Add `async` keyword.
+            *   Get `currentUser` from `userStore`.
+            *   Add loading state ref (e.g., `isAddingNote = ref(false)`).
+            *   Set `isAddingNote.value = true`.
+            *   Call `notesStore.addNewNote` with `project.value.ID`, `newNoteContent.value`, `currentUser.id`, `currentUser.name`, `newNoteTeamOnly.value`.
+            *   If successful, clear `newNoteContent` and `newNoteTeamOnly`.
+            *   Set `isAddingNote.value = false` in a `finally` block.
+            *   Update the "Add Note" `BaseButton` `:loading` and `:disabled` states using `isAddingNote`.
+
+**Phase 2: Implement Attachment Handling**
+
+1.  **Update `OverviewTab.js` for File Input & Display:**
+    *   **File:** `app/components/modal/tabs/overview/OverviewTab.js`
+    *   **Tasks:**
+        *   Add state ref for attachments: `attachments = ref([])`.
+        *   Add a hidden file input (`<input type="file" multiple>`) triggered by an "Attach" button within the `BaseTextArea` actions slot.
+        *   Implement a file input `change` handler:
+            *   Get files from `event.target.files`.
+            *   Optionally validate files (size, type - adapt `validateAttachments` logic from old code or simplify).
+            *   Add valid `File` objects to the `attachments` ref array.
+        *   Implement drag-and-drop handlers (`handleDragOver`, `handleDragLeave`, `handleDrop`) on the note input container.
+            *   Use a state ref `isDragging = ref(false)` to toggle visual styles.
+            *   The `handleDrop` handler should also validate and add files to the `attachments` ref.
+        *   Render attachment previews (similar to `docs/old_code/NotesSectionjs.txt`) below the textarea.
+            *   Display image thumbnails using `URL.createObjectURL()`. Remember to revoke these URLs when removing an attachment or unmounting.
+            *   Display file icons for non-images.
+            *   Add a button to remove individual attachments from the `attachments` ref array.
+
+2.  **Update `notesStore.addNewNote` for Attachments:**
+    *   **File:** `app/store/notesStore.js`
+    *   **Tasks:**
+        *   Modify the `addNewNote` action to accept an `attachments` array (of `File` objects).
+        *   **Attachment Upload Logic:**
+            *   **Strategy 1 (Simpler):** If no attachments, proceed as before. If attachments exist:
+                *   Call `ZohoAPIService.addRecord` for the note *first*, ensuring `Note` content is not empty (use a placeholder like " " if needed).
+                *   Get the `ID` of the newly created note record from the response.
+                *   Iterate through the `attachments` array.
+                *   For each file, call `ZohoAPIService.uploadFile(REPORT_NOTES, newNoteId, FIELD_NOTE_ATTACHMENT_FIELD, fileObject)`. (Need the correct report name for notes and the API name of the file upload field in `Add_Note_Attachment`, which seems to be `File_field` based on `backend_structure`, but `uploadFile` usually targets a field on the *main* record's form, unless there's a specific API for subform uploads. **Clarification needed:** How are attachments linked? Is it a subform, or does `uploadFile` on the `Add_Note` form handle this? Assuming `uploadFile` targets `Add_Note_Attachment` might require a different approach - maybe adding attachment records separately after note creation).
+                *   **Alternative Strategy (if `Add_Note_Attachment` is separate):** After creating the note and getting its ID (`newNoteId`), iterate through attachments. For each attachment, call `ZohoAPIService.addRecord(FORM_NOTE_ATTACHMENTS, { data: { Note: newNoteId, Name: file.name, ... } })` to create the attachment record, *then* call `ZohoAPIService.uploadFile(REPORT_NOTE_ATTACHMENTS, newAttachmentId, FIELD_NOTE_ATTACHMENT_FIELD, fileObject)`. This seems more likely based on the schemas.
+            *   Handle potential errors during file uploads (e.g., upload one by one, report partial success/failure).
+            *   Adjust success/error notifications and logging.
+
+**Phase 3: Implement User Tagging**
+
+1.  **Update `OverviewTab.js` for User Tagging:**
+    *   **File:** `app/components/modal/tabs/overview/OverviewTab.js`
+    *   **Tasks:**
+        *   Import `BaseCombobox`. Register it in `components`.
+        *   Add state ref: `newNoteSelectedUsers = ref([])`.
+        *   Import `useLookupsStore` and get `usersForTagging` computed property (similar to `IssueItem.js`). Call `lookupsStore.fetchTeamUsers()` on mount if not already done globally.
+        *   Add `BaseCombobox` within the `BaseTextArea`'s `#actions` slot.
+            *   Bind `v-model` to `newNoteSelectedUsers`.
+            *   Set `:options="userTaggingOptions"`.
+            *   Set `:multiple="true"`.
+            *   Set `placeholder="Tag users..."`.
+            *   Set `labelKey="label"`, `valueKey="value"`.
+            *   Set `:loading="isLoadingUsersForTagging"`.
+            *   Set `:clearable="true"`.
+
+2.  **Update `notesStore.addNewNote` for Tagged Users:**
+    *   **File:** `app/store/notesStore.js`
+    *   **Tasks:**
+        *   Modify the `addNewNote` action to accept `taggedUserIds` (an array of user IDs).
+        *   Add `[FIELD_NOTE_TAGGED_USERS]: taggedUserIds` to the payload for `ZohoAPIService.addRecord`.
+
+**Phase 4: Implement Reply Functionality**
+
+1.  **Update `NoteItem.js`:**
+    *   **File:** `app/components/modal/tabs/overview/NoteItem.js`
+    *   **Tasks:**
+        *   Add state ref `isReplying = ref(false)`.
+        *   Add state ref `replyContent = ref('')`.
+        *   Create a `toggleReply()` method to set `isReplying.value = !isReplying.value` and clear `replyContent`.
+        *   Add a "Reply" button that calls `toggleReply()`.
+        *   Conditionally render a reply section (`v-if="isReplying"`) containing:
+            *   A `BaseTextArea` bound to `replyContent`.
+            *   Potentially add simplified tagging/attachment options for replies if needed (or omit for simplicity).
+            *   "Cancel" button calling `toggleReply()`.
+            *   "Submit Reply" button.
+        *   Create a `submitReply()` method:
+            *   Import `useNotesStore`, `useUserStore`.
+            *   Add loading state ref (`isSubmittingReply = ref(false)`).
+            *   Call `notesStore.addNewNote` (or a dedicated `addReply` action if preferred), passing:
+                *   `projectId` (from props or store).
+                *   `replyContent.value`.
+                *   `currentUser.id`, `currentUser.name`.
+                *   `teamOnly = false` (usually replies aren't team-only by default, but could be an option).
+                *   `parentNoteId = props.note.id` (passed to the action).
+            *   Clear `replyContent` and set `isReplying = false` on success.
+            *   Handle loading/error states.
+
+2.  **Update `notesStore.addNewNote` (or Create `addReply`):**
+    *   **File:** `app/store/notesStore.js`
+    *   **Tasks:**
+        *   Modify `addNewNote` to accept an optional `parentNoteId`.
+        *   If `parentNoteId` is provided, add `[FIELD_NOTE_REPLIED_TO]: parentNoteId` to the payload.
+        *   Adjust logging/notifications for replies.
+
+**Phase 5: Implement Attachment Preview**
+
+1.  **Update `NoteAttachmentPreview.js`:**
+    *   **File:** `app/components/modal/tabs/overview/NoteAttachmentPreview.js`
+    *   **Tasks:**
+        *   Import `useModalStore`.
+        *   Inject `modalStore` in `setup()`.
+        *   Modify the `handleClick` method for images:
+            *   Instead of `emit('preview-image', ...)`, call `modalStore.openPreview(attachment.value.url, attachment.value.name, true, attachment.value.url, 'noteAttachment')`. `isDirectImage` is true. `downloadUrl` can be the same as the preview URL. Provide context.
+        *   Modify the `handleClick` method for non-images (like PDFs):
+            *   If it's a PDF or other type you want to *try* previewing via iframe: Call `modalStore.openPreview(processedUrl, attachment.value.name, false, processedUrl, 'noteAttachment')`. `isDirectImage` is false.
+            *   Keep the `window.open` as a fallback or for specific non-previewable types if desired.
+
+2.  **Ensure `FilePreview.js` is Registered/Imported Correctly:**
+    *   **File:** `app/components/modal/ProjectDetailModal.js`
+    *   **Tasks:** Verify `FilePreview` is imported and included in the template, likely alongside the main `base-modal`.
+
+**Phase 6: Attachment API Call Optimization**
+
+Currently, adding a note with N attachments requires approximately 1 + 3N API calls:
+- 1 call to create the note
+- N calls to create attachment records
+- N calls to upload files
+- N calls to trigger transfer
+
+Here are several optimization approaches to consider:
+
+1.  **Bulk Attachment Record Creation:**
+    *   **File:** `app/store/notesStore.js`
+    *   **Tasks:**
+        *   Modify `addNewNote` to use `ZohoAPIService.addRecords` (bulk insert) instead of individual `addRecord` calls for attachment records.
+        *   Replace the loop that creates attachment records with a single bulk API call that creates all records at once.
+        *   Implementation:
+            ```javascript
+            // Instead of looping with individual addRecord calls:
+            const attachmentRecords = attachments.map(file => ({
+              Note: newNoteId,
+              Project: projectId,
+              User1: userId,
+              Name: file.name,
+              // other common fields...
+            }));
+            
+            const bulkResponse = await ZohoAPIService.addRecords(FORM_NOTE_ATTACHMENTS, { 
+              data: attachmentRecords 
+            });
+            
+            // Then process bulkResponse.data array for subsequent upload calls
+            ```
+        *   Potential reduction: From 1 + 3N to 1 + 1 + 2N calls
+
+2.  **Delayed Refresh Strategy:**
+    *   **File:** `app/store/notesStore.js`
+    *   **Tasks:**
+        *   Instead of refreshing modal data immediately after all attachment operations complete, use a delayed refresh.
+        *   Use a setTimeout to refresh after a set delay (e.g., 2-3 seconds), giving Zoho background processing time to complete.
+        *   Add optimistic UI updates: Add the new note to the displayed list immediately with an "uploading" indicator for attachments.
+        *   Implementation:
+            ```javascript
+            // After all attachment operations
+            // Don't await the refresh, let it happen after a delay
+            setTimeout(() => {
+              modalStore.refreshModalData();
+            }, 2500); // 2.5 second delay
+            
+            // Return success earlier
+            return true;
+            ```
+
+3.  **Parallel Upload Processing:**
+    *   **File:** `app/store/notesStore.js`
+    *   **Tasks:**
+        *   Modify file upload process to use `Promise.all()` for parallel processing instead of sequential processing.
+        *   Group promises by operation type rather than by attachment.
+        *   Implementation:
+            ```javascript
+            // Create all attachment records first
+            const createPromises = attachments.map(file => 
+              ZohoAPIService.addRecord(FORM_NOTE_ATTACHMENTS, { 
+                data: { 
+                  Note: newNoteId,
+                  Name: file.name,
+                  // other fields...
+                }
+              })
+            );
+            
+            const attachmentRecords = await Promise.all(createPromises);
+            
+            // Then upload all files in parallel
+            const uploadPromises = attachments.map((file, index) => 
+              ZohoAPIService.uploadFile(
+                REPORT_NOTE_ATTACHMENTS, 
+                attachmentRecords[index].data.ID,
+                FIELD_NOTE_ATTACHMENT_FIELD, 
+                file
+              )
+            );
+            
+            await Promise.all(uploadPromises);
+            
+            // Then trigger transfers in parallel
+            // ... similar Promise.all for triggers
+            ```
+        *   Note: While this doesn't reduce the number of API calls, it can significantly reduce the total time by running operations in parallel.
+
+4.  **Combined Record and Attachment Upload (Advanced):**
+    *   **File:** `app/store/notesStore.js`
+    *   **Research:**
+        *   Investigate if Zoho Creator's SDK supports creating a record with attachments in a single operation.
+        *   Example: Some API versions might allow `multipart/form-data` requests that include both record data and file data.
+        *   Look for Zoho Creator SDK functions like `createRecordWithAttachments` that might handle this as a single call.
+        *   Implementation would depend on available API methods.
+
+5.  **Background Processing Service:**
+    *   **Files:** `app/services/backgroundProcessService.js` (new file), `app/store/notesStore.js`
+    *   **Tasks:**
+        *   Create a new service that handles attachment processing in the background.
+        *   The note creation succeeds immediately while attachment processing happens asynchronously.
+        *   Implement using a queue system that processes attachments without blocking the UI.
+        *   Use a global state to track background operations and provide status updates.
+        *   Implementation requires more extensive architectural changes.
+
+**Testing Notes:**
+- Benchmark each optimization approach by measuring:
+  - Total time to complete the operation
+  - User-perceived latency (time until UI is responsive)
+  - Success rate with larger numbers of attachments
+- Test with varying numbers of attachments (1, 5, 10) and file sizes
+- Monitor browser memory usage during large attachment uploads

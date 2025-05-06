@@ -21,9 +21,11 @@ export const useUiStore = defineStore('ui', {
     isGloballyLoading: false,
     globalError: null,
     notifications: [], // Array of notification objects { id, type, title?, message, duration? }
+    newAlerts: [], // Separate state for top-right alerts
     currentStageView: loadSetting(LS_KEYS.BOARD_STAGE_VIEW, DEFAULT_KANBAN_STAGE_VIEW), // Use imported constant
     boardViewMode: DEFAULT_KANBAN_BOARD_MODE, // Use imported constant
-    nextNotificationId: 1
+    nextNotificationId: 1,
+    nextNewAlertId: 1 // Separate ID counter for new alerts
   }),
 
   // Getters: Equivalent to Vuex getters
@@ -36,6 +38,8 @@ export const useUiStore = defineStore('ui', {
 
     // Getter for notifications (same as state property, but explicit if preferred)
     activeNotifications: (state) => state.notifications,
+    // Getter for new alerts
+    activeNewAlerts: (state) => state.newAlerts,
   },
 
   // Actions: Equivalent to Vuex actions, but modify state directly
@@ -58,8 +62,22 @@ export const useUiStore = defineStore('ui', {
           this.nextNotificationId = notification.id + 1;
       }
     },
+    addNewNotificationAlert(alert) {
+      const idToUse = alert.id ?? this.nextNewAlertId++;
+      this.newAlerts.push({
+        ...alert,
+        id: idToUse
+      });
+      // Ensure nextNewAlertId doesn't collide
+      if (typeof alert.id === 'number' && alert.id >= this.nextNewAlertId) {
+          this.nextNewAlertId = alert.id + 1;
+      }
+    },
     removeNotification(notificationId) {
       this.notifications = this.notifications.filter(n => n.id !== notificationId);
+    },
+    removeNewNotificationAlert(alertId) {
+      this.newAlerts = this.newAlerts.filter(a => a.id !== alertId);
     },
     clearNotifications() {
         this.notifications = [];

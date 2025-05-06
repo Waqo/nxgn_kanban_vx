@@ -1,0 +1,261 @@
+# Zoho Creator Widgets: General Guide
+
+## 1. Understanding Widgets
+
+### What are Widgets?
+Widgets are used to extend the capabilities of your Zoho Creator application, allowing you to perform tasks that couldn't be accomplished using the in-built features[cite: 416]. They equip you with additional features to enhance the front-end capabilities of your app[cite: 417].
+
+### Widget Capabilities
+Widgets enable you to:
+* Create and customize features that are specific to your app[cite: 418].
+* Redefine the way your application interacts with your customers[cite: 418].
+* Take complete control of the front-end design[cite: 418].
+* Incorporate third party apps that cater to your Creator app[cite: 418].
+
+### Create and Customize Features
+While Zoho Creator has many features, widgets can help when you can't find the exact solution for a requirement[cite: 419]. You can create a feature, configure it as a widget, and add it to your page to achieve the desired usability[cite: 420].
+
+You can create and add your widget in Creator in two main ways[cite: 421]:
+1.  **Uploading your widget file**[cite: 422].
+2.  **Importing from Figma**[cite: 422].
+
+#### Uploading Your Widget File
+You can customize your widget's appearance and feel and then upload the widget file[cite: 422]. Inject JavaScript code directly into your widget file to incorporate interactive and customized functionalities[cite: 423]. Creator supports uploading the file from your local device and drag-and-drop functionality in the page builder[cite: 424].
+*Info:* Any direct changes to the widget script (e.g., CSS, JS files) require re-uploading the modified file for the widget to work as required[cite: 425].
+
+Points to consider before creating your widget file:
+* Define how you want your widget to behave in the uploaded file (e.g., trigger actions, display data)[cite: 427, 428].
+* Apply CSS styles for visual appeal and consistency with your application's design[cite: 429].
+* Test your widget thoroughly to ensure it behaves as expected[cite: 430].
+
+#### Use Cases
+* **Case 1 (Uploading Widget File):** For an automobile dealer's sales dashboard, you might need a custom feedback matrix form[cite: 431, 432, 433]. You can build this form using HTML, CSS, and JavaScript, upload it as a widget, and add it to your page[cite: 434, 435]. You can use Creator APIs (covered in the API V2 guide) to manage data within this widget[cite: 436].
+* **Case 2 (Importing from Figma):** For a Contacts Management app, instead of a standard form, you could design a wizard-style form with tabs and modified dropdowns using Creator's UI kit in Figma and import it as a widget for an enhanced user experience[cite: 437, 438, 439, 440, 441].
+
+### Redefine App Interface
+Widgets give you significant control over the front-end design, allowing you to tailor the app to your requirements and brand identity[cite: 442, 443]. This changes how your app interacts with customers[cite: 444]. For instance, instead of presenting a long form on a single page, you could create a progressive form (grouping fields into sections displayed linearly) using HTML/CSS/JS, upload it as a widget, and add it to your page[cite: 447, 448, 449, 450].
+
+## 2. Configuring Widget Parameters
+
+You can define parameters within a widget to accept dynamic values[cite: 450]. These parameters are specified in the `plugin-manifest.json` file during widget creation and can be mapped to your application's components (like fields, forms, reports) in the Widget Configuration section when adding the widget to a page[cite: 450, 451]. This allows for greater customization and seamless integration[cite: 452].
+
+The `manifest.json` file specifies how to launch your application[cite: 451]. You can edit this file to define parameters using keys like `name`, `type`, `defaultValue`, `placeholder`, `help`, and `mandatory`[cite: 453].
+
+**Parameter Key Details:** [cite: 454]
+
+| Key           | Type          | Description                                                                  | Editable? | Deletable? |
+| :------------ | :------------ | :--------------------------------------------------------------------------- | :-------- | :--------- |
+| `name`        | string        | Identifier (max 50 chars, alphanumeric/underscore/space, unique) [cite: 456] | No        | No         |
+| `type`        | see below     | Data type (e.g., `Application`, `Form`, `string`, `integer`)                 | No        | No         |
+| `defaultValue`| string        | Default value (max 40 chars)                                                 | Yes       | Yes        |
+| `placeholder` | string        | Placeholder text for configuration pane                                      | Yes       | Yes        |
+| `help`        | string        | Help text for configuration pane (max 140 chars)                             | Yes       | Yes        |
+| `mandatory`   | boolean       | If the parameter must be configured                                          | Yes       | Yes        |
+
+**Supported `type` values:** `application`, `form`, `report`, `field`, `string`, `integer`, `float`, `boolean`[cite: 454].
+
+**Notes:**
+* `name` and `type` keys are mandatory for every parameter and case-sensitive[cite: 455, 457]. They cannot be edited or deleted during widget updates[cite: 458].
+* `name` values must be unique[cite: 458].
+* `Application`, `Form`, `Report` types can only appear once per configuration[cite: 459]. `Field` type requires a corresponding `Form` or `Report` type parameter[cite: 459].
+* Total number of parameters should not exceed 20[cite: 460].
+
+When a widget with parameters is added to a page, the Widget Configuration menu appears, allowing you to map these parameters to specific application data or values[cite: 460, 461].
+
+**Example Use Case:** If you have Employee Management and HR Management apps needing similar check-in/out functionality, you can create one unified widget[cite: 462, 463]. Configure parameters in `manifest.json` for things like the target form or report[cite: 464]. When adding the widget to each app's page, you can map these parameters appropriately for that specific application via the configuration pane[cite: 465, 466].
+
+**Example `manifest.json`:** [cite: 467]
+```json
+{
+  "service": "CREATOR",
+  "cspDomains": {
+    "connect-src": []
+  },
+  "config": [
+    {"name":"welcomeText", "type":"string", "defaultValue":"Welcome"},
+    {"name":"appName", "type":"Application"},
+    {"name":"formName", "type":"Form", "help":"Provide Employee form details"},
+    {"name":"reportName", "type":"Report"},
+    {"name":"fieldName1", "type":"Field"},
+    {"name":"fieldName2", "type":"Field"},
+    {"name":"intVal", "type":"integer", "mandatory":true},
+    {"name":"boolval", "type":"boolean"},
+    {"name":"floatval", "type":"float"}
+  ]
+}
+
+## 3. Incorporating Third-Party Apps
+
+Widgets allow you to incorporate third-party apps or services into your Creator pages[cite: 467].
+
+**Example:** For an Online Courses app, if you want to display a countdown timer for a webinar for logged-in users, you could incorporate a timer from a third-party service or JavaScript plugin as a widget[cite: 471, 472].
+
+## 4. Creating a Widget by Uploading the File
+
+### Prerequisites
+* **Install Command Line Interface (CLI):** You need the Zoho Extension Toolkit (Zet) CLI installed before creating a widget[cite: 483]. Zet helps build and package widgets[cite: 484]. The CLI is used to send text commands to interact with software[cite: 485, 486]. Developers use CLIs for creating applications, software, and operating systems[cite: 488]. Zoho Creator enables widget creation and integration using CLI[cite: 489].
+    * **Node.js:** Download and install Node.js from [https://nodejs.org/en/download/](https://nodejs.org/en/download/)[cite: 490]. Verify installation using `$ node -v` and `$ npm -v`[cite: 490].
+    * **Install Zet:** Run `$ npm install -g zoho-extension-toolkit`[cite: 490].
+    * **Verify Zet:** Run `$ zet` (should show help information)[cite: 490].
+
+### Steps to Create and Upload
+1.  **Create Project:**
+    * Run `$ zet init` in your terminal[cite: 491, 499].
+    * A list of Zoho Services will appear; select "Zoho Creator"[cite: 492, 500].
+    * Enter a Project Name[cite: 500]. A project folder with the necessary structure (`app`, `plugin-manifest.json`, etc.) will be created[cite: 492, 498, 501]. Resources required for rendering your widget will be inside the "app" folder[cite: 492].
+2.  **Develop Widget:**
+    * Navigate into the project folder: `$ cd {Project_name}`[cite: 502, 504].
+    * Open the `app` folder[cite: 502, 504].
+    * Edit the `widget.html` file to define the structure, design, and functionality[cite: 506, 507].
+    * (Optional) Configure widget parameters in the root `plugin-manifest.json` file[cite: 503, 505]. Find the `plugin-manifest.json` file in the project folder[cite: 504]. Configure it with `name` and `type` fields for components to be used[cite: 505].
+    * (Optional) If using Creator JS APIs, include the SDK and write API calls (refer to the API V2 guide)[cite: 508].
+3.  **Start Server (for Local Testing):**
+    * Run `$ zet run` to start a local HTTP server (usually on port 5000) that allows local testing in a sandbox instance[cite: 493]. Ensure the port isn't occupied[cite: 493].
+    * Verify by opening `http://127.0.0.1:5000/app/widget.html` in your browser[cite: 494].
+4.  **Validate and Package:**
+    * Run `$ zet validate` to check the package for violations[cite: 494, 509]. Fix any identified issues before updating the zip[cite: 495, 510].
+    * Run `$ zet pack` to generate a ZIP file of your application in the `dist` folder of your project directory[cite: 496, 497, 511]. This zip needs to be uploaded to Zoho Creator[cite: 497].
+5.  **Upload to Creator (Internal Hosting):**
+    * Navigate to **Settings** -> **Widgets** in your Creator application[cite: 512].
+    * Click the **Create** button[cite: 513]. The New Widget pane will appear[cite: 513].
+    * Enter a **Widget Name**[cite: 513].
+    * Choose **Internal** from the **Hosting** dropdown list[cite: 514].
+    * Upload the packed ZIP file from the `dist` folder[cite: 514].
+    * Enter `/widget.html` in the **Index File** field[cite: 515]. (Note: The widget ZIP folder contains `widget.html` inside the `app` folder by default[cite: 516]. If you moved `widget.html` into a subfolder within `app`, specify the path like `/<folder-name>/<filename>.html` [cite: 517]).
+    * Click **Create**[cite: 517].
+    * The created widget is added to the Widgets page[cite: 518]. It will now be available as a drag-and-drop element in the Page builder for all pages in that application[cite: 518].
+
+### External Hosting Option
+The procedure above is for internal hosting (widgets hosted within Creator)[cite: 519]. Alternatively, widgets can be hosted externally and linked[cite: 520].
+1.  Go to **Application Settings** -> **Widgets**[cite: 521].
+2.  Click the **New Widget** button[cite: 522]. The New Widget pane appears[cite: 522].
+3.  Enter a **Widget Name**[cite: 523].
+4.  Choose **External** from the **Hosting** dropdown list[cite: 523].
+5.  Enter the **Index page URL** of the externally hosted widget in the Index File field[cite: 524].
+6.  Click **Create**[cite: 524].
+The created widget is added to the Widgets page [cite: 525] and will appear as a drag-and-drop element in the Page builder[cite: 525].
+
+## 5. Whitelisting URLs
+
+By default, widgets are allowed access only to Creator servers; all other URLs are blocked[cite: 526]. To use client libraries or access external resources, whitelisting is needed[cite: 527]. Whitelisting creates a list of URLs the widget can access besides the default Creator URLs[cite: 528].
+1.  Install the CLI if you haven't already[cite: 529]. Learn more[cite: 529].
+2.  Open your project folder and find the `plugin-manifest.json` file[cite: 529].
+3.  Add the Domains to be whitelisted in the `plugin-manifest.json` file[cite: 530].
+4.  Pack the ZIP using the CLI client (`$ zet pack`)[cite: 530]. Learn more[cite: 531].
+5.  Upload this ZIP to Creator[cite: 531].
+
+**Syntax:**
+```json
+{
+  "service": "CREATOR",
+  "cspDomains": {
+    "connect-src": [
+      "domain1",
+      "domain2",
+      "domain3"
+    ]
+  }
+}
+
+Example:
+
+{
+  "service": "CREATOR",
+  "cspDomains": {
+    "connect-src": [
+      "wss://*.zohopublic.com",
+      "https://*.zoho.com",
+      "https://*.zohopublic.com"
+    ]
+  }
+}
+
+6\. External Framework Support
+------------------------------
+
+Creator Widgets now support external frameworks like React, Vue, etc.
+
+### Method 1: CDN
+
+Include the respective framework's CDN URLs in your widget app's index HTML files and code your app with the framework.
+
+> **Note:** Use minified production-ready CDN URLs (available for each framework) when deploying to prevent slowdowns.
+
+### Method 2: Bundling
+
+Use the framework's NPM/CLI method to create production-ready bundles and include them in your widget app.\
+No additional inclusion of external URLs is required in this method.
+
+* * * * *
+
+### React CDN Example
+
+Users can follow a similar format for other frameworks, including the script tag with the framework's CDN URLs.
+
+#### Development (use development URLs for meaningful error descriptions)
+
+html
+
+CopyEdit
+
+`<script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>`
+
+#### Production (use minified version URLs to increase loading speed)
+
+html
+
+CopyEdit
+
+`<script src="https://unpkg.com/react@17/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js" crossorigin></script>`
+
+7\. Points to Remember & Limitations
+------------------------------------
+
+-   Widgets with JS APIs (except Publish APIs) will not work on published pages accessible without login.
+
+-   The widget ZIP folder contains `widget.html` inside the `app/` folder by default. This is the index file loaded as the widget.
+
+-   If you created another folder inside `app/` and moved `widget.html` there, specify the index file path like `/folder-name/filename.html`.
+
+* * * * *
+
+### Account Limit
+
+-   Max **50 widgets** per Zoho account.
+
+### Internal Hosting File Limits
+
+-   ZIP max size: **10 MB**
+
+-   Files inside ZIP: **Max 250**
+
+-   Individual file size: **Max 5 MB**
+
+### Naming Rules
+
+-   **Widget ZIP file name**:
+
+    -   Max 100 characters
+
+    -   Allowed: A-Z, a-z, 0-9, `_`, `\`, `$`, `.`, `-`
+
+-   **File names inside ZIP**:
+
+    -   Max 50 characters
+
+    -   Allowed: A-Z, a-z, 0-9, `_`, `.`, `$`, `-`
+
+-   **Folder names inside ZIP**:
+
+    -   Allowed: A-Z, a-z, 0-9, `_`, `$`, `-`
+
+* * * * *
+
+### Supported File Types in ZIP
+
+`.txt`, `.md`, `.XML`, `.dre`, `.jpg`, `.jpeg`, `.png`, `.gif`, `.css`, `.js`, `.HTML`, `.json`,\
+`.mp3`, `.svg`, `.woff`, `.ttf`, `.eot`, `.otf`, `.woff2`, `.webm`, `.mp4`
+
+

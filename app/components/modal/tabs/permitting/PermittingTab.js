@@ -92,7 +92,7 @@ const PermittingTab = {
 
         // --- Initialize or Reset Form Data (Adjust fields) --- 
         const initializeFormData = () => {
-            console.log('PermittingTab: Initializing formData. Current permit.value:', JSON.parse(JSON.stringify(permit.value))); 
+          // console.log('PermittingTab: Initializing formData. Current permit.value:', JSON.parse(JSON.stringify(permit.value))); 
             const p = permit.value;
             Object.assign(formData, {
                 // Permit_Submitted: p?.Permit_Submitted || 'No', // REMOVE
@@ -108,7 +108,7 @@ const PermittingTab = {
                 Tags: p?.Tags || [],
                 Problem: p?.Problem || 'Unknown'
             });
-            console.log('PermittingTab: formData initialized:', JSON.parse(JSON.stringify(formData))); 
+          // console.log('PermittingTab: formData initialized:', JSON.parse(JSON.stringify(formData))); 
         };
 
         // Watch the permit prop and initialize form when it changes (or on initial load)
@@ -232,11 +232,11 @@ const PermittingTab = {
 
         // --- Edit/Save/Cancel Methods ---
         const startEditing = () => {
-            console.log('PermittingTab: startEditing called. Current permit.value:', JSON.parse(JSON.stringify(permit.value))); // Log before init
+          // console.log('PermittingTab: startEditing called. Current permit.value:', JSON.parse(JSON.stringify(permit.value))); // Log before init
             initializeFormData(); // Ensure form has latest data before editing
-            console.log('PermittingTab: startEditing - after initializeFormData. formData:', JSON.parse(JSON.stringify(formData))); // Log after init
+          // console.log('PermittingTab: startEditing - after initializeFormData. formData:', JSON.parse(JSON.stringify(formData))); // Log after init
             isEditing.value = true;
-            console.log('PermittingTab: isEditing set to true'); // Log state change
+          // console.log('PermittingTab: isEditing set to true'); // Log state change
         };
 
         const cancelEditing = () => {
@@ -262,7 +262,7 @@ const PermittingTab = {
             //    Interconnection_Approval_Date: formatDateForAPI(formData.Interconnection_Approval_Date),
             // };
 
-            console.log(`PermittingTab: Saving data. ${existingPermitId ? 'Updating' : 'Adding'}. Payload basis:`, JSON.parse(JSON.stringify(dataToSend)));
+          // console.log(`PermittingTab: Saving data. ${existingPermitId ? 'Updating' : 'Adding'}. Payload basis:`, JSON.parse(JSON.stringify(dataToSend)));
             
             try {
                 if (existingPermitId) {

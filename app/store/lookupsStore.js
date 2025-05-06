@@ -186,7 +186,7 @@ export const useLookupsStore = defineStore('lookups', {
               if(initData.Document_Types) {
                    processedDocTypes = DataProcessors.processDocTypesData(initData.Document_Types);
                    this.docTypes = processedDocTypes;
-                   console.log(`Lookups Store (Pinia): Document Types (${processedDocTypes.length}) populated from init data.`);
+                  // console.log(`Lookups Store (Pinia): Document Types (${processedDocTypes.length}) populated from init data.`);
               } else {
                    console.warn("Lookups Store (Pinia): initData missing Document_Types. Will attempt fallback fetch.");
               }

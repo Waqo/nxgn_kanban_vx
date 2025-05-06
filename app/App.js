@@ -9,6 +9,8 @@ import ZohoAPIService from './services/zohoCreatorAPI.js';
 import { initializeApp } from './services/initService.js'; // IMPORT Initialization Service
 // --- ADD Error Log Service Import ---
 import { logErrorToZoho } from './services/errorLogService.js';
+import { useNotificationsStore } from './store/notificationsStore.js'; // Import notification store
+const { onUnmounted } = Vue; // Import onUnmounted from global Vue
 
 // --- REMOVE Import for non-Base Kanban Components ---
 // import KanbanCard from './components/kanban/KanbanCard.js';
@@ -66,6 +68,10 @@ const { createPinia } = Pinia;
 const pinia = createPinia();
 app.use(pinia); // Ensure Pinia is registered BEFORE initialization call
 // console.log('Pinia Instance Registered:', pinia);
+
+// Instantiate notification store *after* Pinia is used
+// No need to instantiate it here globally unless other parts of App.js need it directly
+// const notificationsStore = useNotificationsStore();
 
 // --- CALL INITIALIZATION SERVICE ---
 initializeApp(); // Call the initialization function

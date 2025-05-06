@@ -1,7 +1,7 @@
 ---
-description: 
+description: If you need to understand the backend structure in Zoho Creator
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 When user gives differing information, changes can be made to this text after asking user.
 

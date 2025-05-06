@@ -6,19 +6,24 @@ import { useLookupsStore } from '../store/lookupsStore.js';
 import { useUserStore } from '../store/userStore.js';
 import { useProjectsStore } from '../store/projectsStore.js';
 import { useModalStore } from '../store/modalStore.js';
+import { useNotificationsStore } from '../store/notificationsStore.js';
 
 // Import Local Storage Utilities
 import { LS_KEYS, loadSetting } from '../utils/localStorage.js';
 // Import Constants for Init Record
 import {
   REPORT_KANBAN_INIT,
-  KANBAN_INIT_RECORD_ID
+  KANBAN_INIT_RECORD_ID,
+  IS_DEVELOPMENT,
+  START_IN_DEMO_MODE
 } from '../config/constants.js';
 
 // --- CORRECT Import ZohoAPIService ---
 import ZohoAPIService from './zohoCreatorAPI.js';
 // --- ADD Error Log Service Import ---
 import { logErrorToZoho } from './errorLogService.js';
+// --- ADD Info Log Service Import and Dev Flag --- 
+import { logInfoToZoho } from './errorLogService.js';
 
 /**
  * Initializes the application by fetching essential data for initial display
@@ -32,6 +37,7 @@ export async function initializeApp() {
   const userStore = useUserStore();
   const projectsStore = useProjectsStore();
   const modalStore = useModalStore();
+  const notificationsStore = useNotificationsStore();
 
   let queryParamsFromUrl = null; // Variable to hold the params
 
@@ -58,19 +64,19 @@ export async function initializeApp() {
   //         // Error is already logged in ZohoAPIService.getRecordById
   //     });
 
-  console.log("App Init Service: Starting initialization...");
+  // console.log("App Init Service: Starting initialization...");
   uiStore.setGlobalLoading(true);
   uiStore.setGlobalError(null);
 
   try {
     // --- Fetch Kanban Init Record First (Await) ---
-    console.log("App Init Service: Fetching Kanban Init Record...");
+   // console.log("App Init Service: Fetching Kanban Init Record...");
     const initRecordData = await ZohoAPIService.getRecordById(REPORT_KANBAN_INIT, KANBAN_INIT_RECORD_ID, null, 'quick_view');
     console.log("App Init Service: Kanban Init Record Data (Quick View):", initRecordData);
 
     // --- Phase 1: Fetch Remaining Core Data (Awaited) ---
     // Pass initRecordData to lookupsStore
-    console.log("App Init Service: Fetching Core Lookups (using init data) and Initial Projects...");
+    //console.log("App Init Service: Fetching Core Lookups (using init data) and Initial Projects...");
     
     // Fetch Core Lookups (will use init data) and Projects concurrently
     await Promise.all([
@@ -80,13 +86,25 @@ export async function initializeApp() {
     // Now process lookups using the fetched data
     await lookupsStore.fetchCoreLookups(initRecordData); // Pass init data
     
-    console.log("App Init Service: Core Lookups (Stages/Tranches from init data) and Projects fetched.");
+    //console.log("App Init Service: Core Lookups (Stages/Tranches from init data) and Projects fetched.");
 
     // --- Fetch Current User (Depends on Core Lookups existing, but fetch is independent) --- 
-    console.log("App Init Service: Fetching Current User...");
+    //console.log("App Init Service: Fetching Current User...");
     // User fetch is now independent of lookups store
     await userStore.fetchCurrentUser();
-    console.log("App Init Service: User fetched.");
+    //console.log("App Init Service: User fetched.");
+
+    // --- Log Widget Access (Development Only - AFTER User Fetch) ---
+    if (IS_DEVELOPMENT) {
+        // Import START_IN_DEMO_MODE if not already present at the top
+        const { START_IN_DEMO_MODE } = await import('../config/constants.js'); 
+        logInfoToZoho('Widget accessed.', { 
+            source: 'initializeApp', 
+            isDemoMode: START_IN_DEMO_MODE, // Add demo mode status
+            widgetName: "Kanban Widget" // Add widget name
+        });
+    }
+    // --- End Log --- 
 
     // --- Check for projectId in URL *BEFORE* checking localStorage ---
     let openedModalFromUrl = false;
@@ -120,6 +138,10 @@ export async function initializeApp() {
     console.log("App Init Service: Phase 1 (Core data) completed. Setting global loading false.");
     uiStore.setGlobalLoading(false); // <<<=== SET LOADING FALSE HERE
 
+    // --- Start notification polling AFTER successful init ---
+    //console.log("App Init Service: Starting notification polling...");
+    notificationsStore.startPolling();
+
     // --- Phase 2: Fetch Filter Lookups (Tags, Reps, Orgs) - Fire and Forget ---
     // These are not awaited, they run in the background after initial render.
     // No need to explicitly call them here, they will be fetched on demand by the toolbar.
@@ -134,7 +156,8 @@ export async function initializeApp() {
     // --- ADD Log error to Zoho --- 
     logErrorToZoho(error, { 
       operation: 'initializeApp',
-      details: 'Critical error during widget initialization sequence.'
+      details: 'Critical error during widget initialization sequence.',
+      widgetName: "Kanban Widget" // Add widget name
     });
     // --- END Log error --- 
 
@@ -146,9 +169,5 @@ export async function initializeApp() {
     // Ensure loading is false even if phase 1 errors out
     uiStore.setGlobalLoading(false); 
   }
-  // REMOVE finally block as loading is set earlier
-  // finally {
-  //   uiStore.setGlobalLoading(false);
-  //   console.log("App Init Service: Global loading state set to false.");
-  // }
+  // No finally block needed
 } 

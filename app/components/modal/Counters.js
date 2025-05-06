@@ -44,6 +44,13 @@ export default {
         daysSinceSystemTurnedOn() {
             return calculateDaysSince(this.systemTurnedOnDate);
         },
+        // *** ADD Days In Current Stage ***
+        daysInCurrentStage() {
+            // Assuming the formula field name is this
+            const days = this.project?.Days_in_Current_Stage;
+            // Formula fields might return numbers directly, handle null/undefined
+            return (days !== null && days !== undefined && !isNaN(Number(days))) ? Number(days) : null;
+        },
         
         // Determine which counters have valid values to display
         activeCounters() {
@@ -56,6 +63,17 @@ export default {
                     type: this.getCounterType(this.daysSinceSold)
                 });
             }
+             // *** ADD Days in Current Stage Counter ***
+             if (this.daysInCurrentStage !== null) {
+                 counters.push({
+                     key: 'stage',
+                     value: this.daysInCurrentStage,
+                     label: 'In Stage', // Simple label
+                     // Use separate logic for stage days coloring, e.g., longer times are red
+                     type: this.getCounterTypeForStage(this.daysInCurrentStage) 
+                 });
+             }
+             // Add other counters *after* the stage counter
             if (this.daysSincePermitSubmission !== null) {
                  counters.push({ 
                     key: 'permit', 
@@ -99,6 +117,14 @@ export default {
             if (days <= 30) return 'blue'; // Default/Blue
             if (days <= 60) return 'yellow'; // Warning/Yellow
             return 'red'; // Danger/Red
+        },
+        // *** ADD Method for Stage Days Coloring ***
+        getCounterTypeForStage(days) {
+            if (days === null) return 'gray';
+            // Example thresholds: Blue < 15, Yellow 15-30, Red > 30
+            if (days < 15) return 'blue';
+            if (days <= 30) return 'yellow';
+            return 'red';
         }
     },
     template: `
@@ -110,9 +136,9 @@ export default {
                         :color="counter.type" 
                         size="md" 
                         class="px-2.5 py-1"
-                        :title="counter.value + ' days since ' + counter.label"
+                        :title="counter.value + ' days ' + counter.label" // Adjusted title
                     >
-                        {{ counter.value }} Days Since {{ counter.label }}
+                         {{ counter.value }} Days {{ counter.label }}
                     </base-badge>
                     <!-- Divider (shown between badges) -->
                     <div v-if="index < activeCounters.length - 1" class="h-5 border-l border-gray-300 dark:border-gray-600"></div>

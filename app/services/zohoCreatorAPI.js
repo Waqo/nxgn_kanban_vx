@@ -162,6 +162,56 @@ const ZohoAPIService = {
   },
 
   /**
+   * Updates multiple records based on criteria.
+   * @param {string} reportName - The link name of the report containing records to update.
+   * @param {string} criteria - Filter criteria to select records for update. **Mandatory.**
+   * @param {object} updateData - The object containing field link names and new values (e.g., { Field_Name: 'New Value' }).
+   * @param {string} [appName] - Optional app link name.
+   * @returns {Promise<object>} Promise resolving with the API response.
+   */
+  async updateRecords(reportName, criteria, updateData, appName) {
+      if (!reportName || !criteria || !updateData) {
+          throw new Error("ZohoAPIService: reportName, criteria, and updateData are required for updateRecords.");
+      }
+
+      const config = {
+          report_name: reportName,
+          payload: { // Payload needs to be nested according to docs
+              criteria: criteria,
+              data: updateData // updateData should be { Field: Value }
+              // skip_workflow can be added here if needed
+          }
+          // process_until_limit and more_records handling might be needed for > 200 updates
+      };
+      if (appName) config.app_name = appName;
+
+      try {
+          // console.log(`ZohoAPIService: Updating records in report: ${reportName} matching criteria: ${criteria}`, config);
+          const response = await ZOHO.CREATOR.DATA.updateRecords(config);
+          // console.log(`ZohoAPIService: Record update response for criteria ${criteria}:`, response);
+
+          // Check the outer code first
+          if (response.code !== 3000) {
+              console.error(`ZohoAPIService: API Error updating records for criteria ${criteria}:`, response);
+              throw new Error(response.message || `API Error Code ${response.code}`);
+          }
+          // Check nested results for individual record update statuses/errors if needed
+          if (response.result && Array.isArray(response.result)) {
+              const errors = response.result.filter(r => r.code !== 3000);
+              if (errors.length > 0) {
+                  console.warn(`ZohoAPIService: Some records failed to update during bulk operation:`, errors);
+                  // Decide if this constitutes a full failure or partial success
+              }
+          }
+          // Success: response structure can vary, often includes a result array
+          return response; // Return the full response 
+      } catch (error) {
+          console.error(`ZohoAPIService: Error in updateRecords for criteria ${criteria}:`, error);
+          throw error;
+      }
+  },
+
+  /**
    * Adds a new record to a specified form.
    * @param {string} formName - The link name of the form.
    * @param {object} payload - The data payload for the new record (e.g., { data: { Field_Name: 'Value' } }).
@@ -401,7 +451,7 @@ const ZohoAPIService = {
    */
   async getQueryParams() {
       try {
-          console.log("ZohoAPIService: Fetching Query Params...");
+          //console.log("ZohoAPIService: Fetching Query Params...");
           const response = await ZOHO.CREATOR.UTIL.getQueryParams();
           console.log("ZohoAPIService: Query Params Received:", response);
           return response;
@@ -409,6 +459,48 @@ const ZohoAPIService = {
           console.error("ZohoAPIService: Error fetching query params:", error);
           // Don't re-throw, allow other init steps to proceed if possible
           return {}; // Return empty object on error
+      }
+  },
+
+  /**
+   * Fetches the count of records in a report, optionally filtered by criteria.
+   * @param {string} reportName - The link name of the report.
+   * @param {string} [criteria] - Optional criteria string (Zoho API format).
+   * @param {string} [appName] - Optional app link name if fetching from another app.
+   * @returns {Promise<object>} Promise resolving with the API response (containing records_count).
+   */
+  async getRecordCount(reportName, criteria, appName) {
+      if (!reportName) {
+          throw new Error("ZohoAPIService: reportName is required for getRecordCount.");
+      }
+
+      const config = {
+          report_name: reportName,
+      };
+
+      if (criteria) config.criteria = criteria;
+      if (appName) config.app_name = appName;
+
+      try {
+          // console.log(`ZohoAPIService: Fetching record count for report: ${reportName}`, config);
+          const response = await ZOHO.CREATOR.DATA.getRecordCount(config);
+          // console.log(`ZohoAPIService: Record count received for ${reportName}:`, response);
+
+          if (response.code !== 3000) {
+              console.error(`ZohoAPIService: API Error fetching record count for ${reportName}:`, response);
+              // Check if it's the specific 'no records found' error that getRecordCount might return differently
+              if (response.code === 3100) { // 3100 seems to be the code for 'no records' in getRecordCount context based on API docs
+                  console.warn(`ZohoAPIService: Handling 'No records found' (3100) for count on ${reportName}. Returning 0 count.`);
+                  return { code: 3000, result: { records_count: "0" } }; // Simulate success with 0 count
+              }
+              throw new Error(response.message || `API Error Code ${response.code}`);
+          }
+          // Success: response structure is { code: 3000, result: { records_count: "..." } }
+          return response; 
+      } catch (error) {
+          console.error(`ZohoAPIService: Error in getRecordCount for ${reportName}:`, error);
+          // Add specific handling for 3100 if it throws instead of returning code
+          throw error;
       }
   },
 

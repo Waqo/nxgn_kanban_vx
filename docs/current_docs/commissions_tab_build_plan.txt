@@ -1,0 +1,115 @@
+# Build Plan: Commissions Tab Functionality
+
+**Objective:** Implement the editing and interaction features from the legacy `SalesRepTab.js` into the current Vue 3 `CommissionsTab.js`, leveraging the existing architecture, base components, Pinia stores, and using the Composition API.
+
+**Current State:** `CommissionsTab.js` (Options API) is UI-complete but primarily read-only, displaying Sales Rep, Org, Active Rate, and Milestone/Advance details from the `project` prop.
+
+**Target Functionality:**
+
+1.  **Change Assigned Sales Rep:** Allow users to select a different Sales Rep for the current project from a dropdown.
+2.  **Edit Sales Rep Details:** Provide a modal (`EditSalesRepModal.vue`) to edit the master record of the *selected* Sales Rep (Name, Email, Phone, Base Rates).
+3.  **Edit Commission Milestones:** Enable editing of M1/M2/Advance amounts and all milestone statuses (Pending/Paid) directly within the `CommissionsTab`. Update paid dates automatically when status changes to 'Paid'.
+4.  **Select Active Commission Rate:** Allow users to select the applicable commission rate type (Regular, Commercial, Shared) for *this project* from a dropdown.
+5.  **Calculate M3 Amount:** Dynamically calculate and display the M3 amount based on system size and the selected active commission rate, deducting relevant paid milestones/advance.
+6.  **Commission Notes:** Implement a section (`CommissionNotesSection.vue`) to view and add notes specifically related to commissions (Context: "Commissions").
+
+**Development Steps:**
+
+1.  **Refactor `CommissionsTab.js` & Create `commissionsStore.js`:**
+    *   Refactor the existing `app/components/modal/tabs/commissions/CommissionsTab.js` to use the **Composition API (`setup` function)**. **[COMPLETED]**
+    *   Create a new store `app/store/commissionsStore.js`.
+    *   **(Store Responsibility - `commissionsStore`)** `commissionsStore` will handle:
+        *   Actions to update master Sales Rep records (`updateSalesRepDetails`).
+        *   Actions to update project-specific commission details (`updateProjectMilestones`, `updateProjectActiveRate`).
+    *   **(Store Responsibility - `lookupsStore`)** `lookupsStore` will *continue* to handle:
+        *   Fetching and storing Sales Reps & Sales Orgs lists.
+    *   **(Tab Responsibility - `CommissionsTab.js`)** `CommissionsTab.js` will:
+        *   Inject necessary stores: `commissionsStore`, `projectsStore`, `lookupsStore`, `userStore`, `notesStore`, `uiStore`, `modalStore`.
+        *   Manage local UI state (selections, edit modes) using `ref`.
+        *   Display data from `project` prop and relevant store getters (`lookupsStore`, `commissionsStore`).
+        *   Call actions in relevant stores (`projectsStore`, `commissionsStore`, `notesStore`).
+
+2.  **Change Assigned Sales Rep:** **[COMPLETED]**
+    *   **(UI - `CommissionsTab.js`)** Replace static Sales Rep display with `BaseSelectMenu`. Populate with `lookupsStore.salesReps`. Manage selection locally (`ref`). Show 'Save' button (`BaseButton`) when selection changes.
+    *   **(Action - `projectsStore`)** Keep the update action in `projectsStore` as it modifies the main project record. Create/use `projectsStore.updateProjectSalesRep`:
+        *   Args: `projectId`, `newSalesRepId`, `oldSalesRepName`, `newSalesRepName` (for logging).
+        *   API: `ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, { data: { Sales_Rep: newSalesRepId } })`. (Verified `Sales_Rep` field name).
+        *   Handle loading, notifications.
+        *   **Activity Log:** Log granular change (e.g., "Changed Sales Rep from '[Old Name]' to '[New Name]'").
+        *   Handle errors (log to Zoho).
+        *   Refresh `modalStore.refreshModalData` on success.
+
+3.  **Edit Sales Rep Details (Inline Form):** **[COMPLETED]**
+    *   **(UI - `CommissionsTab.js`)** Add inline editing functionality within the Sales Rep card.
+        *   Add an "Edit" button (`BaseButton`) when not in edit mode.
+        *   Conditionally show input fields (`BaseTextInput` for First/Last Name, Email, Phone, Rates) instead of static text when in edit mode.
+        *   Add "Save" and "Cancel" buttons (`BaseButton`) during edit mode.
+    *   **(State - `CommissionsTab.js`)** Manage edit mode state (`isEditingRepDetails` ref) and form data (`editedSalesRepData` ref) locally. Populate form data when editing starts.
+    *   **(Action - `commissionsStore`)** On save, call existing action `commissionsStore.updateSalesRepDetails`:
+        *   Args: `salesRepId`, `updatedData` (from `editedSalesRepData`, including nested Name object), `originalRepName` (for logging).
+        *   API call (`ZohoAPIService.updateRecordById(REPORT_SALES_REPS, ...)`) handled by the store action.
+        *   Store action handles loading, notifications, activity log, error log, and data refresh (`lookupsStore.fetchSalesReps`, `modalStore.refreshModalData`).
+    *   **(Integration)** No separate component needed initially. Integrate edit/save/cancel logic directly into `CommissionsTab.js`'s `setup` function and template.
+
+4.  **Edit Commission Milestones:** **[COMPLETED]**
+    *   **(UI - `CommissionsTab.js`)** Modify milestone display:
+        *   Use `BaseTextInput` for editable M1/M2/Advance amounts.
+        *   Use `BaseSelectMenu` for editable M1/M2/M3/Advance statuses (Pending/Paid).
+        *   Display `_Paid_Date` (read-only, formatted). Do *not* display `_Release_Date`.
+        *   Keep M3 amount display read-only (calculated).
+    *   **(State - `CommissionsTab.js`)** Manage editable milestone data locally (`ref`). Track changes (`isMilestonesChanged` ref).
+    *   **(Action - `commissionsStore`)** Add 'Save Milestones' button visible when changed. On click, call new action `commissionsStore.updateProjectMilestones`:
+        *   Args: `projectId`, `updatedMilestonesData`, `originalMilestonesData` (for logging).
+        *   API: `ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, payload)`. Map local state to constants (`FIELD_PROJECT_M1_AMOUNT`, etc.). Auto-set `_Paid_Date`.
+        *   Handle loading, notifications.
+        *   **Activity Log:** Log specific changes (e.g., "Updated M1 Amount to $X", "Updated M2 Status to Paid").
+        *   Handle errors (log to Zoho).
+        *   Refresh `modalStore.refreshModalData` on success.
+
+5.  **Select Active Commission Rate:** **[COMPLETED]**
+    *   **(UI - `CommissionsTab.js`)** Replace static rate display with `BaseSelectMenu`. Options: "Regular Commission Rate", "Commercial Commission Rate", "Shared Commission Rate". Manage selection locally (`ref`). Show 'Save Rate' button (`BaseButton`) when changed. Display rate percentage (%) next to dropdown from `lookupsStore` data (based on assigned rep). Warn if rate is 0/null.
+    *   **(Action - `commissionsStore`)** On save, call new action `commissionsStore.updateProjectActiveRate`:
+        *   Args: `projectId`, `newRateType` string, `oldRateType` string (for logging).
+        *   API: `ZohoAPIService.updateRecordById(REPORT_PROJECTS, projectId, { data: { [FIELD_PROJECT_ACTIVE_COMMISSION_RATE]: newRateType } })`.
+        *   Handle loading, notifications.
+        *   **Activity Log:** Log change (e.g., "Changed Active Commission Rate from '[Old Type]' to '[New Type]'").
+        *   Handle errors (log to Zoho).
+        *   Refresh `modalStore.refreshModalData` on success.
+
+6.  **Calculate M3 Amount:** **[COMPLETED]**
+    *   **(Logic - `CommissionsTab.js`)** Implement computed property using Composition API. Calculate based on `project.kW_STC`, selected `activeCommissionRate` value (from assigned rep in `lookupsStore`), and *paid* amounts of M1, M2, Advance. Display using this computed prop.
+
+7.  **Commission Notes Section (`CommissionNotesSection.js`):** **[COMPLETED]**
+    *   Create `app/components/modal/tabs/commissions/CommissionNotesSection.js` using **Composition API (`setup`)** and `BaseListContainer`.
+    *   **(Display)** Filter `project.Notes` locally by `note.Context === 'Commissions'`. Sort chronologically. Use `BaseAvatar`/helpers. (No replies/tagging display needed).
+    *   **(Add Note)** Use `BaseTextArea` and `BaseButton`. Manage input locally (`ref`).
+    *   **(Action)** On submit, call `notesStore.addNewNote` passing `projectId`, input, `context: "Commissions"`, user details. (No attachments/tagging needed for this context).
+    *   **(Integration - `CommissionsTab.js`)** Add `<commission-notes-section>` component, pass props (`project`, `currentUser`).
+
+8.  **Refinement & Styling:** **[COMPLETED]**
+    *   Ensure consistent use of base components, styling, loading states, disabled states, and error notifications (`uiStore`).
+    *   Verify all API field names using constants.
+    *   Adhere strictly to **Composition API** for all new/refactored files related to this feature.
+    *   Consider breaking down `CommissionsTab.js` further (e.g., `MilestoneItem.vue`) if complexity grows beyond ~400 lines.
+
+## Development Notes
+
+*   **2024-05-17:** Refactored `CommissionsTab.js` to use Composition API. 
+*   **2024-05-17:** Implemented Step 2: Change Assigned Sales Rep functionality in `CommissionsTab.js` and added `updateProjectSalesRep` action to `projectsStore.js`.
+*   **2024-05-17:** Updated Step 3: Changed approach from modal (`SalesRepForm.js`) to inline editing within `CommissionsTab.js`. Implemented inline Sales Rep detail editing.
+*   **2024-05-17:** Completed Step 4: Implemented Milestone editing UI in `CommissionsTab.js` and update logic in `commissionsStore.js`.
+*   **2024-05-17:** Starting Step 5: Implement Active Commission Rate selection.
+*   **2024-05-17:** Completed Step 5: Implemented Active Commission Rate selection UI and save logic in `CommissionsTab.js`.
+*   **2024-05-17:** Completed Step 6: M3 calculation logic verified within `CommissionsTab.js` computed property.
+*   **2024-05-17:** Starting Step 7: Create `CommissionNotesSection.js`.
+*   **2024-05-17:** Completed Step 7: Created `CommissionNotesSection.js` and integrated into `CommissionsTab.js`.
+*   **2024-05-17:** Completed Step 8: Refinement checks performed on Commissions Tab implementation.
+*   **2024-05-17 (Refinement):** Corrected data processing for `Active_Commission_Rate` in `processors.js` to preserve string value.
+*   **2024-05-17 (Refinement):** Updated `lookupsStore.salesRepsForFilter` getter to use `rep.id` as value for correct default selection in `CommissionsTab` dropdown.
+*   **2024-05-17 (Refinement):** Renamed `salesRepsForFilter` to `salesRepsForAssignmentFilter` and created `salesRepsForToolbarFilter` (using name as value) in `lookupsStore` to fix toolbar filtering. Updated `CommissionsTab` and `KanbanToolbar` to use the correct getters.
+*   **2024-05-17 (Refinement):** Updated `DataProcessors.processSalesRepsData` to map all required fields (rates, contact info, etc.) fixing inline edit form pre-population. 
+*   **2024-05-17 (Refinement):** Modified `commissionsStore.updateSalesRepDetails` to return `true` instead of `response.data` to prevent potential `DataCloneError`.
+*   **2024-05-17 (Refinement):** Reverted `commissionsStore.updateSalesRepDetails` to return `response.data` as requested by user.
+*   **2024-05-17 (Refinement):** Simplified `CommissionsTab.js` logic (`selectedRateValue`, `calculatedM3Amount`, `startEditingRepDetails`, template display) to use Sales Rep rates directly from `project` prop following backend data change. 
+*   **2024-05-17 (Refinement):** Corrected `startEditingRepDetails` in `CommissionsTab.js` to use correct flattened field names (`Name.first_name`, `Name.last_name`) for pre-populating inline edit form. 
+*   **2024-05-17 (Refinement):** Corrected read-only rate display in `CommissionsTab.js` template to use direct project prop fields. 

@@ -1,0 +1,154 @@
+# Product Requirements Document: Project Table View Widget
+
+## 1. Introduction & Goal
+
+This document outlines the requirements for creating a table-based view as an alternative or replacement for the existing Kanban board view within the NexGen Portal widget. The goal is to provide users with a dense, sortable, and filterable interface for managing and reviewing projects, leveraging the same underlying data and actions available in the Kanban view.
+
+## 2. Target Users
+
+*   Project Managers
+*   Admin Staff
+*   Sales Representatives (potentially with filtered views)
+*   Executives
+
+## 3. Core Requirements
+
+### 3.1. Data Display: Table Columns
+
+The table should display project data in configurable columns. Default visible columns should provide essential information at a glance, while other relevant data should be available for users to show/hide.
+
+**Default Visible Columns (Initial Proposal):**
+
+1.  **Owner Name:**
+    *   Data Source: `project.Owner_Name_Display`
+    *   Display: Text. Clickable link/area to open `ProjectDetailModal`.
+    *   Sortable: Yes (Alphabetical)
+2.  **Address:**
+    *   Data Source: `project.address` (formatted: `addressLine1, city, state`)
+    *   Display: Text. Truncated if necessary, full address on tooltip/hover.
+    *   Sortable: Yes (Alphabetical based on `addressLine1` or full string)
+3.  **Stage:**
+    *   Data Source: `project.New_Stage.title`
+    *   Display: Text or Badge with color coding (optional, based on stage type?).
+    *   Sortable: Yes (Alphabetical or by Stage Order)
+4.  **System Size (kW):**
+    *   Data Source: `project.kW_STC`
+    *   Display: Formatted number (e.g., "4.80 kW"). Badge indicating approval status (`project.Is_Approved`).
+    *   Sortable: Yes (Numeric)
+5.  **Date Sold:**
+    *   Data Source: `project.Date_Sold`
+    *   Display: Formatted Date (e.g., MM/DD/YY). "N/A" if empty.
+    *   Sortable: Yes (Chronological)
+6.  **Install Date:**
+    *   Data Source: `project.Installation_Date_Time`
+    *   Display: Formatted Date (e.g., MM/DD/YY). "N/A" if empty.
+    *   Sortable: Yes (Chronological)
+7.  **Sales Rep:**
+    *   Data Source: `project.Sales_Rep_Name`
+    *   Display: Text. "Unassigned" if empty.
+    *   Sortable: Yes (Alphabetical)
+8.  **Tags:**
+    *   Data Source: `project.Tags` (array of lookups)
+    *   Display: Multiple small colored badges (similar to BaseBadge). Tooltips for full tag names/categories. Display limited number (e.g., 3) with indicator for more (+2).
+    *   Sortable: No (Filtering preferred)
+9.  **Status Indicators:**
+    *   Display: Icons with tooltips.
+    *   Indicators:
+        *   Need Help (`project.Need_Help`): Red help icon.
+        *   Work Required (`project.Tree_Work_Required`, `project.Roof_Work_Required`, `project.Panel_Upgrade_Required`): Icons for Tree, Roof, PU. Color-coded based on status (e.g., Red=Required, Gray=Complete).
+        *   Permit (`project.Permit_Status`): Y/N badge based on approval status.
+        *   Interconnect (`project.Interconnection_Status`): Y/N badge based on approval status.
+        *   Cash Deal (`project.Is_Cash_Finance`): Dollar sign icon.
+        *   Duplicate (`projectsStore.isPossibleDuplicate`): Yellow warning icon.
+    *   Sortable: No (Filtering preferred)
+10. **Actions:**
+    *   Display: Icon buttons (visible on hover? Or always visible? TBD).
+    *   Actions:
+        *   View Details (Opens `ProjectDetailModal` - may be redundant if row is clickable).
+        *   Call (`project.Owner_Phone` - if available).
+        *   Email (`project.Owner_Email` - if available).
+
+**Potentially Hidden/Configurable Columns:**
+
+*   Project ID (`project.ID`)
+*   OpenSolar ID (`project.OpenSolar_Project_ID`)
+*   Owner Phone (`project.Owner_Phone` - formatted)
+*   Owner Email (`project.Owner_Email`)
+*   Tranche (`project.Tranche.zc_display_value`)
+*   Sales Org (`project.Sales_Org_Name`)
+*   Project Type (`project.Commercial` - COM/RES Badge)
+*   Yield (`project.Yield` - Formatted, colored badge)
+*   Date Added (`project.Added_Time`)
+*   Last Modified (`project.Modified_Time`)
+*   Roof Type (`project.Roof_Type`)
+*   Address Components (Separate columns for Line 1, City, State, Zip)
+
+### 3.2. Sorting
+
+*   Users must be able to sort the table by clicking on the header of sortable columns.
+*   Clicking a header sorts ascending; clicking again sorts descending.
+*   A visual indicator (e.g., arrow icon) must show the currently sorted column and direction.
+*   Default Sort: Date Added (Descending) or Owner Name (Ascending) - TBD.
+*   Sorting should apply to the *entire* filtered dataset, not just the current page.
+
+### 3.3. Filtering
+
+*   The filtering mechanism should mirror the functionality of the existing `KanbanToolbar`.
+*   **Global Search:** A search bar filtering across Owner Name, Address fields, Project ID, OpenSolar ID, Sales Rep Name.
+*   **Specific Filters:**
+    *   Stage (Multi-select? Single select? TBD - Multi-select preferred)
+    *   Sales Rep (Multi-select)
+    *   Sales Org (Multi-select)
+    *   Tags (Multi-select)
+    *   Project Type (Commercial/Residential - Multi-select)
+    *   Tranche (Multi-select, include 'Unassigned')
+    *   Work Required (Tree/Roof/Panel - Multi-select toggle buttons)
+    *   Need Help (Toggle Button - Show only 'Need Help')
+    *   Cash Deal (Toggle Button - Show only 'Cash Deals')
+    *   Duplicates (Toggle Button - Show only potential duplicates)
+*   **Demo Mode Toggle:** A toggle to show *only* projects where `Is_Demo` is true, overriding other filters (or applied in conjunction? TBD - Current Kanban applies *instead* of other filters).
+*   Filters should be clearly indicated and easily clearable (individual clear buttons and a 'Reset All' button).
+*   Filtering should apply to the *entire* dataset.
+
+### 3.4. Pagination
+
+*   The table must implement pagination to handle large numbers of projects efficiently.
+*   Controls Needed:
+    *   Rows per page selector (e.g., 25, 50, 100, All - careful with 'All'). Default: 50.
+    *   Previous/Next page buttons.
+    *   Display of current page and total pages (e.g., "Page 3 of 15").
+    *   Display of total filtered record count (e.g., "Showing 101-150 of 734 projects").
+
+### 3.5. Actions
+
+*   **View Project Details:** Clicking on a project row (or a designated link/button within the row) must open the existing `ProjectDetailModal` for that project.
+*   **Quick Actions (Row Level):** Provide icons for 'Call' and 'Email' based on contact info availability, triggering the same actions as the Kanban card.
+
+### 3.6. View Modes/Toggles
+
+*   **Demo Data Toggle:** Replicate the 'Show Demos Only' functionality from the Kanban toolbar.
+*   **Duplicate Filter Toggle:** Replicate the 'Show Duplicates Only' functionality.
+
+## 4. Data Model
+
+*   The table view will consume data primarily from the `projectsStore`.
+*   It should utilize the `filteredSortedProjects` getter to display data according to the applied filters and sort order.
+*   Data processing logic from `DataProcessors.processProjectsData` will be the source for column data.
+*   Lookup data for filters (Tags, Sales Reps, etc.) will come from `lookupsStore`.
+
+## 5. UI/UX Considerations
+
+*   **Responsiveness:** The table should be usable on various screen sizes, potentially hiding less critical columns on smaller screens or introducing horizontal scrolling.
+*   **Readability:** Ensure sufficient padding, clear typography, and appropriate visual hierarchy.
+*   **Performance:** Table rendering, sorting, and filtering should feel responsive, especially with large datasets. Virtual scrolling could be considered if performance becomes an issue with hundreds/thousands of rows displayed simultaneously.
+*   **Loading/Empty/Error States:** Clear visual states should indicate when data is loading, when no projects match the filters, or when an error occurs during data fetching.
+*   **Tooltips:** Use tooltips extensively for truncated text, icons, and badges to provide full context.
+*   **Visual Consistency:** Maintain the overall visual style (colors, fonts, button styles) of the NexGen Portal.
+
+## 6. Future Considerations
+
+*   **Column Configuration:** Allow users to show/hide and reorder columns, persisting their preferences (e.g., in localStorage).
+*   **Inline Editing:** Ability to edit certain fields directly within the table (e.g., Need Help flag, Stage via dropdown) - Requires careful consideration of UX and backend updates.
+*   **Bulk Actions:** Allow users to select multiple rows and perform actions (e.g., Bulk Stage Change, Add Tag to Multiple).
+*   **Saved Views/Filters:** Allow users to save and load common filter/sort/column configurations.
+*   **Export Data:** Provide functionality to export the currently filtered table data (e.g., to CSV). 

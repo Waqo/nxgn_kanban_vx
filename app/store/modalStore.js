@@ -4,6 +4,7 @@ import { useProjectsStore } from './projectsStore.js'; // Import projects store
 import { logActivity } from '../services/activityLogService.js';
 import { useUiStore } from './uiStore.js';
 import { logErrorToZoho } from '../services/errorLogService.js';
+import { IS_DEVELOPMENT } from '../config/constants.js';
 
 // Access Pinia global
 const { defineStore } = Pinia;
@@ -114,12 +115,36 @@ export const useModalStore = defineStore('modal', {
        // console.log('Modal Store (Pinia): Processed projectData for modal:', processedData);
         this._setProjectData(processedData);
         this._setError(null);
+
+        // --- ADD Info Log for Modal Open (Development Only) --- 
+        if (IS_DEVELOPMENT && processedData) {
+          // Import logInfoToZoho if not already imported at the top
+          const { logInfoToZoho } = await import('../services/errorLogService.js');
+          
+          // Construct address string for details
+          const addr = processedData.Site_Address;
+          const addressString = addr 
+              ? [addr.address_line_1, addr.district_city, addr.state_province, addr.postal_code].filter(Boolean).join(', ') 
+              : 'Address unavailable';
+          
+          logInfoToZoho('Project detail modal opened.', { 
+              source: 'openModal', 
+              widgetName: 'Kanban Widget',
+              projectId: projectId,
+              details: `Address: ${addressString}`
+          });
+        } else if (IS_DEVELOPMENT) {
+             console.warn("[modalStore] Could not log modal open because processedData was null after fetch.");
+        }
+        // --- End Info Log --- 
+
       } catch (error) {
         console.error("Modal Store (Pinia): Error fetching project details:", error);
         logErrorToZoho(error, { 
           operation: 'openModal/fetchProjectDetails',
           projectId: projectId,
-          details: 'Failed to fetch project details when opening modal.'
+          details: 'Failed to fetch project details when opening modal.',
+          widgetName: "Kanban Widget"
         });
         this._setError(error.message || 'Failed to load project details.');
         this._setProjectData(null);
@@ -157,7 +182,8 @@ export const useModalStore = defineStore('modal', {
             logErrorToZoho(error, { 
               operation: 'refreshModalData',
               projectId: this.currentProjectId, // Use state for current ID
-              details: 'Failed to refresh project details in modal.'
+              details: 'Failed to refresh project details in modal.',
+              widgetName: "Kanban Widget"
             });
             this._setError(error.message || 'Failed to refresh project details.');
             // Optionally add error notification *here* instead of just setting state?

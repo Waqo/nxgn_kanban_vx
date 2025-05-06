@@ -46,7 +46,7 @@ export default {
           return [
               'inline-flex items-center justify-center overflow-hidden rounded-full',
               sizeClasses.value,
-              props.bgColorClass
+              props.bgColorClass,
           ].join(' ');
       });
 
@@ -56,8 +56,8 @@ export default {
       };
   },
   template: `
-    <span :class="containerClasses">
+    <span :class="containerClasses" title="BaseAvatar Element">
         <span class="font-medium leading-none text-white">{{ initialsDisplay }}</span>
     </span>
   `
-}; 
+};

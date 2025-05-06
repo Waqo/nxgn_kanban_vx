@@ -1,0 +1,72 @@
+## Initial Load (Init Record + Projects)
+- API: `ZohoAPIService.getRecordById(REPORT_KANBAN_INIT, ...)`
+- API: `ZohoAPIService.getRecords(REPORT_PROJECTS, ...)`
+- Processor: `initService.initializeApp()` calls store actions
+- Processor: `lookupsStore.fetchCoreLookups()` calls `DataProcessors`
+- Processor: `projectsStore.fetchInitialProjects()` calls `DataProcessors.processProjectsData`
+- Store: `lookupsStore.stages`, `.tags`, `.users`, etc.
+- Store: `projectsStore.projectList`
+- Component: `KanbanBoard.js` -> `KanbanColumn.js` -> `KanbanCard.js`
+
+## Fetch Current User
+- API: `ZohoAPIService.getInitParams()` (to get email)
+- Processor: `userStore.fetchCurrentUser()` (uses `lookupsStore.users`)
+- Store: `userStore.currentUser`
+- Component: `WidgetView.js`, `DevToolbar.js`, `UserProfileMenu.js`, etc.
+
+## Fetch Project Details (Modal)
+- API: `ZohoAPIService.getRecordById(REPORT_PROJECT_DETAILS, ...)`
+- API: `ZohoAPIService.getRecords(REPORT_CONTACTS, ...)`
+- Processor: `projectsStore.fetchProjectDetails()` calls `DataProcessors.processProjectDetailsData`
+- Store: `modalStore.projectData`
+- Component: `ProjectDetailModal.js` -> Tab Components (`OverviewTab.js`, `ContactsTab.js`, etc.)
+
+## Update Project Stage/Tranche (Drag & Drop)
+- API: `ZohoAPIService.updateRecordById(REPORT_PROJECTS, ...)`
+- Processor: `projectsStore.updateProjectStage()` / `updateProjectTranche()`
+- Store: `projectsStore.projectList` (optimistic update)
+- Component: `KanbanBoard.js` (initiates)
+
+## Add Note (Modal)
+- API: `ZohoAPIService.addRecord(FORM_NOTES, ...)`
+- API: (Attachment Upload: `addRecord`, `uploadFile`, `updateRecordById`)
+- Processor: `notesStore.addNewNote()`
+- Store: Refreshes `modalStore.projectData` via `modalStore.refreshModalData()`
+- Component: `OverviewTab.js`
+
+## Add Issue (Modal)
+- API: `ZohoAPIService.addRecord(FORM_ISSUES, ...)`
+- Processor: `projectsStore.addProjectIssue()`
+- Store: Refreshes `modalStore.projectData` via `modalStore.refreshModalData()`
+- Component: `OverviewTab.js`
+
+## Fetch Notifications (Polling)
+- API: `ZohoAPIService.getRecordCount(REPORT_NOTIFICATIONS, ...)`
+- API: `ZohoAPIService.getRecords(REPORT_NOTIFICATIONS, ...)`
+- Processor: `notificationsStore.fetchNotifications()`
+- Store: `notificationsStore.notifications`, `uiStore.newAlerts`
+- Component: `NotificationBell.js`, `NotificationDropdown.js`, `NewNotificationAlert.js`
+
+## Mark Notification Read
+- API: `ZohoAPIService.updateRecordById(REPORT_NOTIFICATIONS, ...)` / `updateRecords(...)`
+- Processor: `notificationsStore.markAsRead()` / `markAllAsRead()`
+- Store: `notificationsStore.notifications` (optimistic update)
+- Component: `NotificationDropdown.js`
+
+## Fetch Filter Lookups (On Demand)
+- API: `ZohoAPIService.getRecords(REPORT_TAGS/REPS/ORGS, ...)`
+- Processor: `lookupsStore.fetchTags()` / `fetchSalesReps()` / `fetchSalesOrgs()`
+- Store: `lookupsStore.tags`, `.salesReps`, `.salesOrgs`
+- Component: `KanbanToolbar.js` (triggers fetch)
+
+## Log Error/Info
+- API: `ZohoAPIService.addRecord(FORM_LOGS, ...)`
+- Processor: `errorLogService.logErrorToZoho()` / `logInfoToZoho()`
+- Store: N/A (Fire and forget)
+- Component: Called from various stores (`projectsStore`, `modalStore`, etc.) and services (`initService`).
+
+## Log Activity
+- API: `ZohoAPIService.addRecord(FORM_ACTIVITIES, ...)`
+- Processor: `activityLogService.logActivity()`
+- Store: N/A (Fire and forget)
+- Component: Called from various store actions (`projectsStore`, `notesStore`, etc.).

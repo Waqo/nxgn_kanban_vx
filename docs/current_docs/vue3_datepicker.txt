@@ -1,0 +1,1723 @@
+Browser
+Register and use component in the .html file
+
+Note
+
+Keep in mind that when you use unpkg to import the component, global component name will be VueDatePicker
+When you add a component inside html page, make sure to add it with - like <vue-date-picker>
+Add JavaScript files
+
+
+<script src="https://unpkg.com/vue@latest"></script>
+<script src="https://unpkg.com/@vuepic/vue-datepicker@latest"></script>
+Add CSS file
+
+
+<link rel="stylesheet" href="https://unpkg.com/@vuepic/vue-datepicker@latest/dist/main.css">
+Register and use the component
+
+
+<script>
+    const app = Vue.createApp({
+        components: { VueDatePicker },
+    }).mount("#app");
+</script>
+Add it on html page
+
+
+<vue-date-picker></vue-date-picker>
+
+Modes
+Set the default mode for the datepicker
+
+Info
+
+When checking the examples, for boolean prop types, the example will show the behavior opposite of what is set for the default value
+If you use the component in the browser <script> tag, make sure to pass multi-word props with -, for example, multiCalendars as multi-calendars and so on
+Info
+
+Depending on the mode, v-model might be different, so make sure to use the proper configuration
+
+range
+Range picker mode
+
+Type: boolean | RangeConfig
+Default: false
+Info
+
+If the RangeConfig object is provided, range is auto enabled.
+
+For more info about range configuration properties, please refer to range configuration section
+
+05/02/2025, 20:50 - 05/09/2025, 20:50
+
+<template>
+    <VueDatePicker v-model="date" range />
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+
+const date = ref();
+
+// For demo purposes assign range from the current date
+onMounted(() => {
+  const startDate = new Date();
+  const endDate = new Date(new Date().setDate(startDate.getDate() + 7));
+  date.value = [startDate, endDate];
+})
+</script>
+multi-calendars
+Enabling this prop will show multiple calendars side by side (on mobile devices, they will be in a column layout) for range picker. You can also pass a number to show more calendars. If you pass true, 2 calendars will be shown automatically.
+
+Info
+
+If the MultiCalendarsOptions object is provided, multi-calendars are auto enabled. For more info take a look at multi-calendars configuration section.
+
+This mode is not supported with year-picker and time-picker
+
+Type: boolean | number | string | MultiCalendarsOptions
+Default: false
+05/02/2025, 20:50 - 05/09/2025, 20:50
+
+<template>
+    <VueDatePicker v-model="date" range multi-calendars />
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+
+const date = ref();
+
+onMounted(() => {
+  const startDate = new Date();
+  const endDate = new Date(new Date().setDate(startDate.getDate() + 7));
+  date.value = [startDate, endDate];
+})
+</script>
+month-picker
+Change datepicker mode to select only month and year
+
+Type: boolean
+Default: false
+05/2025
+
+<template>
+    <VueDatePicker v-model="month" month-picker />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const month = ref({
+  month: new Date().getMonth(),
+  year: new Date().getFullYear()
+});
+</script>
+time-picker
+Change datepicker mode to select only time
+
+Type: boolean
+Default: false
+20:50
+
+<template>
+    <VueDatePicker v-model="time" time-picker />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const time = ref({
+  hours: new Date().getHours(),
+  minutes: new Date().getMinutes()
+});
+</script>
+year-picker
+Change datepicker mode to select only year
+
+Type: boolean
+Default: false
+2025
+
+<template>
+    <VueDatePicker v-model="year" year-picker />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const year = ref(new Date().getFullYear());
+</script>
+week-picker
+Select a specific week range
+
+Type: boolean
+Default: false
+
+<template>
+    <VueDatePicker v-model="date" week-picker />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+</script>
+quarter-picker
+Change datepicker mode to select a quarter
+
+Warning
+
+When working with the quarter-picker, you will receive date(s) in the v-model. Each date will be the first date of the quarter. When using validation for min or max dates, disabled dates and so on, use a first date of the targeted quarter
+
+Info
+
+By default, quarter item displays first and last month of the quarter, to change locale of the displayed value, you can use format-locale prop or custom quarter slot
+
+Type: boolean
+Default: false
+Q2/2025
+
+<template>
+  <VueDatePicker v-model="quarter" quarter-picker />
+</template>
+
+<script setup>
+  import {ref} from 'vue';
+  import { startOfQuarter } from "date-fns";
+
+  const quarter = ref(startOfQuarter(new Date()));
+</script>
+text-input
+When enabled, will try to parse the date from the user input.
+
+Info
+
+Text input works with all picker modes.
+
+If the TextInputOptions object is provided, text-input is auto enabled. For more info take a look at text-input configuration section.
+
+Type: boolean | TextInputOptions
+Default: false
+05/02/2025, 20:50
+
+<template>
+    <VueDatePicker v-model="date" placeholder="Start Typing ..." text-input />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+</script>
+inline
+Removes the input field and places the calendar in your parent component
+
+Info
+
+Text input works with all picker modes.
+
+If the InlineOptions object is provided, inline is auto enabled. For more info take a look at inline configuration section.
+
+Type: boolean | InlineOptions
+Default: false
+
+<template>
+    <VueDatePicker v-model="date" inline auto-apply />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref(new Date());
+</script>
+multi-dates
+Allow selecting multiple single dates. When changing time, the latest selected date is affected. To deselect the date, click on the selected value
+
+Type: boolean | MultiDatesConfig
+Default: false
+Info
+
+When configuration object is provided, prop is auto enabled
+For additional multi-dates configuration properties, please refer to multi-dates configuration section
+
+<template>
+    <VueDatePicker v-model="date" multi-dates />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+</script>
+flow
+Define the selecting order. Position in the array will specify the execution step. When you overwrite the execution step, the flow is reset
+
+Type: ('month' | 'year' | 'calendar' | 'time' | 'minutes' | 'hours' | 'seconds')[]
+Default: []
+Info
+
+flow is not supported with multi-calendars mode
+
+
+<template>
+    <VueDatePicker v-model="date" :flow="flow"  />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+const flow = ref(['month', 'year', 'calendar']);
+</script>
+utc
+Output date(s) will be in UTC timezone string. You can use this if you gather dates from different timezones and want to send the date directly to the server
+
+Type: boolean | 'preserve'
+Default: false
+Info
+
+preserve - The input date will be the same, meaning, that it will not convert the date in the local timezone, but preserve the original UTC time.
+true - The input date will be converted to the local timezone. Output date will be in the UTC format. Meaning that what is the actual v-model and what is displayed in the picker will be in the timezone difference.
+
+<template>
+    <VueDatePicker v-model="date" utc />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+</script>
+vertical
+Sets the datepicker orientation in the vertical mode. This mode will change the arrow action from left/right to the top/bottom, transitions will also be vertical
+
+Type: boolean
+Default: false
+05/02/2025, 20:50
+
+<template>
+    <VueDatePicker v-model="date" vertical />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref(new Date());
+</script>
+model-auto
+Automatically switch between range and single picker modes
+
+Type: Boolean
+Default: false
+Note
+
+Since this prop in the background uses a range.partialRange make sure that range prop is provided and keep range.partialRange to true
+
+This is only compatible with date pickers, specific modes are not supported
+
+timezone
+Display the dates in a given timezone. Datepicker always work in the clients timezone, but when the timezone prop is provided, the Date object will adjust offset in the hours, remaining in the client timezone.
+
+Info
+
+Providing props that rely on the Date object such as min-date, max-date, disabled-dates and so on, will be converted to a provided timezone.
+
+For more info about timezone configuration properties, please refer to timezone configuration section
+
+Type: string | TimeZoneConfig
+Default: null
+Timezone: UTC
+Offset: 0
+
+
+<template>
+  <div class="tz-demo-wrap">
+    <div class="dp-container-wrap">
+      <VueDatePicker 
+        v-model="date" 
+        :dark="isDark" 
+        :timezone="tz" 
+        inline 
+        auto-apply
+        :max-date="maxDate"
+      />
+    </div>
+    <div class="tz-range-slider-wrap">
+      <div>
+        <span>Timezone: {{ activeTz.tz }}</span>
+        <br />
+        <span>Offset: {{ activeTz.offset > 0 ? `+${activeTz.offset}` : activeTz.offset }}</span>
+      </div>
+      <div>
+        <input class="tz-range-slider" type="range" v-model="selectedTz" min="0" max="22" />
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+  import { getMonth, getYear } from "date-fns";
+
+  const date = ref();
+  const selectedTz = ref(11);
+  
+  const timezone = ref({ timezone: undefined })
+
+  const maxDate = computed(() => {
+    const month = getMonth(new Date()) + 1 > 9 ? getMonth(new Date()) + 1 : `0${getMonth(new Date()) + 1}`;
+    return `${getYear(new Date())}-${month}-15T01:00:00Z`;
+  });
+
+  const timezones = [
+    { tz: 'Pacific/Midway', offset: -11 },
+    { tz: 'America/Adak', offset: -10 }, 
+    { tz: 'Pacific/Gambier', offset: -9 }, 
+    { tz: 'America/Los_Angeles', offset: -8 }, 
+    { tz: 'America/Denver', offset: -7 }, 
+    { tz: 'America/Chicago', offset: -6 }, 
+    { tz: 'America/New_York', offset: -5 }, 
+    { tz: 'America/Santiago', offset: -4 }, 
+    { tz: 'America/Sao_Paulo', offset: -3 }, 
+    { tz: 'America/Noronha', offset: -2 }, 
+    { tz: 'Atlantic/Cape_Verde', offset: -1 }, 
+    { tz: 'UTC', offset: 0 },
+    { tz: 'Europe/Brussels', offset: 1 }, 
+    { tz: 'Africa/Cairo', offset: 2 }, 
+    { tz: 'Europe/Minsk', offset: 3 }, 
+    { tz: 'Europe/Moscow', offset: 4 },
+    { tz: 'Asia/Tashkent', offset: 5 },
+    { tz: 'Asia/Dhaka', offset: 6 },
+    { tz: 'Asia/Novosibirsk', offset: 7 },
+    { tz: 'Australia/Perth', offset: 8 }, 
+    { tz: 'Asia/Tokyo', offset: 9 },
+    { tz: 'Australia/Hobart', offset: 10 },
+    { tz: 'Asia/Vladivostok', offset: 11 },
+  ];
+
+  const activeTz = computed(() => timezones[selectedTz.value]);
+
+  const tz = computed(() => {
+    return { ...timezone.value, timezone: activeTz.value.tz };
+  });
+</script>
+
+
+Modes configuration
+Props for configuring and extending the datepicker when using a specific mode
+
+Info
+
+If you use the component in the browser <script> tag, make sure to pass multi-word props with -, for example, textInput as text-input and so on
+range configuration
+Providing configuration object will automatically enable range picker
+
+
+interface RangeConfig {
+    noDisabledRange?: boolean;
+    showLastInRange?: boolean;
+    minMaxRawRange?: boolean;
+    partialRange?: boolean;
+    disableTimeRangeValidation?: boolean;
+    fixedStart?: boolean;
+    fixedEnd?: boolean;
+    maxRange?: string | number;
+    minRange?: string | number;
+    autoRange?: string | number;
+}
+autoRange
+Predefine range to select
+
+Default: false
+partialRange
+This option is enabled by default, meaning, two dates are not required for range input. If no second date is selected, the value will be null
+
+Default: true
+05/02/2025, 20:52 - 05/09/2025, 20:52
+
+<template>
+    <VueDatePicker v-model="date" :range="{ partialRange: false }" />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+</script>
+minRange
+Set minimal range available for selection. This is the number of days between the selected start and end date
+
+Default: undefined
+
+<template>
+    <VueDatePicker v-model="date" :range="{ minRange: 3 }" />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+</script>
+maxRange
+Set maximal range available for selection. This is the number of days between the selected start and end date
+
+Default: undefined
+
+<template>
+    <VueDatePicker v-model="date" :range="{ maxRange: 7 }" />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+</script>
+fixedStart
+Allows only adjustment of the second date in the defined range
+
+WARNING
+
+v-model must be provided with both dates.
+
+Should not be used in combination with fixedEnd
+
+Default: false
+05/02/2025, 20:52 - 05/09/2025, 20:52
+
+<template>
+    <VueDatePicker v-model="date" :range="{ fixedStart: true }" :clearable="false" />
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+
+const date = ref();
+
+// For demo purposes assign range from the current date
+onMounted(() => {
+  const startDate = new Date();
+  const endDate = new Date(new Date().setDate(startDate.getDate() + 7));
+  date.value = [startDate, endDate];
+})
+</script>
+fixedEnd
+Allows only adjustment of the first date in the defined range
+
+WARNING
+
+v-model must be provided with both dates.
+
+Should not be used in combination with fixedStart
+
+Default: false
+05/02/2025, 20:52 - 05/09/2025, 20:52
+
+<template>
+    <VueDatePicker v-model="date" :range="{ fixedEnd: true }" :clearable="false" />
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+
+const date = ref();
+
+// For demo purposes assign range from the current date
+onMounted(() => {
+  const startDate = new Date();
+  const endDate = new Date(new Date().setDate(startDate.getDate() + 7));
+  date.value = [startDate, endDate];
+})
+</script>
+showLastInRange
+By default, when the range is selected, calendar view will remain on the last selection, to return to the first selected date, disable this option
+
+Default: true
+05/02/2025, 20:52 - 05/09/2025, 20:52
+
+<template>
+  <VueDatePicker v-model="date" :range="{ showLastInRange: false }" />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+
+onMounted(() => {
+  const startDate = new Date();
+  const endDate = new Date(new Date().setDate(startDate.getDate() + 7));
+  date.value = [startDate, endDate];
+})
+</script>
+noDisabledRange
+Prevents range selection if the range includes disabled dates
+
+Default: false
+
+<template>
+    <VueDatePicker 
+        v-model="date" 
+        :range="{ noDisabledRange: true }"
+        :disabled-dates="disabledDates"
+    />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+import { addDays, subDays } from 'date-fns';
+
+const date = ref(new Date());
+
+const disabledDates = [subDays(new Date(), 1), new Date(), addDays(new Date(), 1)];
+</script>
+disableTimeRangeValidation
+Explicitly allow end time in range mode to be before the start time
+
+Default: false
+20:52 - 20:52
+minMaxRawRange
+When using disabled dates with minRange or mixRange, disabled dates are not calculated within, setting this option to true will validate all dates
+
+Default: false
+preset-dates
+When configured, it will provide a sidebar with configured range/date that user can select
+
+Info
+
+If the timezone prop is provided, values from preset dates will be converted to the provided timezone. If you don't want that, pass noTz: true to all presets
+testId (if provided) will add data-test attribute on the preset button
+Type: PresetDate[]
+Default: []
+
+import type { MaybeRefOrGetter } from "vue";
+
+interface PresetDate {
+  label: string;
+  value: MaybeRefOrGetter<Date[] | string[] | Date | string>;
+  style?: Record<string, string>;
+  slot?: string;
+  noTz?: boolean;
+  testId?: string;
+}
+
+<template>
+    <VueDatePicker v-model="date" range :preset-dates="presetDates">
+      <template #preset-date-range-button="{ label, value, presetDate }">
+        <span 
+            role="button"
+            :tabindex="0"
+            @click="presetDate(value)"
+            @keyup.enter.prevent="presetDate(value)"
+            @keyup.space.prevent="presetDate(value)">
+          {{ label }}
+        </span>
+      </template>
+    </VueDatePicker>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+import { endOfMonth, endOfYear, startOfMonth, startOfYear, subMonths } from 'date-fns';
+
+const date = ref();
+
+const presetDates = ref([
+  { label: 'Today', value: [new Date(), new Date()] },
+  {
+    label: 'Today (Slot)',
+    value: [new Date(), new Date()],
+    slot: 'preset-date-range-button'
+  },
+  { label: 'This month', value: [startOfMonth(new Date()), endOfMonth(new Date())] },
+  {
+    label: 'Last month',
+    value: [startOfMonth(subMonths(new Date(), 1)), endOfMonth(subMonths(new Date(), 1))],
+  },
+  { label: 'This year', value: [startOfYear(new Date()), endOfYear(new Date())] },
+]);
+</script>
+multi-calendars configuration
+multi-calendars prop can be extended with the configuration object, instead of passing a boolean or number values, you can provide an object. When the object is provided, prop will be auto enabled.
+
+Type:
+
+interface MultiCalendarsOptions {
+    solo?: boolean;
+    static?: boolean;
+    count?: string | number;
+}
+Default: { solo: false, static: true, count: 2 }
+solo
+When enabled, both calendars will be independent of each other
+
+05/02/2025, 20:52 - 05/09/2025, 20:52
+
+<template>
+    <VueDatePicker v-model="date" range :multi-calendars="{ solo: true }" />
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+
+const date = ref();
+
+onMounted(() => {
+  const startDate = new Date();
+  const endDate = new Date(new Date().setDate(startDate.getDate() + 7));
+  date.value = [startDate, endDate];
+})
+</script>
+static
+The default calendar view when using multi-calendars is to keep it on the month selected by the user. When this prop is disabled, it will auto-update the first calendar when the range starts and adjust the rest of them based on the first month
+
+05/02/2025, 20:52 - 05/09/2025, 20:52
+
+<template>
+    <VueDatePicker v-model="date" range :multi-calendars="{ static: false }" />
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+
+const date = ref();
+
+onMounted(() => {
+  const startDate = new Date();
+  const endDate = new Date(new Date().setDate(startDate.getDate() + 7));
+  date.value = [startDate, endDate];
+})
+</script>
+text-input configuration
+Configuration for text-input prop. When the configuration object is provided, text-input is auto enabled
+
+Type:
+
+interface TextInputOptions {
+    enterSubmit?: boolean;
+    tabSubmit?: boolean;
+    openMenu?: 'open' | 'toggle' | boolean;
+    rangeSeparator?: string;
+    selectOnFocus?: boolean;
+    format?: string | string[] | ((value: string) => Date | null);
+    escClose?: boolean;
+}
+Default: { enterSubmit: true, tabSubmit: true, openMenu: 'open', rangeSeparator: '-' }
+Properties explanation:
+
+enterSubmit: When enabled, pressing enter will select a date if the input value is a valid date object
+tabSubmit: When enabled, pressing tab will select a date if the input value is a valid date object
+openMenu: open value will keep the menu in the open state when the input field is clicked, toggle will toggle the menu, false disables menu from opening
+format: Override the default parsing format. Default is the string value from format. You can also pass multiple parser patterns or a custom parser function and parse the input yourself. When the input is focused, the date will be shown in this format.
+rangeSeparator: If you use range mode, the default separator is -, you can change it here
+selectOnFocus: Selects the input text when input is focused
+escClose: Closes calendar on esc key press
+05/02/2025, 20:52
+
+<template>
+    <VueDatePicker 
+      v-model="date"
+      placeholder="Start Typing ..."
+      :text-input="textInputOptions" />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+const textInputOptions = {
+  format: 'MM.dd.yyyy HH:mm'
+};
+</script>
+inline configuration
+Use input with the inline mode, useful if you enable text-input. When the configuration object is provided, inline prop is auto enabled
+
+Type:
+
+interface InlineOptions {
+    input?: boolean;
+}
+Default: { input: false }
+05/02/2025, 20:52
+
+<template>
+    <VueDatePicker v-model="date" :inline="{ input: true }" text-input auto-apply />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+</script>
+multi-dates configuration
+Configure additional behaviour for multi-dates mode
+
+
+interface MultiDatesConfig {
+    limit?: number | string;
+    dragSelect?: boolean;
+}
+limit
+Limit the number of dates to select
+
+Default: null
+
+<template>
+  <VueDatePicker v-model="date" :multi-dates="{ limit: 3 }" />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+</script>
+dragSelect
+Allows selecting multiple dates by dragging the mouse over the calendar cells
+
+Default: true
+
+<template>
+  <VueDatePicker v-model="date" :multi-dates="{ dragSelect: false }" />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+</script>
+partial-flow
+When combined with the auto-apply prop, it will set the date as soon as the date is selected without waiting for last flow step to execute
+
+Type: boolean
+Default: false
+
+<template>
+  <VueDatePicker v-model="date" auto-apply partial-flow :flow="['calendar', 'time']" />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+</script>
+timezone configuration
+Configure the timezone conversion behaviour for props that are providing the dates, such as min-date, max-date, disabled-dates and so on
+
+
+interface TimeZoneConfig {
+  timezone?: string;
+  exactMatch?: boolean;
+  dateInTz?: string;
+  emitTimezone?: string;
+  convertModel?: boolean;
+}
+timezone
+Same as timezone string prop type, define a timezone for the datepicker
+
+Default: undefined
+Timezone: UTC
+Offset: 0
+
+
+<template>
+  <div class="tz-demo-wrap">
+    <div class="dp-container-wrap">
+      <VueDatePicker
+        v-model="date"
+        :dark="isDark"
+        :timezone="tz"
+        inline
+        auto-apply
+        :max-date="maxDate"
+      />
+    </div>
+    <div class="tz-range-slider-wrap">
+      <div>
+        <span>Timezone: {{ activeTz.tz }}</span>
+        <br />
+        <span>Offset: {{ activeTz.offset > 0 ? `+${activeTz.offset}` : activeTz.offset }}</span>
+      </div>
+      <div>
+        <input class="tz-range-slider" type="range" v-model="selectedTz" min="0" max="22" />
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+  import { getMonth, getYear } from "date-fns";
+
+  const date = ref();
+  const selectedTz = ref(11);
+
+  const timezone = ref({ timezone: undefined })
+
+  const maxDate = computed(() => {
+    const month = getMonth(new Date()) + 1 > 9 ? getMonth(new Date()) + 1 : `0${getMonth(new Date()) + 1}`;
+    return `${getYear(new Date())}-${month}-15T01:00:00Z`;
+  });
+
+  const timezones = [
+    { tz: 'Pacific/Midway', offset: -11 },
+    { tz: 'America/Adak', offset: -10 },
+    { tz: 'Pacific/Gambier', offset: -9 },
+    { tz: 'America/Los_Angeles', offset: -8 },
+    { tz: 'America/Denver', offset: -7 },
+    { tz: 'America/Chicago', offset: -6 },
+    { tz: 'America/New_York', offset: -5 },
+    { tz: 'America/Santiago', offset: -4 },
+    { tz: 'America/Sao_Paulo', offset: -3 },
+    { tz: 'America/Noronha', offset: -2 },
+    { tz: 'Atlantic/Cape_Verde', offset: -1 },
+    { tz: 'UTC', offset: 0 },
+    { tz: 'Europe/Brussels', offset: 1 },
+    { tz: 'Africa/Cairo', offset: 2 },
+    { tz: 'Europe/Minsk', offset: 3 },
+    { tz: 'Europe/Moscow', offset: 4 },
+    { tz: 'Asia/Tashkent', offset: 5 },
+    { tz: 'Asia/Dhaka', offset: 6 },
+    { tz: 'Asia/Novosibirsk', offset: 7 },
+    { tz: 'Australia/Perth', offset: 8 },
+    { tz: 'Asia/Tokyo', offset: 9 },
+    { tz: 'Australia/Hobart', offset: 10 },
+    { tz: 'Asia/Vladivostok', offset: 11 },
+  ];
+
+  const activeTz = computed(() => timezones[selectedTz.value]);
+
+  const tz = computed(() => {
+    return { ...timezone.value, timezone: activeTz.value.tz };
+  });
+</script>
+exactMatch
+When enabled, it will not convert date to the given timezone. If you are providing the Date object, it will remain as is, while UTC string, will be converted to the local timezone
+
+Default: false
+Timezone: UTC
+Offset: 0
+
+
+<template>
+  <div class="tz-demo-wrap">
+    <div class="dp-container-wrap">
+      <VueDatePicker
+        v-model="date"
+        :dark="isDark"
+        :timezone="tz"
+        inline
+        auto-apply
+        :max-date="maxDate"
+      />
+    </div>
+    <div class="tz-range-slider-wrap">
+      <div>
+        <span>Timezone: {{ activeTz.tz }}</span>
+        <br />
+        <span>Offset: {{ activeTz.offset > 0 ? `+${activeTz.offset}` : activeTz.offset }}</span>
+      </div>
+      <div>
+        <input class="tz-range-slider" type="range" v-model="selectedTz" min="0" max="22" />
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+  const date = ref();
+  const selectedTz = ref(11);
+
+  const timezone = ref({ timezone: undefined, exactMatch: true })
+
+  /**
+   * Let's assume we are in the timezone GMT+1
+   * Provided timezone is UTC which is -1 hour from our local timezone
+   * By setting `exactMatch` property, our maxDate will remain as is
+   * If we set `exactMatch: false`, our maxDate will be new Date() -/+ offset
+   */
+  const maxDate = new Date();
+
+  const timezones = [
+    { tz: 'Pacific/Midway', offset: -11 },
+    { tz: 'America/Adak', offset: -10 },
+    { tz: 'Pacific/Gambier', offset: -9 },
+    { tz: 'America/Los_Angeles', offset: -8 },
+    { tz: 'America/Denver', offset: -7 },
+    { tz: 'America/Chicago', offset: -6 },
+    { tz: 'America/New_York', offset: -5 },
+    { tz: 'America/Santiago', offset: -4 },
+    { tz: 'America/Sao_Paulo', offset: -3 },
+    { tz: 'America/Noronha', offset: -2 },
+    { tz: 'Atlantic/Cape_Verde', offset: -1 },
+    { tz: 'UTC', offset: 0 },
+    { tz: 'Europe/Brussels', offset: 1 },
+    { tz: 'Africa/Cairo', offset: 2 },
+    { tz: 'Europe/Minsk', offset: 3 },
+    { tz: 'Europe/Moscow', offset: 4 },
+    { tz: 'Asia/Tashkent', offset: 5 },
+    { tz: 'Asia/Dhaka', offset: 6 },
+    { tz: 'Asia/Novosibirsk', offset: 7 },
+    { tz: 'Australia/Perth', offset: 8 },
+    { tz: 'Asia/Tokyo', offset: 9 },
+    { tz: 'Australia/Hobart', offset: 10 },
+    { tz: 'Asia/Vladivostok', offset: 11 },
+  ];
+
+  const activeTz = computed(() => timezones[selectedTz.value]);
+
+  const tz = computed(() => {
+    return { ...timezone.value, timezone: activeTz.value.tz };
+  });
+  
+</script>
+dateInTz
+This property is checked only if exactMatch is set to true, meaning that if you provide the date from some other timezone other than local, and want that date to be the same, you'll need to provide the original date timezone
+
+Default: undefined
+Timezone: UTC
+Offset: 0
+
+
+<template>
+  <div class="tz-demo-wrap">
+    <div class="dp-container-wrap">
+      <VueDatePicker
+        v-model="date"
+        :dark="isDark"
+        :timezone="tz"
+        inline
+        auto-apply
+        :max-date="maxDate"
+      />
+    </div>
+    <div class="tz-range-slider-wrap">
+      <div>
+        <span>Timezone: {{ activeTz.tz }}</span>
+        <br />
+        <span>Offset: {{ activeTz.offset > 0 ? `+${activeTz.offset}` : activeTz.offset }}</span>
+      </div>
+      <div>
+        <input class="tz-range-slider" type="range" v-model="selectedTz" min="0" max="22" />
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+  const date = ref();
+  const selectedTz = ref(11);
+
+  const timezone = ref({ timezone: undefined, exactMatch: true, dateInTz: 'UTC' })
+
+  /**
+   * Let's assume we are in the timezone GMT+1
+   * Provided timezone is UTC which is -1 hour from our local timezone
+   * By setting `exactMatch` property, we want to keep the date intact
+   * However, in this case, our `maxDate` is a UTC string, when parsed,
+   * will be automatically converted to a browser timezone
+   * To prevent this behaviour, we need to set `dateInTz`
+   * so that picker can adjust the timezone offset
+   */
+  const maxDate = computed(() => {
+    const month = getMonth(new Date()) + 1 > 9 ? getMonth(new Date()) + 1 : `0${getMonth(new Date()) + 1}`;
+    return `${getYear(new Date())}-${month}-15T01:00:00Z`;
+  });
+
+  const timezones = [
+    { tz: 'Pacific/Midway', offset: -11 },
+    { tz: 'America/Adak', offset: -10 },
+    { tz: 'Pacific/Gambier', offset: -9 },
+    { tz: 'America/Los_Angeles', offset: -8 },
+    { tz: 'America/Denver', offset: -7 },
+    { tz: 'America/Chicago', offset: -6 },
+    { tz: 'America/New_York', offset: -5 },
+    { tz: 'America/Santiago', offset: -4 },
+    { tz: 'America/Sao_Paulo', offset: -3 },
+    { tz: 'America/Noronha', offset: -2 },
+    { tz: 'Atlantic/Cape_Verde', offset: -1 },
+    { tz: 'UTC', offset: 0 },
+    { tz: 'Europe/Brussels', offset: 1 },
+    { tz: 'Africa/Cairo', offset: 2 },
+    { tz: 'Europe/Minsk', offset: 3 },
+    { tz: 'Europe/Moscow', offset: 4 },
+    { tz: 'Asia/Tashkent', offset: 5 },
+    { tz: 'Asia/Dhaka', offset: 6 },
+    { tz: 'Asia/Novosibirsk', offset: 7 },
+    { tz: 'Australia/Perth', offset: 8 },
+    { tz: 'Asia/Tokyo', offset: 9 },
+    { tz: 'Australia/Hobart', offset: 10 },
+    { tz: 'Asia/Vladivostok', offset: 11 },
+  ];
+
+  const activeTz = computed(() => timezones[selectedTz.value]);
+
+  const tz = computed(() => {
+    return { ...timezone.value, timezone: activeTz.value.tz };
+  });
+  
+</script>
+emitTimezone
+Enables the @update:model-timezone-value event that will dispatch a v-model value in a given timezone
+
+Default: undefined
+Timezone: UTC
+Offset: 0
+
+
+<template>
+  <div class="tz-demo-wrap">
+    <div class="dp-container-wrap">
+      <VueDatePicker
+        v-model="date"
+        :dark="isDark"
+        :timezone="tz"
+        inline
+        auto-apply
+        @update:model-timezone-value="setZonedDate"
+      />
+    </div>
+    <div class="tz-range-slider-wrap">
+      <div>
+        <span>Timezone: {{ activeTz.tz }}</span>
+        <br />
+        <span>Offset: {{ activeTz.offset > 0 ? `+${activeTz.offset}` : activeTz.offset }}</span>
+        <br>
+        <span v-if="zonedDate">Zoned date: {{zonedDate}}</span>
+      </div>
+      <div>
+        <input class="tz-range-slider" type="range" v-model="selectedTz" min="0" max="22" />
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+  const date = ref();
+  const selectedTz = ref(11);
+
+  const timezone = ref({ emitTimezone: undefined })
+  const zonedDate = ref();
+
+  const timezones = [
+    { tz: 'Pacific/Midway', offset: -11 },
+    { tz: 'America/Adak', offset: -10 },
+    { tz: 'Pacific/Gambier', offset: -9 },
+    { tz: 'America/Los_Angeles', offset: -8 },
+    { tz: 'America/Denver', offset: -7 },
+    { tz: 'America/Chicago', offset: -6 },
+    { tz: 'America/New_York', offset: -5 },
+    { tz: 'America/Santiago', offset: -4 },
+    { tz: 'America/Sao_Paulo', offset: -3 },
+    { tz: 'America/Noronha', offset: -2 },
+    { tz: 'Atlantic/Cape_Verde', offset: -1 },
+    { tz: 'UTC', offset: 0 },
+    { tz: 'Europe/Brussels', offset: 1 },
+    { tz: 'Africa/Cairo', offset: 2 },
+    { tz: 'Europe/Minsk', offset: 3 },
+    { tz: 'Europe/Moscow', offset: 4 },
+    { tz: 'Asia/Tashkent', offset: 5 },
+    { tz: 'Asia/Dhaka', offset: 6 },
+    { tz: 'Asia/Novosibirsk', offset: 7 },
+    { tz: 'Australia/Perth', offset: 8 },
+    { tz: 'Asia/Tokyo', offset: 9 },
+    { tz: 'Australia/Hobart', offset: 10 },
+    { tz: 'Asia/Vladivostok', offset: 11 },
+  ];
+
+  const activeTz = computed(() => timezones[selectedTz.value]);
+
+  const tz = computed(() => {
+    return { ...timezone.value, emitTimezone: activeTz.value.tz };
+  });
+  
+  const setZonedDate = (date) => {
+    zonedDate.value = date.toISOString();;
+  }
+</script>
+convertModel
+Used to explicitly enable or disable v-model value conversion in a given timezone
+
+Default: true
+05/02/2025, 20:52
+
+<template>
+    <VueDatePicker v-model="date" :timezone="{ convertModel: false, timezone: 'UTC' }" />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const date = ref();
+</script>
+
+
+General configuration
+General behavior props configuration
+
+Info
+
+When checking the examples, for boolean prop types, the example will show the behavior opposite of what is set for the default value
+If you use the component in the browser <script> tag, make sure to pass multi-word props with -, for example, monthChangeOnScroll as month-change-on-scroll and so on
+uid
+Pass an id to the input and menu elements. If provided, you can select menu id as dp-menu-${uid} and input id as dp-input-${uid}
+
+Type: string
+Default: null
+05/02/2025, 20:54
+month-change-on-scroll
+Scrolling the mouse wheel over the calendar will change the month. Scroll down for next month and vice versa
+
+You can also set the value to 'inverse', so that scrolling down will go to the previous month and up on the next
+
+Type: boolean | 'inverse'
+Default: true
+05/02/2025, 20:54
+model-value v-model
+v-model binding
+
+Type:
+Single picker: Date | string
+In case of multiDates it will be Date[] | string[]
+Month picker: { month: number | string; year: number | string }
+Time picker: { hours: number | string; minutes: number | string; seconds?: number | string }
+Week picker: [Date, Date] | [string, string]
+Range picker: [Date, Date] | [string | string]
+If you use time-picker, it will be { hours: number | string; minutes: number | string; seconds?: number | string }[]
+If you use month-picker, it will be { month: number | string; year: number | string }[]
+If you use week-picker, it will be [[Date, Date], [Date, Date]]
+Year picker: number | string
+Quarter picker: Same as single or range pickers
+Default: null
+model-type
+Specify a custom format for v-model
+
+Type: 'timestamp' | 'format' | string
+Default: null
+Note
+
+timestamp - uses timestamp for binding
+format - uses provided format or fallbacks to the default one. Must be a string
+iso - date that will be returned will be in iso string format
+string - use custom format by providing a custom pattern with unicode tokens
+This is only compatible with date pickers, time-picker and month-picker, other modes are not supported
+
+clearable
+Add a clear icon to the input field where you can set the value to null
+
+Type: boolean
+Default: true
+05/02/2025, 20:54
+always-clearable
+Keeps the clear icon even if there is no value in the calendar
+
+Type: boolean
+Default: false
+05/02/2025, 20:54
+auto-apply
+If set to true, clicking on a date value will automatically select the value
+
+Type: boolean
+Default: false
+Info
+
+When auto-apply is used in combination with flow, to select date if flow is broken, you need to set partial-flow prop to true
+
+05/02/2025, 20:54
+placeholder
+Input placeholder
+
+Type: string
+Default: null
+no-today
+Hide today mark from the calendar
+
+Type: boolean
+Default: false
+markers
+Add markers to the specified dates with (optional) tooltips. For color options, you can use any css valid color.
+
+Type: Markers[]
+Default: []
+
+interface Markers {
+    date: Date | string;
+    type?: 'dot' | 'line';
+    tooltip?: { text: string; color?: string;}[];
+    color?: string;
+    // el is a HTML element of a calendar cell
+    customPosition?: (el: HTMLElement) => Record<string, string | number>;
+}
+05/02/2025, 20:54
+highlight
+Specify highlighted dates
+
+Type: HighlightFn | Partial<Highlight>;
+Default: null
+
+interface Highlight {
+    dates: Date[];
+    years: number[];
+    months: { month: number; year: number }[];
+    quarters: { quarter: number; year: number }[];
+    weekdays: number[];
+    options: { highlightDisabled: boolean };
+}
+
+type HighlightFn = ((date: Date) => boolean)
+    | ((month: { month: number; year: number }) => boolean)
+    | ((yearOrWeekDay: number) => boolean)
+    | ((quarter: { quarter: number; year: number }) => boolean);
+05/02/2025, 20:54
+disabled
+Disables the input
+
+Type: boolean
+Default: false
+05/02/2025, 20:54
+readonly
+Sets the input in readonly state
+
+Type: boolean
+Default: false
+05/02/2025, 20:54
+required
+Add required flag to the input field. Use with form tag for built-in validation
+
+Type: boolean
+Default: false
+Submit form
+name
+Sets the input name attribute
+
+Type: string
+Default: null
+05/02/2025, 20:54
+autocomplete
+Sets the input autocomplete attribute
+
+Type: string
+Default: null
+05/02/2025, 20:54
+hide-navigation
+Hide navigation buttons from the overlays
+
+Type: ('month' | 'year' | 'calendar' | 'time' | 'minutes' | 'hours' | 'seconds')[]
+Default: []
+05/02/2025, 20:54
+action-row
+Control which buttons are shown in the action row
+
+Type: ActionRow
+Default: { showSelect: true, showCancel: true, showNow: false, showPreview: true }
+
+interface ActionRow {
+ showSelect?: boolean;
+ showCancel?: boolean;
+ showNow?: boolean;
+ showPreview?: boolean;
+}
+05/02/2025, 20:54
+disable-year-select
+Removes the year button from the menu and cycles trough the current or provided year
+
+05/02/2025, 20:54
+year-first
+Reverse button order in the calendar header
+
+Type: boolean
+Default: false
+05/02/2025, 20:54
+config
+General configuration for customizing specific date picker behaviour
+
+Type: Config
+
+interface Config {
+    allowStopPropagation?: boolean;
+    closeOnScroll?: boolean;
+    modeHeight?: number;
+    allowPreventDefault?: boolean;
+    closeOnClearValue?: boolean;
+    closeOnAutoApply?: boolean;
+    noSwipe?: boolean;
+    keepActionRow?: boolean;
+    onClickOutside?: (validate: () => boolean, evt: PointerEvent) => void;
+    tabOutClosesMenu?: boolean;
+    arrowLeft?: string;
+    keepViewOnOffsetClick?: boolean;
+    timeArrowHoldThreshold?: number;
+    shadowDom?: boolean;
+    mobileBreakpoint?: number;
+    setDateOnMenuClose?: boolean;
+}
+Default: config
+
+const config = {
+    allowStopPropagation: true,
+    closeOnScroll: false,
+    modeHeight: 255,
+    allowPreventDefault: false,
+    closeOnClearValue: true,
+    closeOnAutoApply: true,
+    noSwipe: false,
+    keepActionRow: false,
+    onClickOutside: undefined,
+    tabOutClosesMenu: true,
+    arrowLeft: undefined,
+    keepViewOnOffsetClick: false,
+    timeArrowHoldThreshold: 0,
+    shadowDom: false,
+    mobileBreakpoint: 600,
+    setDateOnMenuClose: false,
+}
+allowStopPropagation: Enable event.sportPropagation on click events
+closeOnScroll: Close datepicker menu on page scroll
+modeHeight: If you use month-picker, time-picker or year-picker, set custom height of the picker in px
+allowPreventDefault: Due to the different implementations of how click outside listeners are implemented, you might encounter issues where the menu closes if the picker is used in dialogs when teleport prop is enabled. To prevent this issue, you need to set this option to true
+closeOnClearValue: Prevent closing the menu on value clear from the input field
+closeOnAutoApply: If set to false, clicking on a date value will automatically select the value but will not close the datepicker menu. Closing will be available on a click-away or clicking on the input again
+noSwipe: Disable touch events on the calendar
+keepActionRow: When enabled, it will keep the action row even if the auto-apply prop is enabled
+onClickOutside: Provide custom click outside handler. Exposed validation function that will return true or false depending on the selected value and pointer event
+tabOutClosesMenu: When tabbing out of the picker menu it will close the picker menu (not compatible when using teleport)
+arrowLeft: Overrides default arrow position from left side of the menu. To keep it always in the center, set it to 50%. Accepts valid CSS value
+keepViewOnOffsetClick: When enabled, clicking on the offset date will not change the month that is currently in the view
+timeArrowHoldThreshold: When provided with a value > 0, clicking and holding the arrow button in the time-picker will increment/decrement the value. This value represents the setTimeout value, meaning the larger the number, the change will be slower.0 disables the hold event
+shadowDom: Set to true if you are using the component with web components
+mobileBreakpoint: Mobile breakpoint in pixels
+setDateOnMenuClose: When enabled, clicking away from the menu will set the selected date if some date is selected. Behaves similar to auto-apply, but it only applies the date on click-away
+loading
+Adds a loading overlay in the menu
+
+Type: boolean
+Default: false
+
+
+Look and feel
+Customization options
+
+Info
+
+When checking the examples, for boolean prop types, the example will show the behavior opposite of what is set for the default value
+If you use the component in the browser <script> tag, make sure to pass multi-word props with -, for example, sixWeeks as six-weeks and so on
+transitions
+Control transitions inside the menu. You can define your own or disable them. Datepicker uses Vue built in transitions component for transitions control. To configure you own, please check the Vue documentation and provide a transition name in the prop
+
+Type: Transitions | boolean
+Default: true
+
+interface Transitions {
+    open?: string; 
+    close?: string; 
+    next?: string; 
+    previous?: string;
+    menuAppearTop?: string; 
+    menuAppearBottom?: string; 
+    vNext?: string; 
+    vPrevious?: string; 
+}
+open and close are added on overlays show/hide
+next and previous added when switching months in the calendar
+menuAppearTop is added when the menu is open above the input filed
+menuAppearBottom is added when the menu is open bellow the input field
+vNext and vPrevious are added when switching months in the calendar in the vertical mode
+05/02/2025, 20:57
+six-weeks
+Always display six weeks on the calendar. This will prevent dynamic calendar height change depending on the month
+
+Type: boolean | 'append' | 'prepend' | 'center' | 'fair'
+Default: false
+Info
+
+boolean - Legacy enable, same as append
+'append' - Always add new row(s) at the bottom of the calendar
+'prepend' - Always add new row(s) at the beginning of the calendar
+'center' - If the month that needs padding starts with the beginning of a week, add a week at the start. If a second week needs to be added, add it in the end. This way, every month will have offset days on each end, and months like Feb. 2021 will not have that huge tail. This mode does not add a week before if the month already starts with a partial week
+'fair' - The first extra week is added to either start or end of the month, depending on which partial week has fewer offset days. This solves the same problems as center, but aims to distribute the padding more evenly. Since it leads to more months having a leading offset week, which is not necessarily desirable. The difference is visible e.g. in June 2021
+true
+append
+prepend
+center
+fair
+05/02/2025, 20:57
+dark
+Theme switch between the dark and light mode
+
+Type: boolean
+Default: false
+05/02/2025, 20:57
+offset
+Number of pixels between the menu and input
+
+Type: number | string
+Default: 10
+05/02/2025, 20:57
+hide-input-icon
+Hide calendar icon in the input field
+
+Type: boolean
+Default: false
+05/02/2025, 20:57
+state
+Validation state of the calendar value. Sets the green/red border depending on the value
+
+Type: boolean
+Default: null
+05/02/2025, 20:57
+ui
+Configure custom classes for a specific element
+
+Type: Partial<UIOptions>
+Default: {}
+
+type CustomClass = string | string[];
+
+interface UIOptions {
+  navBtnNext: CustomClass;
+  navBtnPrev: CustomClass;
+  calendar: CustomClass;
+  calendarCell: CustomClass;
+  menu: CustomClass;
+  input: CustomClass;
+}
+input: Add a custom class to the input field
+menu: Add a custom class to the datepicker menu wrapper
+calendar: Add a custom class to the calendar wrapper
+calendarCell: Add a custom class to the calendar cell wrapper
+navBtnNext: Add a custom class on navigation button 'next'
+navBtnPrev: Add a custom class on navigation button 'previous'
+day-class
+Add custom class to the calendar cell depending on the date
+
+Type: (date: Date, internalModelValue: InternalModelValue) => string
+Default: null
+
+type InternalModelValue = Date | Date[] | null;
+05/02/2025, 20:57
+
+Keyboard
+Configure keyboard actions
+
+Info
+
+When checking the examples, for boolean prop types, the example will show the behavior opposite of what is set for the default value
+If you use the component in the browser <script> tag, make sure to pass multi-word props with -, for example, escClose as esc-close and so on
+Info
+
+You can press tab key in the menu, and it will autofocus elements, pressing enter will do a click action like open overlay or select a date.
+
+All keyboard events are enabled by default
+
+esc-close
+Esc key closes the menu
+
+Type: boolean
+Default: true
+05/02/2025, 20:57
+space-confirm
+space key selects the date (like you pressed the select button)
+
+Type: boolean
+Default: true
+05/02/2025, 20:57
+month-change-on-arrows
+Change months via arrow keys
+
+Type: boolean
+Default: true
+05/02/2025, 20:57
+arrow-navigation
+By default, arrow keys will change the current month. When enabling this prop, you can navigate the menu via arrow keys instead of using tabs
+
+Info
+
+arrowNavigation is not supported with the multi-calendars prop
+
+Type: boolean
+Default: false
+05/02/2025, 20:57
+
+Positioning
+Configure datepicker menu positioning
+
+Info
+
+When checking the examples, for boolean prop types, the example will show the behavior opposite of what is set for the default value
+If you use the component in the browser <script> tag, make sure to pass multi-word props with -, for example, autoPosition as auto-position and so on
+position
+Datepicker menu position
+
+Type: 'left' | 'center' | 'right'
+Default: 'center'
+05/02/2025, 20:57
+teleport
+Use teleport to position the datepicker menu. This is useful if you have hidden overflow on the parent HTML element where the menu is not showing in full. If you just set the value to true, the menu will be placed on body
+
+Type: boolean | string
+Default: null
+Note
+
+In case you are enabling teleport to the default value (<body>), make sure to explicitly set it to true to prevent conflict with the built-in <teleport> component
+
+Default transitions for menu open and close will not work with the teleport enabled
+
+05/02/2025, 20:57
+alt-position
+If you have issues with the menu being miss-placed, you can use custom function that can position the menu to your liking
+
+Type: (el: HTMLElement | undefind) => Record<string, any> | string
+Default: null
+05/02/2025, 20:57
+auto-position
+When enabled, based on viewport space available it will automatically position the menu above or bellow input field
+
+Tip
+
+By providing 'top' | 'bottom' you can force the positioning of the calendar in a given direction
+
+Type: boolean | 'top' | 'bottom'
+Default: true
+05/02/2025, 20:57
+teleport-center
+Note
+
+Combination with teleport prop may introduce incorrect positioning
+
+Sets the menu position on the page center, useful for smaller screens where there is no space available above or bellow the input field
+
+Type: boolean
+Default: false
+05/02/2025, 20:57
+
+
+Localization
+Localization options and label props
+
+Info
+
+If you use the component in the browser <script> tag, make sure to pass multi-word props with -, for example, formatLocale as format-locale and so on
+locale
+Set datepicker locale. Datepicker will use built in javascript locale formatter to extract month and weekday names
+
+Type: string
+Default: 'en-US'
+05/02/2025, 20:57
+format-locale
+Specify localized format output. This prop uses Locale object from date-fns library
+
+For more info about supported locales or adding a custom locale object, please visit date-fns documentation
+
+Note
+
+When format-locale is provided, it will have priority against locale prop
+
+Type: Locale
+Default: null
+金
+select-text
+Select text label in the action row
+
+Type: string
+Default: 'Select'
+05/02/2025, 20:57
+cancel-text
+Cancel text label in the action row
+
+Type: string
+Default: 'Cancel'
+05/02/2025, 20:57
+now-button-label
+Change the text for now button
+
+Type: string
+Default: 'Now'
+week-num-name
+Sets the label for the week numbers column
+
+Type: string
+Default: 'W'
+05/02/2025, 20:57
+aria-labels
+Customize the language of the HTML aria-labels for localized accessibility
+
+Type
+
+interface AriaLabels {
+  toggleOverlay?: string;
+  menu?: string;
+  input?: string;
+  openTimePicker?: string;
+  closeTimePicker?: string;
+  incrementValue?: (type: 'hours' | 'minutes' | 'seconds') => string;
+  decrementValue?: (type: 'hours' | 'minutes' | 'seconds') => string;
+  openTpOverlay?: (type: 'hours' | 'minutes' | 'seconds') => string;
+  amPmButton?: string;
+  openYearsOverlay?: string;
+  openMonthsOverlay?: string;
+  nextMonth?: string;
+  prevMonth?: string;
+  nextYear: string;
+  prevYear: string;
+  day?: ({value}: {value: Date}) => string;
+  weekDay?: (day: number) => string;
+  clearInput?: string;
+  calendarIcon?: string;
+  timePicker?: string;
+  monthPicker: (overlay: boolean) => string;
+  yearPicker: (overlay: boolean) => string;
+  timeOverlay: (type: 'hours' | 'minutes' | 'seconds') => string;
+}
+Default: {}
+day-names
+Provide custom labels for day names in the calendar header
+
+Note
+
+Make sure that provided array has a length of 7
+
+Type: ((lang: string, weekStart: number) => string[]) | string[]
+Default: null;
+05/02/2025, 20:57
+
+
+Formatting
+Format options for the value displayed in the input or preview
+
+Info
+
+If you use the component in the browser <script> tag, make sure to pass multi-word props with -, for example, previewFormat as preview-format and so on
+format
+Format the value of the date(s) in the input field. Formatting is done automatically via provided string format. However, you can override the default format by providing a custom formatter function
+
+Type: string | ((date: Date) => string) | ((dates: Date[]) => string);
+Default:
+Single picker: 'MM/dd/yyyy HH:mm'
+Range picker: 'MM/dd/yyyy HH:mm - MM/dd/yyyy HH:mm'
+Month picker: 'MM/yyyy'
+Time picker: 'HH:mm'
+Time picker range: 'HH:mm - HH:mm'
+Week picker 'RR-yyyy' | 'ww-yyyy' (depends on week numbering)
+Info
+
+If is-24 prop is set to false, hours format will be changed to 'hh:mm aa'
+
+For additional information on how to pass custom string format you can check Unicode tokens
+
+Selected date is 2/5/2025
+preview-format
+Format the value of the date(s) in the action row
+
+Type: string | ((date: Date) => string) | ((dates: Date[]) => string);
+Default: null
+Same configuration as in format prop
+
+Note: If not provided, it will auto inherit data from the format prop
+
+05/02/2025, 20:58
+month-name-format
+Set the month name format
+
+Type: 'short' | 'long'
+Default: 'short'
+05/02/2025, 20:58
+
+

@@ -1,0 +1,45 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+These rules supersede all others. Always follow them unless explicitly overridden by the user.
+
+**1. Refer to API Docs**
+Reference @zoho_Api.txt for all API call construction and updates.
+
+**2. Maintain project_directory.txt**
+Always update docs/active_docs/project_directory.txt when adding/moving files or folders.
+Use it as the source of truth for navigation and import paths.
+
+**3. Keep data_flow.txt Updated**
+Document how API data enters, gets processed, and flows through the UI.
+Use this structure:
+
+```md
+## API → Processor → Store → Component
+- Source: `zoho.creator.api.getMainProjects()`
+- Processor: `processMainProjects()`
+- Store: `projectsStore.mainProjects`
+- Component: `KanbanColumn.vue` (props: `projects`)
+```
+
+**4. Maintain Build Plan**
+Update @commissions_tab_build_plan.txt and its ## 7. Development Notes section when:
+
+*   Steps are completed
+*   Instructions change
+*   New steps are added
+
+**5. Never Assume, Always Ask**
+If uncertain about file contents, flow, or intent, ask the user first before proceeding.
+
+**6. Prefer Composition API**
+Use Vue Composition API for all new code. Avoid Option API.
+
+**7. Avoid Browser Alerts**
+Use the system-wide notification system for alerts and errors—never `alert()`.
+
+**8. Avoid Redundant State**
+Only store state if it's not easily derived.
+Prefer `computed()` for filtered/transformed values instead of manually maintaining derived copies.

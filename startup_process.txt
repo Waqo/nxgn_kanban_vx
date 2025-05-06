@@ -1,0 +1,107 @@
+# Application Startup Process
+
+This document outlines the sequential flow of the Kanban Widget application from initial load to becoming interactive.
+
+## 1. HTML Entry Point (`app/widget.html`)
+
+1.  The browser loads `app/widget.html`.
+2.  Essential CDN libraries are loaded: Tailwind CSS, Font Awesome, Vue 3, VueUse, Pinia, Zoho Widget SDK, VueDatePicker.
+3.  Custom CSS styles are applied.
+4.  The main application script `app/App.js` is loaded as a module (`type="module"`).
+5.  A root `div` with `id="app"` is present for the Vue application to mount onto.
+
+## 2. Vue Application Initialization (`app/App.js`)
+
+1.  **Dependencies Imported:**
+    *   Core Vue/Pinia.
+    *   `WidgetView` (root component).
+    *   `ZohoAPIService`.
+    *   `initializeApp` service (`app/services/initService.js`).
+    *   `logErrorToZoho` service (`app/services/errorLogService.js`).
+    *   Base UI components (`BaseButton`, `BaseCard`, etc.).
+2.  **Vue App Instance Created:** `Vue.createApp(WidgetView)` initializes the application with `WidgetView` as the root component.
+3.  **Pinia Store Installed:**
+    *   A Pinia instance is created (`createPinia()`).
+    *   The Pinia plugin is installed onto the Vue app (`app.use(pinia)`).
+4.  **Core Initialization Triggered:**
+    *   The `initializeApp()` function from `app/services/initService.js` is called. This is a crucial asynchronous step that handles fetching initial data.
+5.  **Global Components Registered:** All `Base*` components and `VueDatePicker` are registered globally, making them available throughout the application without explicit import in child components.
+6.  **Global Properties Set:** `ZohoAPIService` is attached to the app's global properties as `$api`.
+7.  **Global Error Handler Configured:** `app.config.errorHandler` is set up. Any unhandled error within the Vue application will:
+    *   Log the error to the console.
+    *   Attempt to log the error to Zoho Creator using `logErrorToZoho` (`app/services/errorLogService.js`).
+8.  **Application Mount:** The Vue app instance is mounted to the `#app` div in `widget.html` (`app.mount('#app')`).
+
+## 3. Core Initialization Service (`app/services/initService.js` - `initializeApp`)
+
+This function orchestrates the fetching of essential data required before the main UI can be meaningfully displayed.
+
+1.  **Store Instantiation:** Instances of all required Pinia stores (`uiStore`, `lookupsStore`, `userStore`, `projectsStore`, `modalStore`, `notificationsStore`) are obtained.
+2.  **Fetch Parent Query Params (Async):** `ZohoAPIService.getQueryParams()` is called to fetch URL parameters from the parent Zoho Creator page (e.g., `projectId`). This happens concurrently and doesn't block the main initialization flow initially. The result is stored for later use.
+3.  **Set Global Loading State:** `uiStore.setGlobalLoading(true)` is called to indicate data fetching is in progress (used by `WidgetView` to show skeletons).
+4.  **Phase 1 - Essential Data Fetching (Awaited):**
+    *   **Kanban Init Record:** Fetches a specific record (`KANBAN_INIT_RECORD_ID`) from the `All_Kanban_Init` report (`REPORT_KANBAN_INIT`) using `ZohoAPIService.getRecordById`. This record contains pre-aggregated lookup data (Stages, Tranches, Tags, Users, etc.).
+    *   **Initial Projects Fetch (Concurrent):** `projectsStore.fetchInitialProjects()` is called.
+        *   Calls `ZohoAPIService.getRecords` for the `Main_Projects` report (`REPORT_PROJECTS`), potentially fetching multiple pages if >1000 records.
+        *   Processes the raw project data using `DataProcessors.processProjectsData`.
+        *   Updates the `projectsStore` state (`projectList`, `lastUpdatedTimestamp`).
+    *   **Core Lookups Processing (Concurrent with Projects):** `lookupsStore.fetchCoreLookups(initRecordData)` is called.
+        *   Processes the Stages, Tranches, Tags, Document Types, Equipment, Email Templates, Users, and Sales Reps arrays *directly from the `initRecordData`* if they exist, using respective `DataProcessors` functions (`processStagesData`, `processTranchesData`, etc.).
+        *   Updates the `lookupsStore` state (e.g., `stages`, `tranches`, `tags`, `users`, `docTypes`, `equipmentData`, `emailTemplates`).
+        *   If any core lookup data is *missing* from `initRecordData`, it triggers *fallback fetches* (e.g., `fetchStagesFallback`, `fetchTranchesFallback`) which call `ZohoAPIService.getRecords` for the specific reports (`REPORT_STAGES`, `REPORT_TRANCHES`, etc.). Fallback fetches for filter lookups (Tags, Users, SalesReps, SalesOrgs) are generally deferred until needed by the toolbar.
+    *   **Current User Fetch:** `userStore.fetchCurrentUser()` is called (depends on `lookupsStore.users` being populated from the init record or fallback).
+        *   Calls `ZohoAPIService.getInitParams()` to get the logged-in user's email.
+        *   Finds the corresponding user record within `lookupsStore.users`.
+        *   Creates a processed user object and updates the `userStore` state (`currentUser`, `originalUser`).
+        *   Checks/Loads cached user data from localStorage (`LS_KEYS.USER_PROFILE`) first, then fetches/updates. Saves the fetched user data back to localStorage.
+    *   **Log Widget Access (Dev Only):** If `IS_DEVELOPMENT` is true, an informational log is sent to Zoho using `logInfoToZoho`.
+    *   **Modal State Restoration:**
+        *   Checks if a `projectId` was found in the URL query parameters fetched earlier. If yes:
+            *   Calls `modalStore.openModal(projectId)`.
+            *   Removes any potentially conflicting saved modal state from localStorage (`LS_KEYS.ACTIVE_MODAL`).
+        *   If no `projectId` in URL, checks localStorage (`loadSetting(LS_KEYS.ACTIVE_MODAL)`):
+            *   If valid, non-expired state is found, calls `modalStore.openModal` and `modalStore.setActiveTab` to restore the previous session.
+            *   If expired state is found, removes it from localStorage.
+5.  **End Phase 1 - Update Loading State:** `uiStore.setGlobalLoading(false)` is called. At this point, the `WidgetView` can render the actual `KanbanBoard` instead of the skeleton, as core data (projects, stages, tranches, user) is available.
+6.  **Start Ongoing Processes:**
+    *   **Notification Polling:** `notificationsStore.startPolling()` is called.
+        *   Immediately calls `notificationsStore.fetchNotifications()`.
+        *   Sets up an interval (`setInterval`) to call `fetchNotifications` repeatedly (every 60 seconds).
+        *   `fetchNotifications`:
+            *   Gets the current user ID from `userStore`.
+            *   Calls `ZohoAPIService.getRecordCount` for `REPORT_NOTIFICATIONS` (unread only).
+            *   If count > 0, calls `ZohoAPIService.getRecords` for `REPORT_NOTIFICATIONS`.
+            *   Compares fetched notifications with previously seen IDs (`processedNotificationIds`) to identify new ones.
+            *   Triggers in-app alerts for new notifications via `uiStore.addNewNotificationAlert`.
+            *   Updates `notificationsStore.notifications` state.
+7.  **Phase 2 - Background/On-Demand Lookups:** The service notes that filter-specific lookups (Tags, Sales Reps, Sales Orgs) weren't explicitly fetched here *unless* they were missing from the init data. They will be fetched on-demand when the `KanbanToolbar` component requires them (see Section 5).
+
+## 4. UI Rendering (`app/views/WidgetView.js`)
+
+1.  **Initial Render:** While `initializeApp` is running (Phase 1), `WidgetView` initially renders:
+    *   `BaseNavbar`.
+    *   `DevToolbar` (if `userStore.isAdmin` is true).
+    *   `KanbanToolbar`.
+    *   `KanbanBoardSkeleton` (because `uiStore.isGloballyLoading` is true).
+2.  **Data Loaded Render:** Once `initializeApp` sets `uiStore.isGloballyLoading` to false:
+    *   The skeleton is replaced by the actual `KanbanBoard` component.
+    *   `KanbanBoard` renders `KanbanColumn` components based on the current `boardViewMode` ('stages' or 'tranches') using data from `lookupsStore` (stages/tranches) and `projectsStore` (filtered/sorted projects).
+    *   If `modalStore.isVisible` is true (due to URL parameter or localStorage restoration), `ProjectDetailModal` is rendered.
+3.  **Notifications Display:** The view continuously renders `BaseNotification` and `NewNotificationAlert` components based on the `uiStore.activeNotifications` and `uiStore.activeNewAlerts` arrays.
+
+## 5. Toolbar and On-Demand Lookups (`app/components/kanban/KanbanToolbar.js`)
+
+1.  **Initial Render:** The toolbar renders with controls bound to state from `projectsStore` (filters, sort) and `uiStore` (stage view, board mode).
+2.  **On-Demand Lookup Fetching:** When the user interacts with the dynamic filter type dropdown (`Filter By...`):
+    *   Selecting 'Tags', 'Sales Rep', or 'Sales Org' triggers a watcher or method (`handleFilterTypeChange`).
+    *   This watcher/method calls the relevant fetch action in `lookupsStore` *if the data isn't already loaded* (e.g., `lookupsStore.fetchTags()`, `lookupsStore.fetchSalesReps()`, `lookupsStore.fetchSalesOrgs()`).
+    *   These actions call `ZohoAPIService.getRecords` for the respective reports (`REPORT_TAGS`, `REPORT_SALES_REPS`, `REPORT_SALES_ORGS`), process the data (`DataProcessors`), and update the `lookupsStore` state.
+    *   The `filterValueOptions` computed property in the toolbar updates, populating the second dropdown.
+
+## 6. Ongoing Background Processes
+
+*   **Notification Polling:** Continues fetching unread notifications every 60 seconds (via `notificationsStore.startPolling`).
+*   **Global Error Logging:** The global error handler in `app/App.js` catches errors and logs them to Zoho (`logErrorToZoho`).
+*   **Activity Logging:** User actions (like changing a project stage, adding a note, etc.) trigger specific store actions (e.g., `projectsStore.updateProjectStage`) which in turn call `logActivity` (`app/services/activityLogService.js`). This service calls `ZohoAPIService.addRecord` for the `Add_Activities` form (`FORM_ACTIVITIES`).
+*   **Debounced Search:** User input in the toolbar search field triggers a debounced function (`debouncedUpdateSearchResults`) which filters the *local* project list (`projectsStore.projectList`) for dropdown suggestions. Hitting Enter or clearing the search updates the main filter in `projectsStore` (`setSearchTerm`).
+*   **Local Storage Sync:** User preferences like collapsed columns (`LS_KEYS.COLLAPSED_COLUMNS`), sort order (`LS_KEYS.TOOLBAR_SORT`), and stage view (`LS_KEYS.BOARD_STAGE_VIEW`) are saved to and loaded from localStorage. User profile (`LS_KEYS.USER_PROFILE`) and active modal state (`LS_KEYS.ACTIVE_MODAL`) are also managed via localStorage. 

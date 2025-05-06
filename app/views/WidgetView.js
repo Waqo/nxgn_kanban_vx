@@ -4,6 +4,10 @@
 import KanbanBoard from '../components/kanban/KanbanBoard.js';
 import DevToolbar from '../components/kanban/DevToolbar.js'; // Make sure DevToolbar is imported
 import BaseNotification from '../components/common/BaseNotification.js'; // ADD Import
+// --- ADD BaseNavbar Import ---
+import BaseNavbar from '../components/common/BaseNavbar.js';
+// --- ADD NewNotificationAlert Import ---
+import NewNotificationAlert from '../components/common/NewNotificationAlert.js';
 // Import KanbanToolbar
 import KanbanToolbar from '../components/kanban/KanbanToolbar.js';
 import KanbanBoardSkeleton from '../components/kanban/KanbanBoardSkeleton.js'; // Import Skeleton
@@ -26,6 +30,8 @@ const WidgetView = {
     KanbanBoard,
     DevToolbar, // Register DevToolbar locally
     BaseNotification, // ADD Registration
+    BaseNavbar, // <<< ADD Registration
+    NewNotificationAlert, // <<< ADD Registration
     KanbanToolbar, // Register KanbanToolbar
     KanbanBoardSkeleton, // Register Skeleton locally
     ProjectDetailModal // Register ProjectDetailModal
@@ -44,6 +50,7 @@ const WidgetView = {
     ...mapState(useModalStore, {
         isModalVisible: 'isVisible' // Map state.isVisible to computed.isModalVisible
     }),
+    ...mapState(useUiStore, { activeNewAlertsFromStore: 'activeNewAlerts' }), // Map new getter
     
     // --- Map Remaining Vuex Getters --- (None should be left)
     // Remove the leftover mapping for lookups/isLoading
@@ -66,6 +73,7 @@ const WidgetView = {
   methods: {
     // --- Map Pinia Actions ---
     ...mapActions(useUiStore, ['removeNotification']),
+    ...mapActions(useUiStore, { removeNewAlertAction: 'removeNewNotificationAlert' }), // Map new action
 
     // Remove the fetchInitialData method as it's now handled in App.js
     // fetchInitialData() {
@@ -83,6 +91,11 @@ const WidgetView = {
   // template: '#widget-view-template'
   template: `
       <div class="widget-container w-full h-full flex flex-col">
+        <!-- ADD BaseNavbar -->
+        <base-navbar variant="light" class="flex-shrink-0" :max-width="'full'">
+          <!-- Leave slots empty to use defaults (which includes NotificationBell & UserProfileMenu) -->
+        </base-navbar>
+
         <!-- Dev Toolbar (conditionally rendered first) -->
         <dev-toolbar v-if="isAdmin"></dev-toolbar>
 
@@ -122,6 +135,22 @@ const WidgetView = {
                  >
                     {{ notification.message }} 
                  </base-notification>
+            </transition-group>
+        </div>
+
+        <!-- New Notification Alert Container (Top Right) -->
+        <div class="fixed top-16 right-5 z-[60] space-y-3 w-full max-w-sm">
+            <transition-group name="notification-fade" tag="div"> 
+                 <new-notification-alert
+                    v-for="alert in activeNewAlertsFromStore"
+                    :key="alert.id"
+                    :id="alert.id"
+                    :type="alert.type"
+                    :title="alert.title"
+                    :message="alert.message"
+                    :duration="alert.duration"
+                    @dismiss="removeNewAlertAction(alert.id)"
+                 />
             </transition-group>
         </div>
 

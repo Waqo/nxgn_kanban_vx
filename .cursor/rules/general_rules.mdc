@@ -3,44 +3,34 @@ description:
 globs: 
 alwaysApply: true
 ---
-These are the most important rules, they supercede any other document.
+These rules supersede all others. Always follow them unless explicitly overridden by the user.
 
-**1. Use Raw API Names:** Always use the API name from the raw project data as much as possible. Exceptions are constructed fields and object fields (for example: Tranche and New_Stage in project data).
+**1. Refer to API Docs**
+Reference [zoho_Api.txt](mdc:docs/active_docs/zoho_Api.txt)or all API call construction and updates.
 
-**2. Consult API Docs:** Refer to [zoho_Api.txt](mdc:docs/active_docs/zoho_Api.txt) when constructing, altering or adjusting new API calls.
+**2. Maintain project_directory.txt**
+Always update docs/active_docs/project_directory.txt ( [project_directory.txt](mdc:docs/active_docs/project_directory.txt) ) when adding/moving files or fo as the source of truth for navigation and import paths.
 
-**3. Keep Helper Functions Separate:**
-   *   General utility/formatting functions (e.g., date formatters, relative time calculators) should reside in `app/utils/helpers.js`, [helpers.js](mdc:app/utils/helpers.js). 
-   *   Functions specifically designed to transform the structure of raw Zoho API responses should reside in `app/utils/processors.js`, [processors.js](mdc:app/utils/processors.js).
-   *   Import these functions where needed rather than defining them locally within components or store modules.
+**3. Keep [data_flow.txt](mdc:docs/active_docs/data_flow.txt) Updated**
+Document how API data enters, gets processed, and flows through the UI.
+Use this structure:
 
-**4. Maintain Project Directory [project_directory.txt](mdc:docs/active_docs/project_directory.txt) :**
-   *   Keep the `docs/active_docs/project_directory.txt` file updated whenever new files are added, moved, or the folder structure is changed.
+```md
+## API → Processor → Store → Component
+- So.creator.api.getMainProjects()`
+- Processor: `processMainProjects()`
+- Store: `projectsStore.mainProjects`
+- Component: `KanbanColumn.vue`ects`)
+```
 
-**5. Use Project Directory for Navigation:**
-   *   Refer to `docs/active_docs/project_directory.txt` when unsure about the location of a specific file or the overall project structure. 
+**4. Never Assume, Always Ask**
+If uncertain about file contents, flow, or intent, ask the user first before proceeding.
 
-**6. Keep The Active Project Build Plan Updated:**
-   *   Current Active Build Plan is [commissions_tab_build_plan.txt](mdc:docs/current_docs/commissions_tab_build_plan.txt)
-   *   When a step is completed, add a note to the ## 7. Development Notes section..
-   *   When user instruction changes the order of development, or introduces new step, add a note to the ## 7. Development Notes section. 
+**5. Prefer Composition API**
+Use Vue Composition API for all new code. Avoid Option API.
 
-   **7. Never Assume File Content, Ask User To Share:**
-   *   Never assume the contents of a file, ask the user to share before moving forward.
-
-   **8. Begin using Composition API instead of Option API:**
-   *   Initial build of the code used Option API, we should now prioritize Composition API.
-
-      **9. Never use browser alerts, use existing notification system to indicate errors or missing functionality:**
-
-**10. Use Blue as Primary Accent Color:** The standard primary accent color for interactive elements (buttons, active states, links, focus rings) should be blue (specifically Tailwind's `blue-500` or `blue-600` for primary buttons).
-    *   If existing components use indigo (e.g., `indigo-500`, `indigo-600`) as the primary accent, refactor them to use the corresponding blue shade (e.g., replace `indigo-500` with `blue-500`, `text-indigo-600` with `text-blue-600`, `focus:ring-indigo-500` with `focus:ring-blue-500`).
-    *   Maintain relative shades when converting (e.g., if `indigo-700` was used for a hover state, use `blue-700`).
-
-
-   
-
-
+**6. Avoid Browser Alerts**
+Use the system-wide notification system for alerts and errors—never `alert()`.
 
 
 

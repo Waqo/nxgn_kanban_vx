@@ -1,0 +1,68 @@
+import React from 'react';
+
+const Toast = ({ message, type = 'info', isVisible, onClose }) => {
+    React.useEffect(() => {
+        if (isVisible && type !== 'loading') {  // Don't auto-close loading toasts
+            const timer = setTimeout(() => {
+                onClose();
+            }, 5000);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [isVisible, onClose, type]);
+
+    if (!isVisible) return null;
+
+    // Updated padding in bottom-4 (1rem) to bottom-8 (2rem) and right-4 (1rem) to right-8 (2rem)
+    const baseClasses = "fixed bottom-8 right-8 p-4 rounded-lg shadow-lg max-w-md z-[9999] transition-all duration-300";
+    const typeClasses = {
+        info: "bg-blue-50 text-blue-800 border border-blue-300",
+        error: "bg-red-50 text-red-800 border border-red-300",
+        success: "bg-green-50 text-green-800 border border-green-300",
+        warning: "bg-yellow-50 text-yellow-800 border border-yellow-300",
+        loading: "bg-gray-50 text-gray-800 border border-gray-300"
+    };
+
+    return React.createElement('div',
+        {
+            className: `${baseClasses} ${typeClasses[type]} ${isVisible ? 'opacity-100' : 'opacity-0'}`,
+            style: { zIndex: 9999 } // Adding inline style as well for emphasis
+        },
+        [
+            React.createElement('div',
+                { className: "flex items-start gap-3" },
+                [
+                    // Icon based on type
+                    React.createElement('i',
+                        {
+                            className: `${
+                                type === 'loading' ? 'fas fa-circle-notch animate-spin' :
+                                type === 'info' ? 'fas fa-info-circle' :
+                                type === 'error' ? 'fas fa-exclamation-circle' :
+                                type === 'success' ? 'fas fa-check-circle' :
+                                'fas fa-exclamation-triangle'
+                            } mt-0.5`
+                        }
+                    ),
+                    // Message with white-space handling for newlines
+                    React.createElement('p',
+                        { 
+                            className: "flex-1 text-sm whitespace-pre-line"
+                        },
+                        message
+                    ),
+                    // Close button (hidden for loading)
+                    type !== 'loading' && React.createElement('button',
+                        {
+                            className: "text-gray-500 hover:text-gray-700",
+                            onClick: onClose
+                        },
+                        React.createElement('i', { className: "fas fa-times" })
+                    )
+                ]
+            )
+        ]
+    );
+};
+
+export default Toast;

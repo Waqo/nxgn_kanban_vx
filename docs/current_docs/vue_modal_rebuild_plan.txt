@@ -1,0 +1,188 @@
+# Vue Project Details Modal Rebuild Plan
+
+This document outlines the plan to rebuild the Project Details Modal using Vue 3, Pinia, and Tailwind CSS, based on the functionality identified in the old React modal audit (`docs/current_docs/old_modal_audit.txt`) and the current Vue application structure **using JavaScript object components with inline templates**.
+
+## 1. Overall Architecture & Data Flow
+
+1.  **Modal Trigger:** The modal (`ProjectDetailModal.js`) will continue to be rendered conditionally within `WidgetView.js` based on the `isVisible` state in `modalStore`. Opening the modal will still be triggered by an action (likely in `projectsStore` or initiated from `KanbanCard`) that calls `modalStore.openModal(projectId)`.
+2.  **Data Fetching:** The `modalStore.openModal` action is responsible for:
+    *   Setting `isLoading` to true.
+    *   Calling `projectsStore.fetchProjectDetails(projectId)` (which handles the actual API call via `ZohoAPIService`).
+    *   Processing the raw data using `DataProcessors.processProjectDetailsData`.
+    *   Storing the processed data in `modalStore.projectData`.
+    *   Setting `isLoading` to false or setting an `error`.
+3.  **Core Modal Component (`ProjectDetailModal.js`):**
+    *   Reads `isVisible`, `isLoading`, `error`, `projectData`, and `activeTab` from `modalStore`.
+    *   Renders the `BaseModal` wrapper component.
+    *   Renders `ModalHeader` component in the header slot, passing necessary props (`projectData`, `isLoading`, etc.) and listening for events (`@close`, `@refresh`, etc.).
+    *   Renders `BaseTabs` component for navigation, driven by `modalStore.activeTab`.
+    *   Dynamically renders the active tab component (e.g., `OverviewTab`, `DocumentsTab`) using `<component :is="activeTabComponent">`, passing the `projectData` as a prop (`:project="projectData"`).
+4.  **Tab Components (e.g., `OverviewTab.js`, `DocumentsTab.js`):**
+    *   Defined as JavaScript objects with a `template` string property.
+    *   Registered globally or locally in `ProjectDetailModal.js`.
+    *   Receive the processed `projectData` as a prop (`project`).
+    *   Contain the specific layout (within the template string) and logic (in `methods`, `computed`, etc.) for that section.
+    *   Render necessary sub-components (e.g., `NotesSection.js`, `EventsSection.js`) within their template strings.
+    *   Access global state (like `currentUser` from `userStore` or lookups from `lookupsStore`) directly via Pinia stores imported within the component's script section.
+    *   Manage their own internal UI state (e.g., input field values, edit modes) using Vue's Composition API (`ref`, `reactive`) or Options API (`data`).
+    *   Dispatch actions to Pinia stores (`modalStore`, `projectsStore`, etc.) or call API services directly (via `$api` or imported service) to perform updates (e.g., saving notes, updating statuses).
+    *   After successful updates that modify the core `projectData`, they should trigger a refresh, likely by calling an action like `modalStore.refreshModalData()` (needs implementation).
+5.  **Stores (Pinia):**
+    *   `modalStore`: Holds modal visibility, loading/error state *for the modal data itself*, the `projectData`, and the `activeTab`. Can add actions for refreshing data.
+    *   `projectsStore`: Handles fetching the main project list and the *detailed* project data (`fetchProjectDetails`). Handles updates directly related to the Kanban view (stage/tranche changes).
+    *   `uiStore`: Handles global notifications (toasts) and potentially global loading indicators if needed beyond the modal scope.
+    *   `userStore`, `lookupsStore`: Provide global context accessed by components as needed.
+
+## 2. Component Implementation Plan
+
+### 2.1. `ProjectDetailModal.js` (Existing)
+*   **Enhancements:**
+    *   Ensure all required tab components are imported and registered locally in the `components` option.
+    *   Implement the `refreshModalData` method as described above.
+    *   Refine the template's loading/error states within the main content area (`#default` slot of `BaseModal`).
+
+### 2.2. `ModalHeader.js` (Existing)
+*   **Enhancements:**
+    *   Import and register `Counters.js` locally.
+    *   Implement the `@refresh`, `@change-stage`, `@change-tranche`, etc., emits based on user interactions.
+    *   Connect emitted events to appropriate actions in `ProjectDetailModal.js` or directly to store actions.
+    *   Ensure props like `stages`, `tranches`, `tags` are correctly received and used to populate selectors/display data.
+    *   Refine the template string to match the desired layout and functionality outlined in the audit, using Tailwind CSS and Base components.
+
+### 2.3. Tab Components (Enhance existing `.js` files)
+
+*(Detailing a few key examples, focusing on integration and Vue patterns)*
+
+#### 2.3.1. `OverviewTab.js` (Existing)
+*   **Enhancements:**
+    *   Import and register necessary sub-components locally: `EventsSection.js`, `SalesRepInfo.js`, `WorkRequirementBars.js`, `IssuesSection.js`, `CommPreview.js` (or implement inline), `NotesSection.js`.
+    *   Ensure the template string correctly implements the two-column layout using Tailwind.
+    *   Pass the `project` prop down to all child components.
+    *   Implement the Activity/Communication preview sections (or create simple sub-components).
+
+#### 2.3.2. `NotesSection.js` (Needs Creation/Implementation)
+*   **Structure:** Define as a JS object with `name`, `props`, `components`, `data`/`setup`, `computed`, `methods`, `template`.
+*   **Props:** `notes`, `projectId`.
+*   **Components:** `NoteItem.js`, `NoteAttachment.js`, `BaseTextArea`, `BaseButton`, `BaseAvatar`, etc.
+*   **State:** Use `ref`/`reactive` (Composition API recommended) or `data` (Options API) for `noteInput`, `replyInput`, etc.
+*   **Functionality:** Implement note/reply submission logic, user tagging (using `lookupsStore`), attachment handling (calling `attachmentUpload.js` utilities via service/store), display logic (threading, show more/less).
+
+#### 2.3.3. `DocumentsTab.js` (Existing)
+*   **Enhancements:**
+    *   Import and register sub-components: `DocumentChecklist.js`, `DocumentTypeDrawer.js`, `DocumentContent.js`, `MultipleFileUploadForm.js`.
+    *   Refine `groupedDocuments` computed property for clarity and efficiency.
+    *   Implement `renderHeader` logic within the template or as a dedicated method.
+    *   Ensure drag-and-drop functionality is correctly implemented on the designated area.
+    *   Connect WorkDrive/Create Folder buttons to the correct store actions/API calls.
+    *   Pass `previewDoc` state management down correctly (likely emitting an event to `ProjectDetailModal` which calls the `modalStore` action).
+
+#### 2.3.4. `ContactsTab.js` (Existing)
+*   **Enhancements:**
+    *   Import and register `ContactItem.js`, `BaseButton`, etc.
+    *   Refine the template for the Add Contact form section.
+    *   Ensure the `handleAddContact` method correctly formats data and calls `createRecord`.
+    *   Connect the `onRefresh` prop mechanism correctly (potentially emitting an event upwards).
+
+*(Continue outlining enhancements for other existing tab `.js` files: Survey, Systems, Permitting, SalesRep, Investors, Activities, Communications)*
+
+### 2.4. Sub-Components (Create/Enhance `.js` files)
+
+*   Review and implement/enhance all sub-components listed in the audit report (Counters, EventsSection, NoteItem, etc.) as JavaScript objects with template strings.
+*   Ensure they are correctly registered (globally in `App.js` or locally where used).
+*   Define necessary props and emits for communication.
+*   Access store data directly where needed (e.g., `userStore.currentUser`).
+
+## 3. Styling & UI/UX
+
+*   Continue using Tailwind CSS within the template strings.
+*   Leverage existing `Base` components for common UI elements (buttons, dropdowns, modals, etc.).
+*   Focus on consistency across tabs and components.
+
+## 4. API Interaction
+
+*   Maintain the pattern of using `ZohoAPIService.js` for all Zoho interactions.
+*   Call service methods primarily from Pinia store actions.
+*   Components trigger store actions via `mapActions` or direct store calls (`this.$storeName.actionName()` if using Options API, or `storeName.actionName()` in Composition API `setup`).
+
+## 5. Refinement & Testing
+
+*   Focus on implementing one tab component at a time.
+*   Test the data flow from the store to the tab component prop.
+*   Test internal state management within each component.
+*   Test actions dispatched from components and verify state updates/UI changes.
+*   Continuously cross-reference with the old modal audit.
+
+This revised plan aligns with your established development approach of using JavaScript object components with inline templates and no build step. 
+
+## 6. Observations & Improvement Opportunities from Old React Modal
+
+Based on the audit of the previous React modal (`docs/current_docs/old_modal_audit.txt`), the following observations highlight areas where the Vue rebuild can offer improvements:
+
+### 6.1. Structural & State Management Issues
+
+*   **Prop Drilling:** This was a significant issue. State (e.g., note input/replies, issue details, loading flags) and event handlers (`onRefresh`, `fetchModalData`, `handleSave`, etc.) were passed down multiple component levels. This made data flow complex and refactoring difficult.
+    *   **Vue Improvement:** Using Pinia stores (`modalStore`, `projectsStore`, `uiStore`, etc.) eliminates most prop drilling. Components can access necessary state and actions directly from the relevant store.
+*   **Scattered Local State:** Complex UI state (inline editing forms, dropdown visibility, loading flags for specific actions) was managed within many individual components.
+    *   **Vue Improvement:** While some local UI state is fine, Pinia centralizes data-related state and action-related loading/error states, simplifying components.
+*   **Centralized Orchestration Burden:** The main `ProjectDetailsModal` component in React carried a heavy load, managing state, fetching data, and passing numerous props/callbacks down.
+    *   **Vue Improvement:** Store actions (`modalStore.openModal`, `modalStore.refreshModalData`) and component structure distribute this load more effectively.
+
+### 6.2. Redundancy & Repeated Logic
+
+*   **Data Refreshing:** Calling `onRefresh` or `fetchModalData` after updates was a repetitive pattern.
+    *   **Vue Improvement:** A centralized `modalStore.refreshModalData()` action (or similar pattern) provides a cleaner approach.
+*   **Notifications:** `useToast` was called from various places.
+    *   **Vue Improvement:** Using `uiStore.addNotification` provides a single, consistent way to display notifications.
+*   **Utility Functions:** Formatting helpers (dates, currency) were often defined locally within components.
+    *   **Vue Improvement:** Centralizing these in `app/utils/helpers.js` promotes consistency and DRY principles (already implemented).
+*   **Inline Editing Pattern:** The logic for toggling edit mode, managing form state, saving, and canceling appeared in multiple components (`SurveyTab`, `PermittingTab`, `ContactItem`, `DocumentTypeDrawer`, `MilestonesInvestorsTab`, etc.).
+    *   **Vue Improvement:** While complete abstraction might be complex, using shared composables (if applicable) or ensuring a very consistent pattern within each component can improve maintainability. Base components (`BaseSelectMenu`, `BaseTextInput`) help standardize the UI part.
+*   **Component Underutilization/Duplication:**
+    *   `CommItem` was defined but seemingly unused by `CommunicationTab`.
+    *   Document row rendering logic was largely duplicated/inlined in `DocumentTypeDrawer` instead of potentially using `DocumentContent`.
+    *   **Vue Improvement:** Ensure components are used effectively and avoid redundant inline implementations.
+
+### 6.3. API Interaction & Error Handling
+
+*   **Scattered API Calls:** API interactions (CRUD operations, triggers) were initiated from various places (utility functions called by components, directly within components).
+    *   **Vue Improvement:** Centralizing Zoho API calls within `ZohoAPIService.js` and triggering them primarily from Pinia store actions improves separation of concerns and maintainability.
+*   **Inconsistent Error Handling:** The way API errors were handled and presented to the user might have varied.
+    *   **Vue Improvement:** Store actions provide a natural place to standardize error catching, logging, and user notification via `uiStore`.
+*   **Fragile WorkDrive Polling:** The `DocumentTypeDrawer`'s method of triggering a WorkDrive upload and then polling via `onRefresh` is unreliable and lacks robustness.
+    *   **Vue Improvement:** Explore alternatives if possible (Zoho webhooks?). If polling is necessary, implement it within a store action with clear limits, timeouts, and error handling.
+*   **Fragile Data Parsing:** Parsing the multi-line call description in `CommItem` based on assumed formatting is prone to errors.
+    *   **Vue Improvement:** Rely on structured data returned from the API via `DataProcessors.js` whenever possible.
+
+### 6.4. Code Maintainability
+
+*   **Unused Code:** The presence of potentially unused components (`CommItem`) or code paths can hinder understanding and maintenance.
+    *   **Vue Improvement:** Regularly review and remove unused code during the rebuild.
+
+### 6.5. Deeper Component-Level Considerations
+
+Beyond the high-level structural points, the audit revealed specific component complexities and potential areas for refinement during the Vue rebuild:
+
+*   **Component Responsibility & Complexity:**
+    *   *"God" Components:* The React `ProjectDetailsModal` and potentially `ModalHeader` handled excessive logic and state, making them difficult to manage. The Vue plan uses stores, but the corresponding Vue components should be monitored to ensure they don't become overly burdened.
+    *   *Inline Logic:* Components like `DocumentTypeDrawer` and `CommunicationTab` contained complex rendering logic inline. The Vue rebuild should favor clear component boundaries and potentially extract reusable logic into sub-components or utilities.
+    *   *Complex Local State:* Components managing inline editing (`SystemsTab`, `ContactItem`, `SystemApprovalModal`, `MultipleFileUploadForm`, etc.) require careful state management. Vue's Composition API (`ref`, `reactive`) should be used effectively to keep this clean.
+
+*   **UI/UX Refinements:**
+    *   *Action Menu Logic:* The `SystemsTab` action menu (React) being per-category but acting per-item was potentially confusing.
+    *   *Conditional Rendering:* Complex conditional rendering (toggling buttons, forms based on state) needs careful implementation in Vue templates to avoid UI glitches or confusion.
+    *   *User Tagging:* The specific UI for user tagging (notes/issues) needs to be designed thoughtfully for the Vue version.
+    *   *File Handling UX:* The old process for previewing/opening different file types (Zoho native vs. WorkDrive) seemed complex. Simplifying this is a key UX improvement opportunity.
+
+*   **Specific Functionality Concerns:**
+    *   *WorkDrive Polling Reliability:* The polling mechanism for WorkDrive link generation is fragile and needs a more robust solution (webhooks?) or better error handling/timeouts.
+    *   *Data Format Assumptions:* Parsing strings (like the call description) based on assumed formats is risky. Relying on structured API data processed by `DataProcessors.js` is crucial.
+    *   *Milestone Logic Accuracy:* Business logic for commission and investor milestone calculations must be accurately replicated and potentially clarified.
+
+*   **Non-Functional Aspects:**
+    *   *Testability:* The Vue/Pinia structure should inherently improve testability compared to the prop-drilled React version.
+    *   *Performance:* While not audited, complex computations or filtering within render methods (React) could be bottlenecks. Vue's computed properties and efficient reactivity system help, but complex computations (e.g., `groupedDocuments`) still warrant review.
+    *   *Accessibility (A11y):* This wasn't covered in the audit but is critical for the rebuild (focus management, ARIA attributes, keyboard navigation).
+
+Addressing these more granular points alongside the major architectural improvements will help ensure the Vue modal is a comprehensive upgrade.
+
+By addressing these points, particularly through the use of Pinia for state management and centralized services/utilities, the Vue modal rebuild can be significantly more robust, maintainable, and easier to extend than its React predecessor. 

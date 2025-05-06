@@ -1,0 +1,266 @@
+import React, { useState } from 'react';
+import { Mail, Check, AlertCircle } from 'lucide-react';
+import { createRecord } from '../utils/recordCreation.js';
+import { useToast } from '../contexts/ToastContext.js';
+
+const EMAIL_TEMPLATES = [
+    {
+        id: 'contract',
+        name: 'Info Request: Contract',
+        description: 'Request information needed for contract',
+        template: 'Info Request: Contract'
+    },
+    {
+        id: 'utility',
+        name: 'Info Request: Utility Bill',
+        description: 'Request utility bill from customer',
+        template: 'Info Request: Utility Bill'
+    },
+    {
+        id: 'finance',
+        name: 'Info Request: Finance',
+        description: 'Request financial information',
+        template: 'Info Request: Finance'
+    },
+    {
+        id: 'permit',
+        name: 'Permit/Interconnection Submitted',
+        description: 'Notify customer of permit submission',
+        template: 'Permit/Interconnection Submitted'
+    },
+    {
+        id: 'install-booking',
+        name: 'Ready For Installation Booking',
+        description: 'Schedule installation appointment',
+        template: 'Ready For Installation Booking'
+    },
+    {
+        id: 'install-complete',
+        name: 'Install Complete',
+        description: 'Confirm installation completion',
+        template: 'Install Complete'
+    },
+    {
+        id: 'pto',
+        name: 'PTO',
+        description: 'Permission to Operate notification',
+        template: 'PTO'
+    },
+    {
+        id: 'survey-reminder',
+        name: 'Site Survey Reminder',
+        description: 'Remind customer to schedule their site survey appointment',
+        template: 'Site Survey Reminder'
+    },
+    {
+        id: 'not-viable',
+        name: 'Project Not Viable',
+        description: 'Notify customer that their project is not viable',
+        template: 'Project Not Viable'
+    }
+];
+
+const EmailTemplatesSection = ({ project, onEmailSent, currentUser, className = '' }) => {
+    const { showToast } = useToast();
+    const [selectedTemplates, setSelectedTemplates] = useState(new Set());
+    const [isSending, setIsSending] = useState(false);
+
+    // Add function to get last sent time for a template
+    const getLastSentTime = (templateName) => {
+        if (!project.communication) return null;
+        
+        const matchingEmail = project.communication.find(comm => 
+            comm.Communication_Type === 'Email' &&
+            comm.Email_Type === 'Template' &&
+            comm.Email_Subject === templateName
+        );
+
+        return matchingEmail?.Email_Sent_Time || null;
+    };
+
+    const toggleTemplate = (templateId) => {
+        setSelectedTemplates(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(templateId)) {
+                newSet.delete(templateId);
+            } else {
+                newSet.add(templateId);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSendTemplates = async () => {
+        if (selectedTemplates.size === 0) return;
+        if (!currentUser?.id) {
+            showToast('Unable to send email: User not found', 'error');
+            return;
+        }
+
+        setIsSending(true);
+        try {
+            showToast('Sending email notifications...', 'loading');
+            
+            // Get current date in MM/dd/yyyy HH:mm:ss format
+            const now = new Date();
+            const formattedDate = `${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getDate().toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+            
+            // Send each selected template
+            for (const templateId of selectedTemplates) {
+                const template = EMAIL_TEMPLATES.find(t => t.id === templateId);
+                if (template) {
+                    console.log('Creating communication record for template:', template.name);
+                    
+                    // Create record data for the Add_Communication form
+                    const recordData = {
+                        Communication_Type: "Email",
+                        Email_Type: "Template",
+                        Email_Sent_Time: formattedDate,
+                        Email_To: project.contactEmail,
+                        Email_Subject: template.template,
+                        Project: project.id,
+                        Contact: project.contactID,
+                        User: currentUser.id,
+                        TRIG_Send_Template: true
+                    };
+                    
+                    // Create the record using the createRecord function
+                    const response = await createRecord(
+                        "Add_Communication",
+                        recordData,
+                        null, // Don't show toast here as we're handling it in this function
+                        {
+                            loadingMessage: `Sending template: ${template.name}...`,
+                            successMessage: `Template ${template.name} sent successfully`,
+                            errorMessage: `Failed to send template ${template.name}:`
+                        }
+                    );
+                    
+                    console.log('Communication record created:', response);
+                }
+            }
+
+            // Clear selections and notify parent
+            setSelectedTemplates(new Set());
+            if (onEmailSent) {
+                await onEmailSent();
+            }
+            showToast('Email notifications sent successfully', 'success');
+        } catch (error) {
+            console.error('Error sending email notifications:', error);
+            showToast('Failed to send email notifications', 'error');
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    return React.createElement('div',
+        { 
+            className: `px-6 py-4 border-b bg-gray-50 ${className}`
+        },
+        [
+            // Header with Send button
+            React.createElement('div',
+                { className: "flex items-center justify-between mb-4" },
+                [
+                    React.createElement('h3',
+                        { className: "font-semibold" },
+                        "Email Templates"
+                    ),
+                    React.createElement('button',
+                        {
+                            onClick: handleSendTemplates,
+                            disabled: selectedTemplates.size === 0 || isSending,
+                            className: `px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 
+                                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 
+                                disabled:opacity-50 disabled:cursor-not-allowed
+                                flex items-center gap-2`
+                        },
+                        [
+                            React.createElement(Mail, { size: 16 }),
+                            isSending ? "Sending..." : "Send Selected"
+                        ]
+                    )
+                ]
+            ),
+            // Templates Grid - Modified to show last sent time
+            React.createElement('div',
+                { className: "grid grid-cols-2 gap-4" },
+                EMAIL_TEMPLATES.map(template => {
+                    const lastSentTime = getLastSentTime(template.template);
+                    
+                    return React.createElement('div',
+                        {
+                            key: template.id,
+                            onClick: () => toggleTemplate(template.id),
+                            className: `p-3 border rounded-lg cursor-pointer transition-colors ${
+                                selectedTemplates.has(template.id)
+                                    ? 'bg-blue-50 border-blue-200'
+                                    : 'bg-white hover:bg-gray-50'
+                            }`
+                        },
+                        [
+                            React.createElement('div',
+                                { className: "flex items-center justify-between" },
+                                [
+                                    React.createElement('span',
+                                        { className: "font-medium" },
+                                        template.name
+                                    ),
+                                    React.createElement('div',
+                                        { className: "flex items-center text-gray-500" },
+                                        selectedTemplates.has(template.id)
+                                            ? [
+                                                React.createElement(Check, {
+                                                    size: 16,
+                                                    className: "mr-1 text-blue-600"
+                                                }),
+                                                React.createElement('span',
+                                                    { className: "text-sm text-blue-600" },
+                                                    "Selected"
+                                                )
+                                            ]
+                                            : [
+                                                React.createElement(AlertCircle, {
+                                                    size: 16,
+                                                    className: "mr-1"
+                                                }),
+                                                React.createElement('span',
+                                                    { className: "text-sm" },
+                                                    "Click to select"
+                                                )
+                                            ]
+                                    )
+                                ]
+                            ),
+                            React.createElement('p',
+                                { className: "text-sm text-gray-600 mt-1" },
+                                template.description
+                            ),
+                            // Add last sent time if available
+                            lastSentTime && React.createElement('p',
+                                { className: "text-xs text-gray-500 mt-2" },
+                                `Last sent: ${formatDate(lastSentTime)}`
+                            )
+                        ]
+                    );
+                })
+            )
+        ]
+    );
+};
+
+// Add formatDate function if not already imported
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleString('en-US', { 
+        month: '2-digit', 
+        day: '2-digit', 
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+};
+
+export default EmailTemplatesSection;

@@ -1,0 +1,33 @@
+ #zcNotificationIcon {
+        display: none !important;
+      }
+
+      Used in html snippet to hide the notification bell
+
+.zc-pb-page-content-wrapper {
+    height: 100%;
+    background: #f2f4f5;
+    overflow: hidden;
+}
+
+turned off horizontal scroll
+
+
+<div class="zc-pb-formreport-placeholder" at-name="widgetsContainer" style="height: 700px"><iframe id="b28b2eb6-27da-42a4-b8bc-8a28cf55dba5" frameborder="0" height="100%" width="100%" class="widget_Frame widget_Frame_homePage widget_Frame_loading" agent-type="ZohoWidgets" allow="geolocation; microphone; camera; midi; encrypted-media; clipboard-write;display-capture;" src="https://127.0.0.1:5001/app/widget.html?serviceOrigin=https%3A%2F%2Fcreatorapp.zoho.com" data-location="widget_1746341251830"></iframe></div>
+
+this limits height
+
+
+	.zc-pb-formreport-placeholder[at-name="widgetsContainer"] {
+  /* Override the inline style height: 700px */
+  height: 100vh !important;
+
+
+  .widget_Frame {
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    border: none;
+}
+
+final element to set to 100% to get full height

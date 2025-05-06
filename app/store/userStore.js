@@ -14,6 +14,8 @@ import { useLookupsStore } from './lookupsStore.js';
 
 // Access Pinia global
 const { defineStore } = Pinia;
+// --- ADD localStorage Utils ---
+import { LS_KEYS, loadSetting, saveSetting } from '../utils/localStorage.js';
 
 export const useUserStore = defineStore('user', {
   state: () => ({
@@ -61,14 +63,30 @@ export const useUserStore = defineStore('user', {
     
     // Main public actions
     async fetchCurrentUser() {
-     // console.log("User Store (Pinia): Starting fetchCurrentUser...");
-      this._setLoading(true);
-      this._setError(null);
-      this._setUserState(null); // Clear current user
-      this._setOriginalUser(null); // Clear original user
-      this._setIsImpersonating(false);
+      // console.log("User Store (Pinia): Starting fetchCurrentUser...");
+      
+      // --- Load from Cache First ---
+      const cachedUser = loadSetting(LS_KEYS.USER_PROFILE, null);
+      if (cachedUser) {
+        console.log("User Store (Pinia): Found cached user profile, loading initial state.", cachedUser);
+        this._setUserState(cachedUser);
+        this._setOriginalUser(cachedUser); // Assume cached user is the original until proven otherwise
+        this._setIsImpersonating(false); // Should not be impersonating on initial load
+        // Keep isLoading false for now, only set true for actual fetch
+      } else {
+        console.log("User Store (Pinia): No valid cached user profile found.");
+        // Ensure state is cleared if no cache
+        this._setUserState(null);
+        this._setOriginalUser(null);
+        this._setIsImpersonating(false);
+      }
+      // --- End Load from Cache ---
+      
+      this._setLoading(true); // Set loading TRUE only before the actual API calls
+      this._setError(null); // Clear previous errors before fetching
+      // DO NOT clear user state here, keep cached version if available
 
-      let initialUser = null;
+      let fetchedUser = null;
       const lookupsStore = useLookupsStore();
 
       try {
@@ -95,7 +113,7 @@ export const useUserStore = defineStore('user', {
 
         if (!loggedInUserRecord) {
            console.warn(`User Store (Pinia): User record not found for email ${userEmail}. Creating fallback.`);
-           initialUser = {
+           fetchedUser = {
                id: `fallback-${userEmail}`,
                email: userEmail,
                name: userEmail, 
@@ -109,7 +127,7 @@ export const useUserStore = defineStore('user', {
            };
         } else {
             // console.log("User Store (Pinia): Found user data from lookups:", loggedInUserRecord);
-            initialUser = {
+            fetchedUser = {
                 id: loggedInUserRecord.ID, 
                 email: loggedInUserRecord[FIELD_USER_EMAIL],
                 name: loggedInUserRecord[FIELD_USER_NAME]?.zc_display_value || '',
@@ -123,10 +141,22 @@ export const useUserStore = defineStore('user', {
             };
         }
 
-        // Use internal actions to set state
-        this._setUserState(initialUser);
-        this._setOriginalUser(initialUser);
-        this._setIsImpersonating(false);
+        // Use internal actions to set state with FRESH data
+        this._setUserState(fetchedUser); // Update with fetched data
+        this._setOriginalUser(fetchedUser); // Set original user based on fetched data
+        this._setIsImpersonating(false); // Reset impersonation on fresh fetch
+        
+        // --- Save Fetched User to Cache ---
+        if (fetchedUser && !fetchedUser.isFallback) { // Only cache real user data
+           console.log("User Store (Pinia): Saving fetched user profile to cache.");
+           saveSetting(LS_KEYS.USER_PROFILE, fetchedUser);
+        } else if (fetchedUser?.isFallback) {
+           console.log("User Store (Pinia): Not caching fallback user profile.");
+           // Optionally clear cache if fetch resulted in fallback?
+           // localStorage.removeItem(LS_KEYS.USER_PROFILE);
+        }
+        // --- End Save to Cache ---
+        
         // console.log("User Store (Pinia): fetchCurrentUser completed.");
 
       } catch (error) {

@@ -1,0 +1,8 @@
+export const getQueryParams = () => {
+    const params = ZOHO.CREATOR.UTIL.getQueryParams();
+    // Remove salesReps if it exists
+    if (params.salesReps) {
+        delete params.salesReps;
+    }
+    return params;
+};
